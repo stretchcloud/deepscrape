@@ -1,236 +1,506 @@
 # DeepScrape Docker Documentation
 
-## Approach 1: Running the Pre-built Docker Image
+This guide provides comprehensive instructions for running DeepScrape using Docker, including both pre-built images and building from source.
 
-This approach allows you to quickly run DeepScrape without building the Docker image yourself. You'll use a pre-built image from Docker Hub.
+## Prerequisites
 
-### Prerequisites
-- Docker installed on your system
-- An OpenAI API key
+- **Docker** and **Docker Compose** installed on your system
+- **OpenAI API key** (required for LLM-powered extraction)
+- **Git** (for building from source)
 
-### Steps
+## Quick Start with Docker Compose (Recommended)
 
-#### 1. Run with Docker Run Command
+The easiest way to run DeepScrape is using Docker Compose, which automatically sets up both the application and Redis.
 
-```bash
-docker run -d \
-  --name deepscrape \
-  -p 3000:3000 \
-  -e OPENAI_API_KEY=your-openai-api-key \
-  -e OPENAI_MODEL=gpt-4o \
-  -e API_KEY=your-api-key-for-auth \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/cache:/app/cache \
-  your-dockerhub-username/deepscrape:latest
-```
-
-Replace:
-- `your-openai-api-key` with your actual OpenAI API key
-- `your-api-key-for-auth` with a secret key of your choice for DeepScrape API authentication
-- `your-dockerhub-username` with the actual username where the image is hosted
-
-#### 2. Run with Docker Compose
-
-If you prefer using Docker Compose, create a `docker-compose.yml` file:
-
-```yaml
-version: '3.8'
-
-services:
-  deepscrape:
-    image: your-dockerhub-username/deepscrape:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - OPENAI_API_KEY=your-openai-api-key
-      - OPENAI_MODEL=gpt-4o
-      - API_KEY=your-api-key-for-auth
-      - CACHE_ENABLED=true
-      - CACHE_TTL=3600
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    volumes:
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-    restart: unless-stopped
-    shm_size: 1gb
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:alpine
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-
-volumes:
-  redis-data:
-```
-
-Then run:
+### 1. Clone the Repository
 
 ```bash
-docker-compose up -d
-```
-
-### Environment Variables
-
-| Variable | Description | Default Value |
-|----------|-------------|---------------|
-| OPENAI_API_KEY | Your OpenAI API key (required) | None |
-| OPENAI_MODEL | OpenAI model to use | gpt-4o |
-| OPENAI_ORGANIZATION | OpenAI organization ID (optional) | None |
-| API_KEY | Secret key for DeepScrape API authentication | None |
-| PORT | Port the server listens on | 3000 |
-| CACHE_ENABLED | Enable caching | true |
-| CACHE_TTL | Cache time-to-live in seconds | 3600 |
-| CACHE_DIRECTORY | Directory to store cache files | ./cache |
-| MAX_EXTRACTION_TOKENS | Max tokens for LLM extraction | 15000 |
-| LLM_TEMPERATURE | LLM temperature setting | 0.2 |
-| REDIS_HOST | Redis host | localhost |
-| REDIS_PORT | Redis port | 6379 |
-| REDIS_PASSWORD | Redis password | None |
-| LOG_LEVEL | Logging level | info |
-
----
-
-## Approach 2: Building Your Own Docker Image
-
-This approach allows you to customize the DeepScrape Docker image before running it.
-
-### Prerequisites
-- Docker installed on your system
-- Git installed on your system
-- An OpenAI API key
-
-### Steps
-
-#### 1. Clone the Repository
-```bash
-git clone https://github.com/your-username/deepscrape.git
+git clone https://github.com/stretchcloud/deepscrape.git
 cd deepscrape
 ```
 
-#### 2. Build the Docker Image
+### 2. Create Environment File
+
+Copy the example environment file and configure it:
+
 ```bash
-docker build -t deepscrape:custom .
+cp .env.example .env
 ```
 
-#### 3. Run the Custom Image
+Edit `.env` with your configuration:
 
-Using Docker run:
-```bash
-docker run -d \
-  --name deepscrape \
-  -p 3000:3000 \
-  -e OPENAI_API_KEY=your-openai-api-key \
-  -e OPENAI_MODEL=gpt-4o \
-  -e API_KEY=your-api-key-for-auth \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/cache:/app/cache \
-  deepscrape:custom
+```env
+# Server Configuration
+PORT=3000
+NODE_ENV=production
+LOG_LEVEL=info
+
+# Extraction Settings
+MAX_EXTRACTION_TOKENS=15000
+LLM_TEMPERATURE=0.2
+
+# Scraper Configuration
+MAX_TIMEOUT=60000
+BLOCK_RESOURCES=true
+BLOCK_ADS=true
+USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+
+# API Security
+API_KEY=your-secret-api-key-change-this
+
+# OpenAI Configuration (REQUIRED)
+OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_MODEL=gpt-4o
+
+# Redis Configuration (Docker service names)
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Cache Configuration
+CACHE_ENABLED=true
+CACHE_TTL=3600
+CACHE_DIRECTORY=/app/cache
+
+# Logging Configuration
+LOG_DIRECTORY=/app/logs
+
+# Browser Configuration
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ```
 
-Or create a custom docker-compose.yml file:
-```yaml
-version: '3.8'
+### 3. Build and Start Services
 
-services:
-  deepscrape:
-    image: deepscrape:custom
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - OPENAI_API_KEY=your-openai-api-key
-      - OPENAI_MODEL=gpt-4o
-      - API_KEY=your-api-key-for-auth
-      - CACHE_ENABLED=true
-      - CACHE_TTL=3600
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    volumes:
-      - ./logs:/app/logs
-      - ./cache:/app/cache
-    restart: unless-stopped
-    shm_size: 1gb
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:alpine
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-
-volumes:
-  redis-data:
-```
-
-Then run:
 ```bash
+# Build and start all services
 docker-compose up -d
+
+# Check logs
+docker-compose logs -f
+
+# Check service status
+docker-compose ps
 ```
 
-### Customizing the Image
-
-If you want to make modifications to the DeepScrape codebase before building:
-
-1. Make your code changes in the src/ directory
-2. Update any dependencies in package.json if needed
-3. Build your custom image with `docker build -t deepscrape:custom .`
-
-Common customizations include:
-- Changing default parameters in source files
-- Adding additional middlewares or routes
-- Modifying how content is processed or scraped
-
-### Publishing Your Custom Image
-
-If you want to publish your customized image to Docker Hub:
+### 4. Verify Installation
 
 ```bash
-# Tag your image
-docker tag deepscrape:custom your-dockerhub-username/deepscrape:custom
+# Test health endpoint
+curl http://localhost:3000/health
 
-# Login to Docker Hub
-docker login
-
-# Push the image
-docker push your-dockerhub-username/deepscrape:custom
+# Test scraping
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-api-key-change-this" \
+  -d '{
+    "url": "https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform",
+    "options": {
+      "extractorFormat": "markdown"
+    }
+  }' | jq -r '.content' > vertex-ai-intro.md
 ```
 
 ---
 
-## Verifying the Installation
+## Docker Compose Configuration
 
-After running the container with either approach, verify that DeepScrape is working:
+The included `docker-compose.yml` provides a complete setup with:
 
-1. Check the container logs:
-   ```bash
-   docker logs deepscrape
-   ```
+- **DeepScrape Application**: Main scraping service with Playwright browser automation
+- **Redis**: For job queuing and caching
+- **Health Checks**: Automatic service monitoring
+- **Volume Mounts**: Persistent cache and logs
+- **Network Isolation**: Secure inter-service communication
 
-2. Test the API health endpoint:
-   ```bash
-   curl http://localhost:3000/health
-   ```
-   You should see a response like: `{"status":"ok"}`
+### Services Overview
 
-3. Test a simple scrape operation:
-   ```bash
-   curl -X POST http://localhost:3000/api/scrape \
-     -H "Content-Type: application/json" \
-     -H "X-API-KEY: your-api-key-for-auth" \
-     -d '{"url": "https://example.com", "options": {"extractorFormat": "markdown"}}'
-   ```
+```yaml
+version: '3.8'
+
+services:
+  # Redis service for job queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: deepscrape-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Main DeepScrape application
+  deepscrape:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepscrape-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - LOG_DIRECTORY=/app/logs
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+---
+
+## Building from Source
+
+### Dockerfile Overview
+
+The application uses a multi-stage Ubuntu-based Dockerfile optimized for Playwright:
+
+```dockerfile
+# Multi-stage build for smaller image
+FROM node:18-bullseye AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:18-bullseye AS production
+
+# Install system dependencies for Playwright
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxss1 \
+    libxtst6 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory and non-root user
+WORKDIR /app
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home deepscrape
+
+# Install production dependencies and Playwright
+COPY package*.json ./
+RUN npm ci --only=production
+RUN npx playwright install chromium
+RUN npx playwright install-deps chromium
+
+# Copy built application
+COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
+
+# Set up directories and permissions
+RUN mkdir -p /app/cache /app/logs && \
+    touch /app/logs/access.log /app/logs/combined.log /app/logs/error.log && \
+    chown -R deepscrape:nodejs /app
+
+# Switch to non-root user
+USER deepscrape
+
+# Expose port and add health check
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Start application
+CMD ["node", "dist/index.js"]
+```
+
+### Manual Build Steps
+
+```bash
+# Clone repository
+git clone https://github.com/stretchcloud/deepscrape.git
+cd deepscrape
+
+# Build Docker image
+docker build -t deepscrape:latest .
+
+# Run with custom image
+docker run -d \
+  --name deepscrape \
+  -p 3000:3000 \
+  --env-file .env \
+  -v $(pwd)/cache:/app/cache \
+  -v $(pwd)/logs:/app/logs \
+  deepscrape:latest
+```
+
+---
+
+## Environment Variables Reference
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| **Core Configuration** |
+| `PORT` | Server port | `3000` | No |
+| `NODE_ENV` | Environment mode | `production` | No |
+| `LOG_LEVEL` | Logging level | `info` | No |
+| `API_KEY` | API authentication key | None | **Yes** |
+| **OpenAI Configuration** |
+| `OPENAI_API_KEY` | OpenAI API key | None | **Yes** |
+| `OPENAI_MODEL` | Model to use | `gpt-4o` | No |
+| `OPENAI_ORGANIZATION` | Organization ID | None | No |
+| **Redis Configuration** |
+| `REDIS_HOST` | Redis hostname | `localhost` | No |
+| `REDIS_PORT` | Redis port | `6379` | No |
+| **Cache Configuration** |
+| `CACHE_ENABLED` | Enable caching | `true` | No |
+| `CACHE_TTL` | Cache TTL (seconds) | `3600` | No |
+| `CACHE_DIRECTORY` | Cache directory | `/app/cache` | No |
+| **Browser Configuration** |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Chromium path | `/usr/bin/chromium-browser` | No |
+
+---
+
+### Service Management
+
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Restart services
+docker-compose restart
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f deepscrape
+docker-compose logs -f redis
+```
+
+### Maintenance
+
+```bash
+# Rebuild application (after code changes)
+docker-compose build --no-cache deepscrape
+docker-compose up -d
+
+# Clean up unused resources
+docker system prune -f
+
+# Update images
+docker-compose pull
+docker-compose up -d
+```
+
+### Debugging
+
+```bash
+# Execute commands in running container
+docker-compose exec deepscrape bash
+
+# Check container resource usage
+docker stats
+
+# Inspect container configuration
+docker-compose exec deepscrape env
+```
+
+---
+
+## API Testing Examples
+
+### Basic Scraping
+
+```bash
+# Simple HTML extraction
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "url": "https://example.com",
+    "options": {
+      "extractorFormat": "html"
+    }
+  }'
+
+# Markdown conversion
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "url": "https://news.ycombinator.com",
+    "options": {
+      "extractorFormat": "markdown"
+    }
+  }'
+```
+
+### LLM-Powered Extraction
+
+```bash
+# Structured data extraction
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "url": "https://example-ecommerce.com/product/123",
+    "options": {
+      "extractorFormat": "llm",
+      "extractorOptions": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {"type": "string"},
+            "price": {"type": "number"},
+            "description": {"type": "string"},
+            "availability": {"type": "string"}
+          }
+        }
+      }
+    }
+  }'
+```
+
+---
 
 ## Troubleshooting
 
-- **API Key Issues**: Make sure the OPENAI_API_KEY environment variable contains a valid API key.
-- **Volume Permissions**: If you see permission errors, ensure the host directories for volumes have appropriate permissions.
-- **Memory Issues**: When scraping complex websites, you might need to increase the memory limit in docker-compose.yml.
-- **Container Crashes**: Check logs with `docker logs deepscrape` to identify the cause.
+### Common Issues
+
+**1. Container fails to start**
+```bash
+# Check logs for errors
+docker-compose logs deepscrape
+
+# Common causes:
+# - Missing .env file
+# - Invalid OpenAI API key
+# - Port 3000 already in use
+```
+
+**2. Playwright browser issues**
+```bash
+# The application includes HTTP fallback for browser failures
+# Check logs for "falling back to HTTP scraper" messages
+docker-compose logs deepscrape | grep -i "fallback"
+```
+
+**3. Redis connection errors**
+```bash
+# Verify Redis is running
+docker-compose ps redis
+
+# Check Redis logs
+docker-compose logs redis
+
+# Test Redis connectivity
+docker-compose exec redis redis-cli ping
+```
+
+**4. Permission errors**
+```bash
+# Fix volume permissions
+sudo chown -R $USER:$USER ./cache ./logs
+
+# Or run with proper permissions
+docker-compose down
+sudo rm -rf ./cache ./logs
+docker-compose up -d
+```
+
+### Performance Optimization
+
+**Memory Usage**
+```yaml
+# Add to docker-compose.yml under deepscrape service
+deploy:
+  resources:
+    limits:
+      memory: 2G
+    reservations:
+      memory: 1G
+```
+
+**Browser Optimization**
+```env
+# Add to .env for better browser performance
+PLAYWRIGHT_BROWSER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+```
+
+---
+
+## Production Deployment
+
+### Security Considerations
+
+1. **Use strong API keys**
+2. **Limit network exposure** (use reverse proxy)
+3. **Regular updates** of base images
+4. **Monitor resource usage**
+5. **Implement rate limiting**
+
+### Scaling
+
+```yaml
+# docker-compose.yml for multiple instances
+version: '3.8'
+services:
+  deepscrape:
+    # ... existing config
+    deploy:
+      replicas: 3
+    
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - deepscrape
+```
+
+### Monitoring
+
+```bash
+# Add health check monitoring
+curl -f http://localhost:3000/health || exit 1
+
+# Monitor logs
+docker-compose logs -f --tail=100
+
+# Resource monitoring
+docker stats deepscrape-app deepscrape-redis
+```
+
+This documentation provides a complete guide for running DeepScrape in Docker with proper configuration, troubleshooting, and production considerations.
