@@ -1,6 +1,6 @@
 # 📚 DeepScrape – Intelligent Web Scraping & LLM-Powered Extraction
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Build](https://img.shields.io/github/actions/workflow/status/your-org/deepscrape/ci.yml?label=build)](https://github.com/your-org/deepscrape/actions) [![Docker Pulls](https://img.shields.io/docker/pulls/your-org/deepscrape)](https://hub.docker.com/r/your-org/deepscrape)
+[![License: Apache License 2.0](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Build](https://img.shields.io/github/actions/workflow/status/stretchcloud/deepscrape/ci.yml?label=build)](https://github.com/stretchcloud/deepscrape/actions) [![Docker Pulls](https://img.shields.io/docker/pulls/stretchcloud/deepscrape)](https://hub.docker.com/r/stretchcloud/deepscrape)
 
 > **Turn _any_ web page into structured data with Playwright-powered scraping, caching & GPT-4o extraction.**
 
