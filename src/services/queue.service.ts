@@ -10,14 +10,14 @@ const QUEUE_NAME = 'deepscrape-crawler-queue';
 
 const redisConnection = new IORedis({
   host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6380')
+  port: parseInt(process.env.REDIS_PORT || '6379')
 });
 
 // Create Bull queue
 const crawlQueue = new Queue(QUEUE_NAME, {
   connection: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6380')
+    port: parseInt(process.env.REDIS_PORT || '6379')
   },
   defaultJobOptions: {
     attempts: 3,
@@ -118,7 +118,7 @@ export function initializeWorker(): Worker {
     }, {
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6380')
+        port: parseInt(process.env.REDIS_PORT || '6379')
       },
       concurrency: 5, // Process 5 jobs at a time
     }

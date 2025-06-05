@@ -46,6 +46,17 @@ export class PlaywrightScraper {
         
         const launchOptions: any = {
           headless: true,
+          // Use system chromium in Docker/Alpine
+          executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+          ],
           ...options.puppeteerLaunchOptions
         };
         
@@ -53,6 +64,11 @@ export class PlaywrightScraper {
         if (isEcommerce) {
           logger.info('E-commerce site detected, using enhanced anti-bot measures');
           launchOptions.headless = false;
+        }
+        
+        // Force use of system chromium in Docker
+        if (process.env.NODE_ENV === 'production' || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+          launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser';
         }
         
         browser = await chromium.launch(launchOptions);

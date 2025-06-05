@@ -1,54 +1,76 @@
-# Use an official Node.js runtime as the base image
-FROM node:18-slim
+# Multi-stage build for smaller image
+FROM node:18-bullseye AS builder
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Install Playwright dependencies
-RUN apt-get update && apt-get install -y \
-    libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libxcb1 \
-    libxkbcommon0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
-    fonts-noto-color-emoji \
-    fonts-freefont-ttf \
-    xvfb \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy package.json and package-lock.json
+# Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
-# Copy the rest of the application code
+# Copy source code
 COPY . .
 
-# Build the TypeScript code
+# Build the application
 RUN npm run build
 
-# Install Playwright browsers
-RUN npx playwright install chromium
+# Production stage
+FROM node:18-bullseye AS production
 
-# Expose the port the app runs on
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxss1 \
+    libxtst6 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home deepscrape
+
+# Copy package files and install production dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Install Playwright browsers and dependencies
+RUN npx playwright install chromium
+RUN npx playwright install-deps chromium
+
+# Set Playwright environment variables
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/deepscrape/.cache/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
+
+# Copy built application from builder stage
+COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
+
+# Create directories and set proper permissions
+RUN mkdir -p /app/cache /app/logs && \
+    touch /app/logs/access.log /app/logs/combined.log /app/logs/error.log && \
+    chown -R deepscrape:nodejs /app
+
+# Switch to non-root user
+USER deepscrape
+
+# Expose port
 EXPOSE 3000
 
-# Command to run the application
-CMD ["npm", "start"] 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Start the application
+CMD ["node", "dist/index.js"]

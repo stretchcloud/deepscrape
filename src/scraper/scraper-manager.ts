@@ -1,5 +1,6 @@
 import { ScraperOptions, ScraperResponse, BrowserAction } from '../types';
 import { PlaywrightScraper } from './playwright-scraper';
+import { HttpScraper } from './http-scraper';
 import { ContentCleaner } from '../transformers/content-cleaner';
 import { HtmlToMarkdownTransformer } from '../transformers/html-to-markdown';
 import { LLMExtractor } from '../transformers/llm-extractor';
@@ -10,6 +11,7 @@ import { logger } from '../utils/logger';
 
 export class ScraperManager {
   private playwriteScraper: PlaywrightScraper;
+  private httpScraper: HttpScraper;
   private contentCleaner: ContentCleaner;
   private markdownTransformer: HtmlToMarkdownTransformer;
   private llmExtractor: LLMExtractor | null = null;
@@ -17,6 +19,7 @@ export class ScraperManager {
 
   constructor() {
     this.playwriteScraper = new PlaywrightScraper();
+    this.httpScraper = new HttpScraper();
     this.contentCleaner = new ContentCleaner();
     this.markdownTransformer = new HtmlToMarkdownTransformer();
     
@@ -88,10 +91,20 @@ export class ScraperManager {
         }
       }
       
-      // Step 1: Get raw HTML using Playwright scraper
-      const scraperResponse = await this.playwriteScraper.scrape(url, options);
+      // Step 1: Get raw HTML using Playwright scraper (with HTTP fallback)
+      let scraperResponse = await this.playwriteScraper.scrape(url, options);
       
-      // If there was an error, return immediately
+      // If Playwright fails, try HTTP scraper as fallback
+      if (scraperResponse.error && scraperResponse.error.includes('browserType.launch')) {
+        logger.warn(`Playwright failed, falling back to HTTP scraper: ${scraperResponse.error}`);
+        scraperResponse = await this.httpScraper.scrape(url, options);
+        
+        if (!scraperResponse.error) {
+          logger.info('HTTP scraper fallback successful');
+        }
+      }
+      
+      // If there was still an error, return immediately
       if (scraperResponse.error) {
         logger.error(`Error occurred during scraping: ${scraperResponse.error}`);
         return scraperResponse;

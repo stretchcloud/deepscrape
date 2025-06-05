@@ -1,34 +1,59 @@
 version: '3.8'
 
 services:
-  scraper-api:
-    build: .
+  # Redis service for job queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: deepscrape-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - deepscrape-network
+
+  # Main DeepScrape application
+  deepscrape:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepscrape-app
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      # You can uncomment and set these values directly or use a .env file
-      # - API_KEY=your-api-key-here
-      # - MAX_TIMEOUT=60000
-      # - BLOCK_RESOURCES=true
-      # - BLOCK_ADS=true
+      - LOG_DIRECTORY=/app/logs
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
     volumes:
-      # Mount these directories for logs and persistent data
+      - ./cache:/app/cache
       - ./logs:/app/logs
-      # Uncomment if you have a .env file
-      # - ./.env:/app/.env
-    restart: unless-stopped
-    # Increase shared memory size for browser instance
-    shm_size: 1gb
-    # Optional resource limits
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: '1'
-    #       memory: 2G
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - deepscrape-network
 
-# Create a custom network for services
+volumes:
+  redis_data:
+    driver: local
+
 networks:
-  default:
-    driver: bridge 
+  deepscrape-network:
+    driver: bridge
