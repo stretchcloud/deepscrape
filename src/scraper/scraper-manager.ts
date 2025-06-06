@@ -10,12 +10,12 @@ import { ExtractionOptions } from '../types/schema';
 import { logger } from '../utils/logger';
 
 export class ScraperManager {
-  private playwriteScraper: PlaywrightScraper;
-  private httpScraper: HttpScraper;
-  private contentCleaner: ContentCleaner;
-  private markdownTransformer: HtmlToMarkdownTransformer;
+  private readonly playwriteScraper: PlaywrightScraper;
+  private readonly httpScraper: HttpScraper;
+  private readonly contentCleaner: ContentCleaner;
+  private readonly markdownTransformer: HtmlToMarkdownTransformer;
   private llmExtractor: LLMExtractor | null = null;
-  private cacheService: CacheService;
+  private readonly cacheService: CacheService;
 
   constructor() {
     this.playwriteScraper = new PlaywrightScraper();
@@ -30,8 +30,8 @@ export class ScraperManager {
       directory: process.env.CACHE_DIRECTORY || './cache'
     });
     
-    // Initialize LLM extractor with GPT-4o model
-    this.initializeLLMExtractor();
+    // LLM extractor will be initialized lazily or explicitly
+    this.llmExtractor = null;
   }
 
   /**
@@ -46,6 +46,13 @@ export class ScraperManager {
     };
     
     return `${url}:${JSON.stringify(cacheableOptions)}`;
+  }
+
+  /**
+   * Initialize the ScraperManager - must be called before using
+   */
+  public async initialize(): Promise<void> {
+    await this.initializeLLMExtractor();
   }
 
   /**
@@ -65,6 +72,15 @@ export class ScraperManager {
       logger.info('LLM extractor initialized successfully');
     } catch (error) {
       logger.error(`Error initializing LLM extractor: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Ensure LLM extractor is initialized (lazy initialization)
+   */
+  private async ensureLLMExtractor(): Promise<void> {
+    if (!this.llmExtractor) {
+      await this.initializeLLMExtractor();
     }
   }
 
@@ -95,7 +111,7 @@ export class ScraperManager {
       let scraperResponse = await this.playwriteScraper.scrape(url, options);
       
       // If Playwright fails, try HTTP scraper as fallback
-      if (scraperResponse.error && scraperResponse.error.includes('browserType.launch')) {
+      if (scraperResponse.error?.includes('browserType.launch')) {
         logger.warn(`Playwright failed, falling back to HTTP scraper: ${scraperResponse.error}`);
         scraperResponse = await this.httpScraper.scrape(url, options);
         
@@ -147,17 +163,21 @@ export class ScraperManager {
       }
 
       // Step 4: Apply LLM extraction if requested
-      if (options.extractionOptions && this.llmExtractor) {
-        logger.info('Applying LLM extraction with schema');
+      if (options.extractionOptions) {
+        await this.ensureLLMExtractor();
         
-        const extractionResult = await this.llmExtractor.extract<T>(
-          processedResponse, 
-          options.extractionOptions
-        );
-        
-        processedResponse = extractionResult;
-      } else if (options.extractionOptions) {
-        logger.warn('Extraction options provided but LLM extractor not available');
+        if (this.llmExtractor) {
+          logger.info('Applying LLM extraction with schema');
+          
+          const extractionResult = await this.llmExtractor.extract<T>(
+            processedResponse, 
+            options.extractionOptions
+          );
+          
+          processedResponse = extractionResult;
+        } else {
+          logger.warn('Extraction options provided but LLM extractor failed to initialize');
+        }
       }
       
       // Add performance metrics

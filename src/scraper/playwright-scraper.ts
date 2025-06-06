@@ -1,4 +1,5 @@
 import { chromium, Browser, Page, Route, Request } from 'playwright';
+import { randomBytes } from 'crypto';
 import { logger } from '../utils/logger';
 import { ScraperOptions, BrowserAction, ScraperResponse } from '../types';
 import { AD_SERVING_DOMAINS } from '../types';
@@ -81,9 +82,13 @@ export class PlaywrightScraper {
         // Add special handling for Amazon and other e-commerce sites
         if (isEcommerce) {
           // Set cookies to appear more like a regular user
+          const timestamp = Date.now();
+          const sessionId = `${timestamp.toString(36)}-${randomBytes(8).toString('hex')}`;
+          const ubidValue = `${timestamp.toString(36)}-${randomBytes(12).toString('hex')}`;
+          
           await context.addCookies([
-            { name: 'session-id', value: `${Date.now()}`, domain: '.amazon.com', path: '/' },
-            { name: 'ubid-main', value: `${Math.floor(Math.random() * 1000000)}`, domain: '.amazon.com', path: '/' }
+            { name: 'session-id', value: sessionId, domain: '.amazon.com', path: '/' },
+            { name: 'ubid-main', value: ubidValue, domain: '.amazon.com', path: '/' }
           ]);
           
           // Add extra headers to appear more like a regular browser
