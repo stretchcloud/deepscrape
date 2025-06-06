@@ -21,7 +21,7 @@ const logger = winston.createLogger({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.printf(({ timestamp, level, message, stack }) => {
-          return `${timestamp} ${level}: ${stack || message}`;
+          return `${timestamp} ${level}: ${stack ?? message}`;
         })
       ),
     }),
