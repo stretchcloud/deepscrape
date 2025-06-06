@@ -39,7 +39,7 @@ DeepScrape leverages a modern stack to provide robust and intelligent scraping c
 | **Job queue** | BullMQ + Redis handle heavy jobs without blocking the API.
 | **API-first** | REST endpoints secured with API keys, documented with Swagger.
 | **Docker-ready** | One-command deployment for prod. Works great on Fly, Railway, Render or your own k8s.
-| **MIT-licensed** | Fully open-source and free forever.
+| **Apache-2.0-licensed** | Fully open-source and free forever.
 
 ---
 
@@ -49,7 +49,7 @@ DeepScrape leverages a modern stack to provide robust and intelligent scraping c
 
 ```bash
 # Clone & install
-git clone https://github.com/your-org/deepscrape.git
+git clone https://github.com/stretchcloud/deepscrape.git
 cd deepscrape
 npm install
 
@@ -67,11 +67,11 @@ Hit `http://localhost:3000/health` and you should see `{ status: 'ok' }`.
 ```bash
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: $API_KEY" \
+  -H "X-API-KEY: test-key" \
   -d '{
     "url": "https://example.com",
     "options": { "extractorFormat": "markdown" }
-  }'
+  }' | jq -r '.content' > content.md
 ```
 
 ### 3. Schema-based extraction
@@ -79,7 +79,7 @@ curl -X POST http://localhost:3000/api/scrape \
 ```bash
 curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: $API_KEY" \
+  -H "X-API-KEY: test-key" \
   -d '{
     "url": "https://example.com/article",
     "schema": {
@@ -91,7 +91,7 @@ curl -X POST http://localhost:3000/api/extract-schema \
       },
       "required": ["title", "content"]
     }
-  }'
+  }' | jq -r '.extractedData' > schemadata.md
 ```
 
 ### 4. Docker production image
@@ -128,22 +128,6 @@ docker run -d -p 3000:3000 \
                                 Cache Layer (FS/Redis)
 ```
 
-**Request Flow:**
-
-1.  A client sends a request (e.g., scrape URL, extract schema) to the **Express API Gateway**.
-2.  The API gateway validates the request, authenticates the API key, and pushes a job onto the **BullMQ Job Queue** (backed by Redis). This ensures the API remains responsive even under load.
-3.  A **Scraper Worker** picks up the job from the queue.
-4.  The worker uses **Playwright** (a headless browser) to navigate to the target URL, interact with the page if necessary (e.g., scrolling, clicking), and retrieve the raw HTML content.
-5.  The HTML content is passed to the **Extractor** module.
-    *   It first checks the **Cache Layer** (filesystem by default) for a valid, non-expired response for this request. If found, the cached response is returned immediately.
-    *   If not cached or expired, the Extractor converts the HTML to the desired format (Markdown, Text).
-    *   For `/extract-schema` or `/summarize` requests, it constructs a prompt including the processed content (e.g., Markdown) and the user's schema or instructions, then calls the **OpenAI API** (GPT-4o).
-6.  The final result (extracted content, structured JSON, or summary) is stored in the cache and returned to the API gateway, which forwards it back to the client.
-
-* **Scraper Worker** – launches a headless Chromium, executes actions & returns HTML.
-* **Extractor** – converts HTML → Markdown/Text and optionally invokes GPT-4o.
-* **Cache** – responses are cached to avoid redundant scraping & GPT calls.
-
 ---
 
 ## 🛣️ Roadmap
@@ -154,17 +138,6 @@ docker run -d -p 3000:3000 \
 - [ ] 🌐 Cloud-native cache backends (S3/Redis)
 - [ ] 🌈 Web UI playground
 
-Join the [discussion board](https://github.com/your-org/deepscrape/discussions) to vote!
-
----
-
-## 🔌 API Reference
-
-All API endpoints require authentication via the `X-API-KEY` header, using the key defined in your `.env` file, **except** for the `/api/v1/crawl/*` endpoints which appear to be public based on the router configuration.
-
-The base URL is typically `http://localhost:3000` during development.
-
-The complete OpenAPI specification lives in [`swagger.yaml`](./swagger.yaml). When you run the dev server (`npm run dev`), an interactive Swagger UI is available at `http://localhost:3000/docs`.
 
 ---
 
