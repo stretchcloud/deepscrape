@@ -633,7 +633,7 @@ class HtmlToMarkdownTransformer {
             .replace(/\n{3,}/g, '\n\n')
             // Fix spacing around headings (ensure heading has empty lines around it)
             .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
-            .replace(/(#+\s[^\n]+)\n([^\n])/g, '$1\n\n$2')
+            .replace(/(#+\s[^\n]*?)\n([^\n])/g, '$1\n\n$2')
             // Improve list formatting
             .replace(/\n(\s*[-*+])\s+/g, '\n$1 ')
             // Improve code block formatting

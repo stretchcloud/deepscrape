@@ -107,7 +107,7 @@ class WebCrawler {
             }
             const isAllowed = this.ignoreRobotsTxt
                 ? true
-                : ((this.robots.isAllowed(link, "XeroxCrawler")) ?? true);
+                : ((this.robots.isAllowed(link, "DeepScrapeCrawler")) ?? true);
             if (!isAllowed) {
                 this.logger.debug(`Link disallowed by robots.txt: ${link}`);
                 return false;

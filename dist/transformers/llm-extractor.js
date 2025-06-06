@@ -18,11 +18,11 @@ function limitTextSize(text, maxTokens = 15000) {
         "\n\n[Note: Content was truncated due to length limitations.]";
 }
 class LLMExtractor {
-    constructor(openAIService) {
-        this.openAIService = openAIService;
+    constructor(llmService) {
+        this.llmService = llmService;
     }
     /**
-     * Extract structured data using Azure OpenAI
+     * Extract structured data using LLM
      */
     async extract(scraperResponse, options) {
         try {
@@ -49,7 +49,7 @@ class LLMExtractor {
                 ? { type: 'json_object' }
                 : undefined;
             // Make the LLM API call
-            const llmResponse = await this.openAIService.getCompletion(messages, {
+            const llmResponse = await this.llmService.getCompletion(messages, {
                 temperature: options.temperature || 0.2,
                 maxTokens: options.maxTokens || 4000
             }, responseFormat);
@@ -77,7 +77,7 @@ class LLMExtractor {
                     data: llmResponse.data,
                     metadata: {
                         extractionTime,
-                        modelName: 'gpt-4o' // This would ideally come from the service
+                        modelName: this.llmService.model || 'gpt-4o'
                     }
                 }
             };

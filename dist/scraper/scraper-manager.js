@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScraperManager = void 0;
 const playwright_scraper_1 = require("./playwright-scraper");
+const http_scraper_1 = require("./http-scraper");
 const content_cleaner_1 = require("../transformers/content-cleaner");
 const html_to_markdown_1 = require("../transformers/html-to-markdown");
 const llm_extractor_1 = require("../transformers/llm-extractor");
@@ -12,6 +13,7 @@ class ScraperManager {
     constructor() {
         this.llmExtractor = null;
         this.playwriteScraper = new playwright_scraper_1.PlaywrightScraper();
+        this.httpScraper = new http_scraper_1.HttpScraper();
         this.contentCleaner = new content_cleaner_1.ContentCleaner();
         this.markdownTransformer = new html_to_markdown_1.HtmlToMarkdownTransformer();
         // Initialize cache service
@@ -20,8 +22,8 @@ class ScraperManager {
             ttl: Number(process.env.CACHE_TTL || 3600),
             directory: process.env.CACHE_DIRECTORY || './cache'
         });
-        // Initialize LLM extractor with GPT-4o model
-        this.initializeLLMExtractor();
+        // LLM extractor will be initialized lazily or explicitly
+        this.llmExtractor = null;
     }
     /**
      * Generate a unique cache key for a scrape request
@@ -36,21 +38,35 @@ class ScraperManager {
         return `${url}:${JSON.stringify(cacheableOptions)}`;
     }
     /**
+     * Initialize the ScraperManager - must be called before using
+     */
+    async initialize() {
+        await this.initializeLLMExtractor();
+    }
+    /**
      * Initialize LLM extractor with GPT-4o model
      */
     async initializeLLMExtractor() {
         try {
-            // Get Azure OpenAI service with GPT-4o
-            const azureOpenAIService = llm_service_factory_1.LLMServiceFactory.createAzureOpenAIService();
-            if (!azureOpenAIService) {
-                logger_1.logger.warn('Failed to initialize Azure OpenAI service for LLM extraction');
+            // Get the appropriate LLM service
+            const llmService = llm_service_factory_1.LLMServiceFactory.createLLMService();
+            if (!llmService) {
+                logger_1.logger.warn('Failed to initialize LLM service for extraction');
                 return;
             }
-            this.llmExtractor = new llm_extractor_1.LLMExtractor(azureOpenAIService);
-            logger_1.logger.info('LLM extractor initialized with GPT-4o model');
+            this.llmExtractor = new llm_extractor_1.LLMExtractor(llmService);
+            logger_1.logger.info('LLM extractor initialized successfully');
         }
         catch (error) {
             logger_1.logger.error(`Error initializing LLM extractor: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+    /**
+     * Ensure LLM extractor is initialized (lazy initialization)
+     */
+    async ensureLLMExtractor() {
+        if (!this.llmExtractor) {
+            await this.initializeLLMExtractor();
         }
     }
     /**
@@ -69,9 +85,17 @@ class ScraperManager {
                     return cachedResponse;
                 }
             }
-            // Step 1: Get raw HTML using Playwright scraper
-            const scraperResponse = await this.playwriteScraper.scrape(url, options);
-            // If there was an error, return immediately
+            // Step 1: Get raw HTML using Playwright scraper (with HTTP fallback)
+            let scraperResponse = await this.playwriteScraper.scrape(url, options);
+            // If Playwright fails, try HTTP scraper as fallback
+            if (scraperResponse.error?.includes('browserType.launch')) {
+                logger_1.logger.warn(`Playwright failed, falling back to HTTP scraper: ${scraperResponse.error}`);
+                scraperResponse = await this.httpScraper.scrape(url, options);
+                if (!scraperResponse.error) {
+                    logger_1.logger.info('HTTP scraper fallback successful');
+                }
+            }
+            // If there was still an error, return immediately
             if (scraperResponse.error) {
                 logger_1.logger.error(`Error occurred during scraping: ${scraperResponse.error}`);
                 return scraperResponse;
@@ -108,13 +132,16 @@ class ScraperManager {
                 processedResponse = this.extractTextOnly(cleanedResponse);
             }
             // Step 4: Apply LLM extraction if requested
-            if (options.extractionOptions && this.llmExtractor) {
-                logger_1.logger.info('Applying LLM extraction with schema');
-                const extractionResult = await this.llmExtractor.extract(processedResponse, options.extractionOptions);
-                processedResponse = extractionResult;
-            }
-            else if (options.extractionOptions) {
-                logger_1.logger.warn('Extraction options provided but LLM extractor not available');
+            if (options.extractionOptions) {
+                await this.ensureLLMExtractor();
+                if (this.llmExtractor) {
+                    logger_1.logger.info('Applying LLM extraction with schema');
+                    const extractionResult = await this.llmExtractor.extract(processedResponse, options.extractionOptions);
+                    processedResponse = extractionResult;
+                }
+                else {
+                    logger_1.logger.warn('Extraction options provided but LLM extractor failed to initialize');
+                }
             }
             // Add performance metrics
             processedResponse.metadata.processingTime = Date.now() - startTime;

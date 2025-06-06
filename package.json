@@ -9,7 +9,9 @@
     "build": "tsc",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "clean": "rm -rf dist cache",
+    "clean:logs": "rm -f logs/*.log"
   },
   "keywords": [
     "web-scraper",

@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.crawlQueue = void 0;
 exports.initQueue = initQueue;
@@ -12,12 +15,17 @@ const uuid_1 = require("uuid");
 const logger_1 = require("../utils/logger");
 const redis_service_1 = require("./redis.service");
 const crawler_processor_1 = require("../scraper/crawler-processor");
-const QUEUE_NAME = 'xerox-crawler-queue';
+const ioredis_1 = __importDefault(require("ioredis"));
+const QUEUE_NAME = 'deepscrape-crawler-queue';
+const redisConnection = new ioredis_1.default({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379')
+});
 // Create Bull queue
 const crawlQueue = new bullmq_1.Queue(QUEUE_NAME, {
     connection: {
         host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6380')
+        port: parseInt(process.env.REDIS_PORT || '6379')
     },
     defaultJobOptions: {
         attempts: 3,
@@ -92,7 +100,7 @@ function initializeWorker() {
     }, {
         connection: {
             host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6380')
+            port: parseInt(process.env.REDIS_PORT || '6379')
         },
         concurrency: 5, // Process 5 jobs at a time
     });

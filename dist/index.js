@@ -18,8 +18,12 @@ const queue_service_1 = require("./services/queue.service");
 dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
-// Set up logging
-const accessLogStream = fs_1.default.createWriteStream(path_1.default.join(__dirname, '..', 'access.log'), { flags: 'a' });
+// Set up logging - ensure logs directory exists
+const logsDir = path_1.default.join(__dirname, '..', 'logs');
+if (!fs_1.default.existsSync(logsDir)) {
+    fs_1.default.mkdirSync(logsDir, { recursive: true });
+}
+const accessLogStream = fs_1.default.createWriteStream(path_1.default.join(logsDir, 'access.log'), { flags: 'a' });
 // Configuration
 const PORT = process.env.PORT || 3000;
 // Middleware

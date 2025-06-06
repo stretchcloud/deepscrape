@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LLMServiceFactory = exports.TaskComplexity = void 0;
-const azure_openai_service_1 = require("./azure-openai.service");
+const openai_service_1 = require("./openai.service");
 const logger_1 = require("../utils/logger");
 /**
  * Task complexity types (kept for API compatibility)
@@ -13,43 +13,42 @@ var TaskComplexity;
     TaskComplexity["HIGH"] = "high";
 })(TaskComplexity || (exports.TaskComplexity = TaskComplexity = {}));
 /**
- * Simplified factory class for creating LLM services
- * Always uses GPT-4o regardless of task complexity
+ * Factory class for creating LLM services
+ * Always uses the OpenAI model specified in env variables
  */
 class LLMServiceFactory {
     /**
-     * Create an Azure OpenAI service instance using the GPT-4o model
-     * Ignores task complexity and always uses the same model
+     * Create an OpenAI service instance
      */
-    static createAzureOpenAIService(taskComplexity) {
+    static createOpenAIService(taskComplexity) {
         try {
             // Get configuration
-            const apiKey = process.env.AZURE_OPENAI_API_KEY;
-            const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-            const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview'; // Default to latest API version
-            const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4o'; // Default to gpt-4o
-            if (!apiKey || !endpoint) {
-                const missingVars = [];
-                if (!apiKey)
-                    missingVars.push('AZURE_OPENAI_API_KEY');
-                if (!endpoint)
-                    missingVars.push('AZURE_OPENAI_ENDPOINT');
-                logger_1.logger.warn(`Azure OpenAI service not configured correctly. Missing environment variables: ${missingVars.join(', ')}. ` +
-                    'Make sure to set these variables in your .env file.');
+            const apiKey = process.env.OPENAI_API_KEY;
+            const organization = process.env.OPENAI_ORGANIZATION;
+            const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Default to gpt-4o
+            if (!apiKey) {
+                logger_1.logger.warn('OpenAI service not configured correctly. Missing environment variable: OPENAI_API_KEY. ' +
+                    'Make sure to set this variable in your .env file.');
                 return null;
             }
-            logger_1.logger.info(`Creating Azure OpenAI service with deployment: ${deploymentName}, API version: ${apiVersion}`);
-            return new azure_openai_service_1.AzureOpenAIService({
+            logger_1.logger.info(`Creating OpenAI service with model: ${model}`);
+            return new openai_service_1.OpenAIService({
                 apiKey,
-                endpoint,
-                apiVersion,
-                deploymentName
+                organization,
+                model
             });
         }
         catch (error) {
-            logger_1.logger.error(`Error creating Azure OpenAI service: ${error instanceof Error ? error.message : String(error)}`);
+            logger_1.logger.error(`Error creating OpenAI service: ${error instanceof Error ? error.message : String(error)}`);
             return null;
         }
+    }
+    /**
+     * Create an LLM service
+     * This is the main method to use for getting an LLM service instance
+     */
+    static createLLMService(taskComplexity) {
+        return this.createOpenAIService(taskComplexity);
     }
     /**
      * Determine the task complexity (kept for API compatibility)

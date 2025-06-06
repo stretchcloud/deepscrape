@@ -240,7 +240,7 @@ function formatResponseAsMarkdown(url, title, schema, extractedData, warningMess
         }
     }
     else {
-        markdown += "*No data could be extracted. Try enabling LLM extraction with Azure OpenAI credentials.*\n\n";
+        markdown += "*No data could be extracted. Try enabling LLM extraction with OpenAI credentials.*\n\n";
     }
     return markdown;
 }

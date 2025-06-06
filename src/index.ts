@@ -17,9 +17,14 @@ dotenv.config();
 // Create Express app
 const app = express();
 
-// Set up logging
+// Set up logging - ensure logs directory exists
+const logsDir = path.join(__dirname, '..', 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
 const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, '..', 'access.log'),
+  path.join(logsDir, 'access.log'),
   { flags: 'a' }
 );
 

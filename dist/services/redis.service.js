@@ -20,7 +20,7 @@ const logger_1 = require("../utils/logger");
 // Connect to Redis using the Docker configuration
 const redisClient = new ioredis_1.default({
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6380')
+    port: parseInt(process.env.REDIS_PORT || '6379')
 });
 exports.redisClient = redisClient;
 redisClient.on('error', (err) => {

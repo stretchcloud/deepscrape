@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlaywrightScraper = void 0;
 const playwright_1 = require("playwright");
+const crypto_1 = require("crypto");
 const logger_1 = require("../utils/logger");
 const types_1 = require("../types");
 const playwright_service_1 = require("../services/playwright.service");
@@ -38,12 +39,27 @@ class PlaywrightScraper {
                 logger_1.logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions || {})}`);
                 const launchOptions = {
                     headless: true,
+                    // Use system chromium in Docker/Alpine
+                    executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--disable-gpu'
+                    ],
                     ...options.puppeteerLaunchOptions
                 };
                 // Use non-headless mode for e-commerce sites to bypass bot detection
                 if (isEcommerce) {
                     logger_1.logger.info('E-commerce site detected, using enhanced anti-bot measures');
                     launchOptions.headless = false;
+                }
+                // Force use of system chromium in Docker
+                if (process.env.NODE_ENV === 'production' || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+                    launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser';
                 }
                 browser = await playwright_1.chromium.launch(launchOptions);
                 const context = await browser.newContext({
@@ -54,9 +70,12 @@ class PlaywrightScraper {
                 // Add special handling for Amazon and other e-commerce sites
                 if (isEcommerce) {
                     // Set cookies to appear more like a regular user
+                    const timestamp = Date.now();
+                    const sessionId = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(8).toString('hex')}`;
+                    const ubidValue = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(12).toString('hex')}`;
                     await context.addCookies([
-                        { name: 'session-id', value: `${Date.now()}`, domain: '.amazon.com', path: '/' },
-                        { name: 'ubid-main', value: `${Math.floor(Math.random() * 1000000)}`, domain: '.amazon.com', path: '/' }
+                        { name: 'session-id', value: sessionId, domain: '.amazon.com', path: '/' },
+                        { name: 'ubid-main', value: ubidValue, domain: '.amazon.com', path: '/' }
                     ]);
                     // Add extra headers to appear more like a regular browser
                     await context.setExtraHTTPHeaders({
