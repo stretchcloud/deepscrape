@@ -4,7 +4,7 @@
 
 Transform any website into structured data using Playwright automation and GPT-4o extraction. Built for modern web applications, RAG pipelines, and data workflows.
 
-## Features
+## ✨ Features
 
 - **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI
 - **🧬 API-first** - REST endpoints secured with API keys, documented with Swagger.
@@ -15,7 +15,7 @@ Transform any website into structured data using Playwright automation and GPT-4
 - **🕷️ Web Crawling** - Multi-page crawling with configurable strategies
 - **🐳 Docker Ready** - One-command deployment
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Installation
 
@@ -236,7 +236,7 @@ curl http://localhost:3000/api/v1/crawl/{job-id}
 | `/api/v1/crawl/:id` | GET | Get crawl status |
 | `/api/cache` | DELETE | Clear cache |
 
-## Configuration Options
+## ⚙️ Configuration Options
 
 ### Environment Variables
 
@@ -319,14 +319,27 @@ Interact with dynamic content:
 - Lower `temperature` values for consistent results
 - Include examples in descriptions for better accuracy
 
-## Architecture
+## 🏗️ Architecture
 
-```
-Client → Express API → BullMQ Queue → Worker
-                    ↓
-         [Playwright Scraper] → [Content Cleaner] → [LLM Extractor]
-                    ↓
-              Cache Layer (File/Redis)
+```text
+┌───────────────┐    REST     ┌────────────────────────┐
+│    Client     │────────────▶│  Express API Gateway   │
+└───────────────┘             └────────┬───────────────┘
+                                        │ (Job Payload)
+                                        ▼
+                             ┌───────────────────────┐
+                             │   BullMQ Job Queue    │ (Redis)
+                             └────────┬──────────────┘
+                                      │
+                           pulls job   │ pushes result
+                                      ▼
+ ┌─────────────────┐ Playwright ┌─────────────────┐  GPT-4o ┌──────────────┐
+ │ Scraper Worker  │──────────▶│  Extractor      │────────▶│ OpenAI       │
+ └─────────────────┘           └─────────────────┘         └──────────────┘
+   (Headless Browser)            (HTML → MD/Text/JSON)          (LLM API)
+                                      │
+                                      ▼
+                                Cache Layer (FS/Redis)
 ```
 
 ## 🛣️ Roadmap
