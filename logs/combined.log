@@ -334,3 +334,395 @@
 {"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:37:06"}
 {"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:37:06"}
 {"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:37:06"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 17:47:01"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 17:47:01"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 17:47:01"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:59:12"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:59:12"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 17:59:12"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 17:59:12"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:03:03"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:03:04"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:03:04"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:03:09"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:05:11"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:05:46"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:08:16"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:08:16"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:08:16"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:08:16"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:09:25"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:09:25"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:09:25"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:09:30"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:09:53"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:11:26"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:11:41"}
+{"level":"info","message":"API request received to scrape URL: https://example.com","timestamp":"2025-06-07 18:11:41"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:11:41"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:11:41"}
+{"level":"info","message":"Navigating to URL: https://example.com","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Page loaded in 867ms","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Cleaning HTML content for URL: https://example.com","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Found 1 headings in the document","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"No main content with headings found, using text density analysis","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Using largest text block with score 1199 and 1 headings","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Final cleaned HTML contains 1 headings","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: undefined","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Cache set for key: https://example.com:{} (TTL: 3600s)","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://example.com in 917ms","timestamp":"2025-06-07 18:11:42"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:11:50"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:12:20"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:12:20"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:12:20"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:12:20"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:12:21"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:12:21"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:14:24"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:14:24"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:16:55"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:16:55"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:16:55"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:17:00","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"a2b75065-81cd-4569-973b-983f32aaa907","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"Completed batch processing for a2b75065-81cd-4569-973b-983f32aaa907","timestamp":"2025-06-07 18:17:00"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:17:06"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:17:12"}
+{"concurrency":2,"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:17:12","urlCount":2,"userAgent":"curl/8.7.1"}
+{"batchId":"91e7c544-337d-4655-883e-69944212f4fa","concurrency":2,"estimatedTime":30000,"level":"info","message":"Initiated batch scraping for 2 URLs","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Starting scraping process for URL: https://httpbin.org/json","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Navigating to URL: https://httpbin.org/json","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Page loaded in 711ms","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Cleaning HTML content for URL: https://httpbin.org/json","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Found 0 headings in the document","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"No main content with headings found, using text density analysis","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Creating artificial main content container with all heading sections","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"No main content found, using entire cleaned document","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: undefined","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Cache set for key: https://httpbin.org/json:{} (TTL: 3600s)","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://httpbin.org/json in 748ms","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"Completed batch processing for 91e7c544-337d-4655-883e-69944212f4fa","timestamp":"2025-06-07 18:17:12"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:17:21"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:18:19"}
+{"concurrency":3,"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:18:19","urlCount":5,"userAgent":"curl/8.7.1"}
+{"batchId":"3957c651-e4f8-4ce9-bf2c-0ee107e8b2bc","concurrency":3,"estimatedTime":50000,"level":"info","message":"Initiated batch scraping for 5 URLs","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Navigating to URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Navigating to URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Navigating to URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:18:19"}
+{"level":"info","message":"Waiting additional 2000ms","timestamp":"2025-06-07 18:18:20"}
+{"level":"info","message":"Waiting additional 2000ms","timestamp":"2025-06-07 18:18:20"}
+{"level":"info","message":"Waiting additional 2000ms","timestamp":"2025-06-07 18:18:20"}
+{"level":"info","message":"Page loaded in 3246ms","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found 31 headings in the document","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found main content using selector: main with 26 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Final cleaned HTML contains 25 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Original HTML contains 25 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaned HTML contains 49 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown contains 49 heading lines","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown conversion complete. Content length: 38164","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt in 3503ms","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Navigating to URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Page loaded in 3749ms","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found 11 headings in the document","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found main content using selector: main with 6 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Final cleaned HTML contains 6 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Original HTML contains 6 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaned HTML contains 11 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown contains 11 heading lines","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown conversion complete. Content length: 13240","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart in 3832ms","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Page loaded in 3841ms","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found 16 headings in the document","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Found main content using selector: main with 11 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Final cleaned HTML contains 11 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Original HTML contains 11 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cleaned HTML contains 21 headings","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown contains 21 heading lines","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Markdown conversion complete. Content length: 25701","timestamp":"2025-06-07 18:18:22"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 18:18:23"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview in 3958ms","timestamp":"2025-06-07 18:18:23"}
+{"level":"info","message":"Completed batch processing for 3957c651-e4f8-4ce9-bf2c-0ee107e8b2bc","timestamp":"2025-06-07 18:18:23"}
+{"level":"info","message":"Navigating to URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:18:23"}
+{"level":"info","message":"Waiting additional 2000ms","timestamp":"2025-06-07 18:18:23"}
+{"level":"info","message":"Waiting additional 2000ms","timestamp":"2025-06-07 18:18:24"}
+{"level":"info","message":"Page loaded in 3236ms","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Found 11 headings in the document","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Found main content using selector: main with 6 headings","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Final cleaned HTML contains 6 headings","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Original HTML contains 6 headings","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Cleaned HTML contains 11 headings","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Markdown contains 11 heading lines","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Markdown conversion complete. Content length: 9181","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart in 3338ms","timestamp":"2025-06-07 18:18:25"}
+{"level":"info","message":"Page loaded in 3259ms","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Found 15 headings in the document","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Found main content using selector: main with 10 headings","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Final cleaned HTML contains 10 headings","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Original HTML contains 10 headings","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Cleaned HTML contains 19 headings","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Markdown contains 27 heading lines","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Markdown conversion complete. Content length: 13580","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 18:18:26"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart in 3367ms","timestamp":"2025-06-07 18:18:26"}
+{"level":"warn","message":"Invalid API key provided: your-secret-key","timestamp":"2025-06-07 18:18:57"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:19:14"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:23:26"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:25:11","urlCount":2,"userAgent":"curl/8.7.1"}
+{"batchId":"fc21b13d-3d33-4029-9e24-5877f5270ef6","concurrency":3,"estimatedTime":20000,"level":"info","message":"Initiated batch scraping for 2 URLs","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Starting scraping process for URL: https://httpbin.org/json","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Cache hit for key: https://httpbin.org/json:{}","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Retrieved from cache: https://httpbin.org/json","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"Completed batch processing for fc21b13d-3d33-4029-9e24-5877f5270ef6","timestamp":"2025-06-07 18:25:11"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:25:19"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:25:30"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:25:55"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:26:33"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:26:33"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:26:33"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:26:33"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:29:34"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:29:34"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:29:34"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:29:39","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"f6eb27e1-8d83-4b70-8902-e9c5ad914698","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"Completed batch processing for f6eb27e1-8d83-4b70-8902-e9c5ad914698","timestamp":"2025-06-07 18:29:39"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:29:47"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:30:57"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:30:57"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:30:57"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:30:57"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:33:03"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:33:03"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:33:03"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:33:09"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:33:16","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"467618f0-6968-4df3-bef3-d06403f1b378","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"Completed batch processing for 467618f0-6968-4df3-bef3-d06403f1b378","timestamp":"2025-06-07 18:33:16"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:33:24"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:33:42"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:35:06"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:35:06"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:35:06"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:35:06"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:36:56"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:36:56"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:36:56"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:37:02","urlCount":2,"userAgent":"curl/8.7.1"}
+{"batchId":"cfd359a9-c2b2-4901-a0c9-bff9dbed16c1","concurrency":3,"estimatedTime":20000,"level":"info","message":"Initiated batch scraping for 2 URLs","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Starting scraping process for URL: https://httpbin.org/json","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Cache hit for key: https://httpbin.org/json:{}","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Retrieved from cache: https://httpbin.org/json","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"Completed batch processing for cfd359a9-c2b2-4901-a0c9-bff9dbed16c1","timestamp":"2025-06-07 18:37:02"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:37:10"}
+{"batchId":"cfd359a9-c2b2-4901-a0c9-bff9dbed16c1","format":"markdown","level":"info","message":"ZIP download method called","timestamp":"2025-06-07 18:37:10"}
+{"batchId":"cfd359a9-c2b2-4901-a0c9-bff9dbed16c1","format":"markdown","level":"info","message":"Creating ZIP download for batch","timestamp":"2025-06-07 18:37:10"}
+{"hasResults":true,"level":"info","message":"Checking valid results","resultsLength":2,"success":true,"timestamp":"2025-06-07 18:37:10"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:39:34"}
+{"concurrency":3,"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:39:34","urlCount":5,"userAgent":"curl/8.7.1"}
+{"batchId":"24141ed7-db53-416a-a712-8802ab7b1b8e","concurrency":3,"estimatedTime":50000,"level":"info","message":"Initiated batch scraping for 5 URLs","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"Completed batch processing for 24141ed7-db53-416a-a712-8802ab7b1b8e","timestamp":"2025-06-07 18:39:34"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:40:26"}
+{"batchId":"24141ed7-db53-416a-a712-8802ab7b1b8e","format":"markdown","level":"info","message":"ZIP download method called","timestamp":"2025-06-07 18:40:26"}
+{"batchId":"24141ed7-db53-416a-a712-8802ab7b1b8e","format":"markdown","level":"info","message":"Creating ZIP download for batch","timestamp":"2025-06-07 18:40:26"}
+{"hasResults":true,"level":"info","message":"Checking valid results","resultsLength":5,"success":true,"timestamp":"2025-06-07 18:40:27"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:43:28","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"927fcdcc-ff91-4c9f-bcfd-5db5f033a19e","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"Completed batch processing for 927fcdcc-ff91-4c9f-bcfd-5db5f033a19e","timestamp":"2025-06-07 18:43:28"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:43:33","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"4b033752-216f-4167-a3ad-a6dc8b7ff92c","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"Completed batch processing for 4b033752-216f-4167-a3ad-a6dc8b7ff92c","timestamp":"2025-06-07 18:43:33"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:44:17"}
+{"level":"info","message":"API request received to scrape URL: https://example.com","timestamp":"2025-06-07 18:44:17"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:44:17"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:44:17"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:44:17"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:44:22"}
+{"level":"info","message":"API request received to scrape URL: https://example.com","timestamp":"2025-06-07 18:44:22"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:44:22"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:44:22"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:44:22"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:44:28","urlCount":1,"userAgent":"curl/8.7.1"}
+{"batchId":"faf0d290-d313-4229-b203-84495fd4d1f8","concurrency":3,"estimatedTime":10000,"level":"info","message":"Initiated batch scraping for 1 URLs","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"Cache hit for key: https://example.com:{}","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"Retrieved from cache: https://example.com","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"Completed batch processing for faf0d290-d313-4229-b203-84495fd4d1f8","timestamp":"2025-06-07 18:44:28"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:45:58"}
+{"concurrency":3,"level":"info","message":"Initiating batch scraping operation","timestamp":"2025-06-07 18:45:58","urlCount":5,"userAgent":"curl/8.7.1"}
+{"batchId":"58253af9-0969-4a20-94fc-cafa040986cd","concurrency":3,"estimatedTime":50000,"level":"info","message":"Initiated batch scraping for 5 URLs","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Cache hit for key: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Retrieved from cache: https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"Completed batch processing for 58253af9-0969-4a20-94fc-cafa040986cd","timestamp":"2025-06-07 18:45:58"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 18:46:47"}
+{"batchId":"58253af9-0969-4a20-94fc-cafa040986cd","format":"markdown","level":"info","message":"ZIP download method called","timestamp":"2025-06-07 18:46:47"}
+{"batchId":"58253af9-0969-4a20-94fc-cafa040986cd","format":"markdown","level":"info","message":"Creating ZIP download for batch","timestamp":"2025-06-07 18:46:47"}
+{"hasResults":true,"level":"info","message":"Checking valid results","resultsLength":5,"success":true,"timestamp":"2025-06-07 18:46:47"}

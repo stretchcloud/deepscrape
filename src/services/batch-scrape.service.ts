@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from './redis.service';
 import { logger } from '../utils/logger';
-import { ScraperManager } from '../scraper/scraper-manager';
+import scraperManager, { ScraperManager } from '../scraper/scraper-manager';
 import { 
   BatchScrapeRequest, 
   BatchScrapeJob, 
@@ -222,7 +222,7 @@ export class BatchScrapeService {
       if (!jobsStr) return;
 
       const jobs: BatchScrapeJob[] = JSON.parse(jobsStr);
-      const scraperManager = new ScraperManager();
+      // Use the singleton instance
 
       // Process jobs with controlled concurrency
       const processingPromises: Promise<void>[] = [];
