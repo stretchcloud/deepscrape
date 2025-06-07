@@ -34,8 +34,8 @@ export class BatchScrapeService {
     this.validateBatchRequest(request);
 
     const batchId = uuidv4();
-    const concurrency = Math.min(request.concurrency || BatchScrapeService.DEFAULT_CONCURRENCY, BatchScrapeService.MAX_CONCURRENCY);
-    const timeout = request.timeout || BatchScrapeService.DEFAULT_TIMEOUT;
+    const concurrency = Math.min(request.concurrency ?? BatchScrapeService.DEFAULT_CONCURRENCY, BatchScrapeService.MAX_CONCURRENCY);
+    const timeout = request.timeout ?? BatchScrapeService.DEFAULT_TIMEOUT;
     
     // Estimate processing time based on URL count and concurrency
     const estimatedTime = Math.ceil((request.urls.length / concurrency) * 30000); // ~30s per URL
@@ -52,9 +52,9 @@ export class BatchScrapeService {
       concurrency,
       timeout,
       webhook: request.webhook,
-      failFast: request.failFast || false,
-      maxRetries: request.maxRetries || 3,
-      options: request.options || {}
+      failFast: request.failFast ?? false,
+      maxRetries: request.maxRetries ?? 3,
+      options: request.options ?? {}
     };
 
     // Store batch metadata in Redis
@@ -83,7 +83,7 @@ export class BatchScrapeService {
 
     // Start processing asynchronously
     setImmediate(() => {
-      this.processBatch(batchId, request.options || {}, concurrency, timeout)
+      this.processBatch(batchId, request.options ?? {}, concurrency, timeout)
         .catch(error => {
           logger.error(`Batch processing failed for ${batchId}`, { error: (error as Error).message });
         });
@@ -304,7 +304,7 @@ export class BatchScrapeService {
         job.result = result;
         job.status = 'completed';
         job.endTime = Date.now();
-        job.processingTime = job.endTime - job.startTime!;
+        job.processingTime = job.endTime - (job.startTime ?? job.endTime);
         job.retryCount = attempt;
 
         logger.debug(`Successfully processed job ${job.id}`);
@@ -324,7 +324,7 @@ export class BatchScrapeService {
           job.status = 'failed';
           job.error = (error as Error).message;
           job.endTime = Date.now();
-          job.processingTime = job.endTime - job.startTime!;
+          job.processingTime = job.endTime - (job.startTime ?? job.endTime);
           
           logger.error(`Job ${job.id} failed after ${maxRetries + 1} attempts`, {
             error: (error as Error).message

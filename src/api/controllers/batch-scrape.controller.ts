@@ -3,7 +3,6 @@ import { logger } from '../../utils/logger';
 import { batchScrapeService } from '../../services/batch-scrape.service';
 import { BatchScrapeRequest } from '../../types';
 import archiver from 'archiver';
-import path from 'path';
 
 /**
  * Controller for batch scraping operations
@@ -200,7 +199,7 @@ export class BatchScrapeController {
 
       const status = await batchScrapeService.getBatchStatus(batchId);
       
-      if (!status.success || !status.results || status.results.length === 0) {
+      if (!this.hasValidResults(status)) {
         res.status(404).json({
           success: false,
           error: 'No completed results found for this batch'
@@ -208,98 +207,110 @@ export class BatchScrapeController {
         return;
       }
 
-      // Set response headers for ZIP download
-      const timestamp = new Date().toISOString().split('T')[0];
-      const zipFilename = `batch_${batchId}_${timestamp}.zip`;
+      this.setupZipResponseHeaders(res, batchId);
+      const archive = this.createZipArchive(res);
       
-      res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
-      res.setHeader('Content-Type', 'application/zip');
+      this.addResultsToArchive(archive, status.results!, format);
+      this.addSummaryToArchive(archive, batchId, status);
 
-      // Create ZIP archive
-      const archive = archiver('zip', {
-        zlib: { level: 9 } // Maximum compression
-      });
-
-      // Handle archive errors
-      archive.on('error', (err) => {
-        logger.error('ZIP archive error', { error: err.message });
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            error: 'Failed to create ZIP archive'
-          });
-        }
-      });
-
-      // Pipe archive to response
-      archive.pipe(res);
-
-      // Add files to archive
-      for (let i = 0; i < status.results.length; i++) {
-        const result = status.results[i];
-        const url = new URL(result.url);
-        const hostname = url.hostname.replace(/[^a-zA-Z0-9]/g, '_');
-        const pathname = url.pathname.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
-        
-        let filename: string;
-        let content: string;
-        let extension: string;
-
-        if (format === 'markdown' && result.contentType === 'markdown') {
-          extension = 'md';
-          content = result.content;
-        } else if (format === 'html' && result.contentType === 'html') {
-          extension = 'html';
-          content = result.content;
-        } else if (format === 'text') {
-          extension = 'txt';
-          content = result.content;
-        } else {
-          extension = 'json';
-          content = JSON.stringify(result, null, 2);
-        }
-
-        filename = `${i + 1}_${hostname}${pathname}.${extension}`;
-        
-        // Add file to archive
-        archive.append(content, { name: filename });
-      }
-
-      // Add a summary file
-      const summary = {
-        batchId,
-        generatedAt: new Date().toISOString(),
-        totalFiles: status.results.length,
-        completedUrls: status.completedUrls,
-        failedUrls: status.failedUrls,
-        processingTime: status.processingTime,
-        urls: status.results.map(r => r.url)
-      };
-      
-      archive.append(JSON.stringify(summary, null, 2), { name: 'batch_summary.json' });
-
-      // Finalize the archive
       await archive.finalize();
 
     } catch (error) {
-      logger.error('Failed to create ZIP download', {
-        batchId: req.params.batchId,
-        error: (error as Error).message
-      });
+      this.handleZipError(error, req.params.batchId, res);
+    }
+  }
 
+  private hasValidResults(status: any): boolean {
+    return status.success && status.results && status.results.length > 0;
+  }
+
+  private setupZipResponseHeaders(res: Response, batchId: string): void {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const zipFilename = `batch_${batchId}_${timestamp}.zip`;
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+    res.setHeader('Content-Type', 'application/zip');
+  }
+
+  private createZipArchive(res: Response): any {
+    const archive = archiver('zip', {
+      zlib: { level: 9 }
+    });
+
+    archive.on('error', (err) => {
+      logger.error('ZIP archive error', { error: err.message });
       if (!res.headersSent) {
-        if ((error as Error).message.includes('not found')) {
-          res.status(404).json({
-            success: false,
-            error: (error as Error).message
-          });
-        } else {
-          res.status(500).json({
-            success: false,
-            error: 'Internal server error'
-          });
-        }
+        res.status(500).json({
+          success: false,
+          error: 'Failed to create ZIP archive'
+        });
       }
+    });
+
+    archive.pipe(res);
+    return archive;
+  }
+
+  private addResultsToArchive(archive: any, results: any[], format: string): void {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const { filename, content } = this.prepareFileData(result, i, format);
+      archive.append(content, { name: filename });
+    }
+  }
+
+  private prepareFileData(result: any, index: number, format: string): { filename: string; content: string } {
+    const url = new URL(result.url);
+    const hostname = url.hostname.replace(/[^a-zA-Z0-9]/g, '_');
+    const pathname = url.pathname.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+    
+    const { extension, content } = this.getContentByFormat(result, format);
+    const filename = `${index + 1}_${hostname}${pathname}.${extension}`;
+    
+    return { filename, content };
+  }
+
+  private getContentByFormat(result: any, format: string): { extension: string; content: string } {
+    if (format === 'markdown' && result.contentType === 'markdown') {
+      return { extension: 'md', content: result.content };
+    }
+    if (format === 'html' && result.contentType === 'html') {
+      return { extension: 'html', content: result.content };
+    }
+    if (format === 'text') {
+      return { extension: 'txt', content: result.content };
+    }
+    return { extension: 'json', content: JSON.stringify(result, null, 2) };
+  }
+
+  private addSummaryToArchive(archive: any, batchId: string, status: any): void {
+    const summary = {
+      batchId,
+      generatedAt: new Date().toISOString(),
+      totalFiles: status.results.length,
+      completedUrls: status.completedUrls,
+      failedUrls: status.failedUrls,
+      processingTime: status.processingTime,
+      urls: status.results.map((r: any) => r.url)
+    };
+    
+    archive.append(JSON.stringify(summary, null, 2), { name: 'batch_summary.json' });
+  }
+
+  private handleZipError(error: unknown, batchId: string, res: Response): void {
+    logger.error('Failed to create ZIP download', {
+      batchId,
+      error: (error as Error).message
+    });
+
+    if (!res.headersSent) {
+      const statusCode = (error as Error).message.includes('not found') ? 404 : 500;
+      const errorMessage = statusCode === 404 ? (error as Error).message : 'Internal server error';
+      
+      res.status(statusCode).json({
+        success: false,
+        error: errorMessage
+      });
     }
   }
 
