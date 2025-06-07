@@ -1,0 +1,2 @@
+{"level":"error","message":"Error scraping URL: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:42:28"}
+{"level":"error","message":"Error scraping URL: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:43:20"}

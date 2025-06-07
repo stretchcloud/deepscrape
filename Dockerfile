@@ -46,24 +46,26 @@ RUN groupadd --gid 1001 nodejs && \
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Install Playwright browsers and dependencies
-RUN npx playwright install chromium
+# Install Playwright system dependencies as root
 RUN npx playwright install-deps chromium
-
-# Set Playwright environment variables
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/deepscrape/.cache/ms-playwright
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 # Copy built application from builder stage
 COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
 
 # Create directories and set proper permissions
-RUN mkdir -p /app/cache /app/logs && \
+RUN mkdir -p /app/cache /app/logs /home/deepscrape/.cache && \
     touch /app/logs/access.log /app/logs/combined.log /app/logs/error.log && \
-    chown -R deepscrape:nodejs /app
+    chown -R deepscrape:nodejs /app /home/deepscrape/.cache
 
 # Switch to non-root user
 USER deepscrape
+
+# Install Playwright browsers as the deepscrape user
+RUN npx playwright install chromium
+
+# Set Playwright environment variables
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/deepscrape/.cache/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 # Expose port
 EXPOSE 3000
