@@ -82,7 +82,8 @@ export async function crawl(
       ignoreRobotsTxt,
       regexOnFullURL,
       strategy,
-      useBrowser
+      useBrowser,
+      deduplicateSimilarUrls: true // Enable URL deduplication by default
     });
 
     // Try to get robots.txt
@@ -128,7 +129,7 @@ export async function crawl(
     res.status(200).json({
       success: true,
       id,
-      url: `${protocol}://${req.get('host')}/api/v1/crawl/${id}`
+      url: `${protocol}://${req.get('host')}/api/crawl/${id}`
     });
   } catch (error: any) {
     logger.error('Error initiating crawl', { error });

@@ -82,7 +82,9 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         // Setup hooks if needed - for now we'll just use the default empty object
         hooks: {},
         // Use browser-based crawling if specified
-        useBrowser: crawl.crawlerOptions.useBrowser || false
+        useBrowser: crawl.crawlerOptions.useBrowser || false,
+        // Enable URL deduplication by default
+        deduplicateSimilarUrls: true
     });
     // Import robots.txt if it was previously fetched
     if (crawl.robots) {

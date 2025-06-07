@@ -205,8 +205,9 @@ Extract complex data structure from any medium articles
 Start a multi-page crawl:
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-secret-key" \
   -d '{
     "url": "https://docs.example.com",
     "limit": 50,
@@ -222,7 +223,8 @@ curl -X POST http://localhost:3000/api/v1/crawl \
 Check crawl status:
 
 ```bash
-curl http://localhost:3000/api/v1/crawl/{job-id}
+curl http://localhost:3000/api/crawl/{job-id} \
+  -H "X-API-KEY: your-secret-key"
 ```
 
 ## API Endpoints
@@ -232,8 +234,8 @@ curl http://localhost:3000/api/v1/crawl/{job-id}
 | `/api/scrape` | POST | Scrape single URL |
 | `/api/extract-schema` | POST | Extract structured data |
 | `/api/summarize` | POST | Generate content summary |
-| `/api/v1/crawl` | POST | Start web crawl |
-| `/api/v1/crawl/:id` | GET | Get crawl status |
+| `/api/crawl` | POST | Start web crawl |
+| `/api/crawl/:id` | GET | Get crawl status |
 | `/api/cache` | DELETE | Clear cache |
 
 ## ⚙️ Configuration Options

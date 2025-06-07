@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /api/v1/crawl:
+ * /api/crawl:
  *   post:
  *     summary: Initiate a new web crawl
  *     description: Starts a new web crawl with the specified parameters

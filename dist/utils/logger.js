@@ -19,7 +19,7 @@ const logger = winston_1.default.createLogger({
         // Console transport for development
         new winston_1.default.transports.Console({
             format: winston_1.default.format.combine(winston_1.default.format.colorize(), winston_1.default.format.printf(({ timestamp, level, message, stack }) => {
-                return `${timestamp} ${level}: ${stack || message}`;
+                return `${timestamp} ${level}: ${stack ?? message}`;
             })),
         }),
         // File transport for errors

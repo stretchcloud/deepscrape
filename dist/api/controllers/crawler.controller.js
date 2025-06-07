@@ -46,7 +46,8 @@ async function crawl(req, res) {
             ignoreRobotsTxt,
             regexOnFullURL,
             strategy,
-            useBrowser
+            useBrowser,
+            deduplicateSimilarUrls: true // Enable URL deduplication by default
         });
         // Try to get robots.txt
         let robotsTxt = '';
@@ -89,7 +90,7 @@ async function crawl(req, res) {
         res.status(200).json({
             success: true,
             id,
-            url: `${protocol}://${req.get('host')}/api/v1/crawl/${id}`
+            url: `${protocol}://${req.get('host')}/api/crawl/${id}`
         });
     }
     catch (error) {

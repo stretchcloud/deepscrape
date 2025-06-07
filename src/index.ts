@@ -9,7 +9,7 @@ import scraperRoutes from './api/routes/scraper';
 import crawlerRoutes from './api/routes/crawler.routes';
 import { apiKeyAuth } from './api/middleware/auth.middleware';
 import { logger } from './utils/logger';
-import { initQueue, initializeWorker } from './services/queue.service';
+import { initQueue, initializeWorker, closeQueue } from './services/queue.service';
 
 // Load environment variables
 dotenv.config();
@@ -40,7 +40,7 @@ app.use(morgan('combined', { stream: accessLogStream })); // HTTP request loggin
 
 // API Routes
 app.use('/api', scraperRoutes);
-app.use('/api/v1/crawl', crawlerRoutes);
+app.use('/api/crawl', crawlerRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -77,8 +77,8 @@ async function initializeCrawlQueue() {
     
     // Graceful shutdown
     const shutdown = async () => {
-      logger.info('Shutting down worker...');
-      await worker.close();
+      logger.info('Shutting down enhanced queue service...');
+      await closeQueue();
       process.exit(0);
     };
     

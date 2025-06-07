@@ -34,7 +34,7 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' })); // Par
 app.use((0, morgan_1.default)('combined', { stream: accessLogStream })); // HTTP request logging
 // API Routes
 app.use('/api', scraper_1.default);
-app.use('/api/v1/crawl', crawler_routes_1.default);
+app.use('/api/crawl', crawler_routes_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Service is running' });
@@ -64,8 +64,8 @@ async function initializeCrawlQueue() {
         logger_1.logger.info('Crawl queue and worker initialized successfully');
         // Graceful shutdown
         const shutdown = async () => {
-            logger_1.logger.info('Shutting down worker...');
-            await worker.close();
+            logger_1.logger.info('Shutting down enhanced queue service...');
+            await (0, queue_service_1.closeQueue)();
             process.exit(0);
         };
         process.on('SIGTERM', shutdown);

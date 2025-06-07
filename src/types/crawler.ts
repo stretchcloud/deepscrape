@@ -38,6 +38,7 @@ export interface CrawlerOptions {
   maxDiscoveryDepth?: number;
   currentDiscoveryDepth?: number;
   useBrowser?: boolean; // Option to use browser-based crawling with Playwright
+  deduplicateSimilarUrls?: boolean; // Enable similar URL deduplication (default: true)
 }
 
 export interface StoredCrawl {
