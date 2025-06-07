@@ -16,3 +16,6 @@ cache/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# External repositories/analysis
+firecrawl/
