@@ -304,7 +304,7 @@ export class BatchScrapeService {
         job.result = result;
         job.status = 'completed';
         job.endTime = Date.now();
-        job.processingTime = job.endTime - job.startTime!;
+        job.processingTime = job.endTime - (job.startTime ?? job.endTime);
         job.retryCount = attempt;
 
         logger.debug(`Successfully processed job ${job.id}`);
