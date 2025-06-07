@@ -133,7 +133,7 @@ export interface BatchScrapeResponse {
 export interface BatchScrapeStatusResponse {
   success: boolean;
   batchId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled';
   totalUrls: number;
   completedUrls: number;
   failedUrls: number;

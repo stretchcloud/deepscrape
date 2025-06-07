@@ -130,7 +130,7 @@ export class BatchScrapeService {
     // Determine overall status
     let status = metadata.status;
     if (status === 'processing' && pendingJobs.length === 0) {
-      status = failedJobs.length === 0 ? 'completed' : 'completed';
+      status = failedJobs.length === 0 ? 'completed' : 'completed_with_errors';
       
       // Update metadata status
       metadata.status = status;
