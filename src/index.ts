@@ -71,7 +71,7 @@ async function initializeCrawlQueue() {
     await initQueue();
     
     // Start worker to process crawl jobs
-    const worker = initializeWorker();
+    initializeWorker();
     
     logger.info('Crawl queue and worker initialized successfully');
     

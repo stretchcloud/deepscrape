@@ -8,6 +8,7 @@ const logger_1 = require("../../utils/logger");
 const crawler_1 = require("../../scraper/crawler");
 const redis_service_1 = require("../../services/redis.service");
 const queue_service_1 = require("../../services/queue.service");
+const file_export_service_1 = require("../../services/file-export.service");
 /**
  * Initiate a new crawl job
  */
@@ -90,7 +91,9 @@ async function crawl(req, res) {
         res.status(200).json({
             success: true,
             id,
-            url: `${protocol}://${req.get('host')}/api/crawl/${id}`
+            url: `${protocol}://${req.get('host')}/api/crawl/${id}`,
+            message: 'Crawl initiated successfully. Individual pages will be exported as markdown files.',
+            outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(id)
         });
     }
     catch (error) {
@@ -135,6 +138,8 @@ async function getCrawlStatus(req, res) {
         const doneCount = await (0, redis_service_1.getCrawlDoneJobsCount)(jobId);
         const doneJobIds = await (0, redis_service_1.getCrawlDoneJobs)(jobId, start, end ?? -1);
         const doneJobs = await (0, queue_service_1.getJobs)(doneJobIds);
+        // Get exported files information
+        const exportedFiles = await (0, redis_service_1.getExportedFiles)(jobId);
         // Format jobs for response
         const jobs = await Promise.all(doneJobs.map(async (job) => {
             const jobState = await job.getState();
@@ -164,7 +169,12 @@ async function getCrawlStatus(req, res) {
             status,
             crawl: storedCrawl,
             jobs,
-            count: doneCount
+            count: doneCount,
+            exportedFiles: {
+                count: exportedFiles.length,
+                outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(jobId),
+                files: exportedFiles.slice(0, 10) // Show first 10 files to avoid huge responses
+            }
         });
     }
     catch (error) {

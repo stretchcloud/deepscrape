@@ -9,6 +9,7 @@ const crawler_1 = require("./crawler");
 const redis_service_1 = require("../services/redis.service");
 const queue_service_1 = require("../services/queue.service");
 const scraper_manager_1 = require("./scraper-manager");
+const file_export_service_1 = require("../services/file-export.service");
 const axios_1 = __importDefault(require("axios"));
 /**
  * Process a crawl job
@@ -146,13 +147,23 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
     if (crawl.crawlerOptions.useBrowser) {
         await crawler.close();
     }
+    // Log crawl initiation for summary tracking
+    logger_1.logger.info(`Crawl ${crawlId} initiated - discovered ${filteredLinks.length} URLs to process`, {
+        crawlId,
+        initialUrl: url,
+        discoveredCount: filteredLinks.length,
+        strategy: crawler.getStrategy(),
+        usedBrowser: crawl.crawlerOptions.useBrowser || false,
+        outputDir: file_export_service_1.fileExportService.getCrawlOutputDir(crawlId)
+    });
     // Return discovery result
     return {
         url,
         links: filteredLinks,
         discoveredCount: filteredLinks.length,
         strategy: crawler.getStrategy(),
-        usedBrowser: crawl.crawlerOptions.useBrowser || false
+        usedBrowser: crawl.crawlerOptions.useBrowser || false,
+        outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(crawlId)
     };
 }
 /**
@@ -203,6 +214,33 @@ async function handlePageScrape(url, scrapeOptions, crawlId) {
         : (result.contentType === 'html' ? result.content : null);
     // Make sure to log the content we're returning
     logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
+    // Export page content to markdown file if content exists
+    if (result.content && result.contentType === 'markdown') {
+        try {
+            const exportedFilePath = await file_export_service_1.fileExportService.exportPage(url, result.content, result.title || 'Untitled', crawlId, {
+                status: result.metadata?.status,
+                contentType: result.contentType,
+                loadTime: result.metadata?.loadTime,
+                usedBrowser: useBrowser,
+                processingTime: result.metadata?.processingTime,
+                timestamp: new Date().toISOString()
+            });
+            // Track the exported file
+            await (0, redis_service_1.addExportedFile)(crawlId, exportedFilePath);
+            logger_1.logger.info(`Page exported to file: ${exportedFilePath}`, {
+                url,
+                crawlId,
+                contentLength: result.content.length
+            });
+        }
+        catch (exportError) {
+            logger_1.logger.error(`Failed to export page to file: ${url}`, {
+                error: exportError,
+                crawlId
+            });
+            // Don't fail the crawl if file export fails, just log it
+        }
+    }
     // Return both a document structure AND the content directly
     // This ensures the content is accessible in the crawler API response
     return {

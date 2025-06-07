@@ -2,9 +2,10 @@ import { Job } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { WebCrawler } from './crawler';
-import { getCrawl, saveCrawl, markCrawlFinished, addCrawlJobs } from '../services/redis.service';
+import { getCrawl, saveCrawl, markCrawlFinished, addCrawlJobs, addExportedFile } from '../services/redis.service';
 import { addCrawlJobsToQueue } from '../services/queue.service';
 import { ScraperManager } from './scraper-manager';
+import { fileExportService } from '../services/file-export.service';
 import axios from 'axios';
 
 /**
@@ -171,13 +172,24 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     await crawler.close();
   }
   
+  // Log crawl initiation for summary tracking
+  logger.info(`Crawl ${crawlId} initiated - discovered ${filteredLinks.length} URLs to process`, {
+    crawlId,
+    initialUrl: url,
+    discoveredCount: filteredLinks.length,
+    strategy: crawler.getStrategy(),
+    usedBrowser: crawl.crawlerOptions.useBrowser || false,
+    outputDir: fileExportService.getCrawlOutputDir(crawlId)
+  });
+  
   // Return discovery result
   return {
     url,
     links: filteredLinks,
     discoveredCount: filteredLinks.length,
     strategy: crawler.getStrategy(),
-    usedBrowser: crawl.crawlerOptions.useBrowser || false
+    usedBrowser: crawl.crawlerOptions.useBrowser || false,
+    outputDirectory: fileExportService.getCrawlOutputDir(crawlId)
   };
 }
 
@@ -236,6 +248,41 @@ async function handlePageScrape(url: string, scrapeOptions: any, crawlId: string
   
   // Make sure to log the content we're returning
   logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
+  
+  // Export page content to markdown file if content exists
+  if (result.content && result.contentType === 'markdown') {
+    try {
+      const exportedFilePath = await fileExportService.exportPage(
+        url,
+        result.content,
+        result.title || 'Untitled',
+        crawlId,
+        {
+          status: result.metadata?.status,
+          contentType: result.contentType,
+          loadTime: result.metadata?.loadTime,
+          usedBrowser: useBrowser,
+          processingTime: result.metadata?.processingTime,
+          timestamp: new Date().toISOString()
+        }
+      );
+      
+      // Track the exported file
+      await addExportedFile(crawlId, exportedFilePath);
+      
+      logger.info(`Page exported to file: ${exportedFilePath}`, { 
+        url, 
+        crawlId,
+        contentLength: result.content.length 
+      });
+    } catch (exportError) {
+      logger.error(`Failed to export page to file: ${url}`, { 
+        error: exportError, 
+        crawlId 
+      });
+      // Don't fail the crawl if file export fails, just log it
+    }
+  }
   
   // Return both a document structure AND the content directly
   // This ensures the content is accessible in the crawler API response

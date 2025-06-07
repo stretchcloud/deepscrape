@@ -18,9 +18,11 @@ import {
   getCrawlDoneJobs,
   getCrawlDoneJobsCount,
   cancelCrawl,
-  isCrawlFinished
+  isCrawlFinished,
+  getExportedFiles
 } from '../../services/redis.service';
 import { getJob, getJobs, addCrawlJobToQueue } from '../../services/queue.service';
+import { fileExportService } from '../../services/file-export.service';
 
 /**
  * Initiate a new crawl job
@@ -129,7 +131,9 @@ export async function crawl(
     res.status(200).json({
       success: true,
       id,
-      url: `${protocol}://${req.get('host')}/api/crawl/${id}`
+      url: `${protocol}://${req.get('host')}/api/crawl/${id}`,
+      message: 'Crawl initiated successfully. Individual pages will be exported as markdown files.',
+      outputDirectory: fileExportService.getCrawlOutputDir(id)
     });
   } catch (error: any) {
     logger.error('Error initiating crawl', { error });
@@ -184,6 +188,9 @@ export async function getCrawlStatus(
     const doneJobIds = await getCrawlDoneJobs(jobId, start, end ?? -1);
     const doneJobs = await getJobs(doneJobIds);
     
+    // Get exported files information
+    const exportedFiles = await getExportedFiles(jobId);
+    
     // Format jobs for response
     const jobs = await Promise.all(doneJobs.map(async job => {
       const jobState = await job.getState();
@@ -219,7 +226,12 @@ export async function getCrawlStatus(
       status,
       crawl: storedCrawl,
       jobs,
-      count: doneCount
+      count: doneCount,
+      exportedFiles: {
+        count: exportedFiles.length,
+        outputDirectory: fileExportService.getCrawlOutputDir(jobId),
+        files: exportedFiles.slice(0, 10) // Show first 10 files to avoid huge responses
+      }
     });
   } catch (error: any) {
     logger.error('Error getting crawl status', { error });

@@ -60,7 +60,7 @@ async function initializeCrawlQueue() {
         // Initialize queue
         await (0, queue_service_1.initQueue)();
         // Start worker to process crawl jobs
-        const worker = (0, queue_service_1.initializeWorker)();
+        (0, queue_service_1.initializeWorker)();
         logger_1.logger.info('Crawl queue and worker initialized successfully');
         // Graceful shutdown
         const shutdown = async () => {

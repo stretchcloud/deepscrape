@@ -192,6 +192,24 @@ export async function markCrawlFinished(crawlId: string): Promise<boolean> {
     if (isFinished) {
       const result = await redisClient.setnx(`crawl:${crawlId}:finish`, 'yes');
       await redisClient.expire(`crawl:${crawlId}:finish`, 24 * 60 * 60);
+      
+      // Set completion timestamp
+      if (result === 1) {
+        await redisClient.set(`crawl:${crawlId}:completed_at`, Date.now());
+        await redisClient.expire(`crawl:${crawlId}:completed_at`, 24 * 60 * 60);
+        
+        logger.info(`Crawl ${crawlId} marked as finished`, { crawlId });
+        
+        // Trigger summary generation asynchronously (don't block completion)
+        setImmediate(async () => {
+          try {
+            await generateCrawlSummary(crawlId);
+          } catch (summaryError) {
+            logger.error(`Failed to generate crawl summary for ${crawlId}`, { error: summaryError });
+          }
+        });
+      }
+      
       return result === 1;
     }
     return false;
@@ -230,6 +248,84 @@ export async function cancelCrawl(crawlId: string): Promise<void> {
   } catch (error) {
     logger.error('Error canceling crawl', { error, crawlId });
     throw error;
+  }
+}
+
+// Track exported files for crawls
+export async function addExportedFile(crawlId: string, filePath: string): Promise<void> {
+  try {
+    await redisClient.lpush(`crawl:${crawlId}:exported_files`, filePath);
+    await redisClient.expire(`crawl:${crawlId}:exported_files`, 24 * 60 * 60);
+  } catch (error) {
+    logger.error('Error tracking exported file', { error, crawlId, filePath });
+  }
+}
+
+export async function getExportedFiles(crawlId: string): Promise<string[]> {
+  try {
+    return await redisClient.lrange(`crawl:${crawlId}:exported_files`, 0, -1);
+  } catch (error) {
+    logger.error('Error getting exported files', { error, crawlId });
+    return [];
+  }
+}
+
+// Generate crawl summary when crawl completes
+async function generateCrawlSummary(crawlId: string): Promise<void> {
+  try {
+    // Import here to avoid circular dependency
+    const { fileExportService } = await import('./file-export.service');
+    
+    const crawl = await getCrawl(crawlId);
+    if (!crawl) {
+      logger.warn(`Cannot generate summary: crawl ${crawlId} not found`);
+      return;
+    }
+    
+    // Get crawl statistics
+    const totalJobs = await redisClient.scard(`crawl:${crawlId}:jobs`);
+    const successfulJobs = await redisClient.scard(`crawl:${crawlId}:jobs:done:success`);
+    const failedJobs = await redisClient.scard(`crawl:${crawlId}:jobs:done:failed`);
+    const exportedFiles = await getExportedFiles(crawlId);
+    const completedAt = await redisClient.get(`crawl:${crawlId}:completed_at`);
+    
+    const summary = {
+      initialUrl: crawl.originUrl,
+      totalPages: totalJobs,
+      successfulPages: successfulJobs,
+      failedPages: failedJobs,
+      startTime: new Date(crawl.createdAt).toISOString(),
+      endTime: completedAt ? new Date(parseInt(completedAt)).toISOString() : new Date().toISOString(),
+      exportedFiles: exportedFiles.reverse(), // Reverse to get chronological order
+      crawlOptions: crawl.crawlerOptions
+    };
+    
+    await fileExportService.exportCrawlSummary(crawlId, summary);
+    
+    // Also create consolidated export files for easy access
+    try {
+      const consolidatedMarkdown = await fileExportService.exportCrawlAsConsolidatedFile(crawlId, 'markdown');
+      const consolidatedJson = await fileExportService.exportCrawlAsConsolidatedFile(crawlId, 'json');
+      
+      logger.info(`Generated crawl summary and consolidated exports for ${crawlId}`, {
+        crawlId,
+        totalPages: summary.totalPages,
+        successfulPages: summary.successfulPages,
+        exportedFiles: summary.exportedFiles.length,
+        consolidatedFiles: [consolidatedMarkdown, consolidatedJson]
+      });
+    } catch (consolidationError) {
+      logger.warn(`Failed to create consolidated exports for ${crawlId}`, { error: consolidationError });
+      
+      logger.info(`Generated crawl summary for ${crawlId}`, {
+        crawlId,
+        totalPages: summary.totalPages,
+        successfulPages: summary.successfulPages,
+        exportedFiles: summary.exportedFiles.length
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to generate crawl summary for ${crawlId}`, { error, crawlId });
   }
 }
 

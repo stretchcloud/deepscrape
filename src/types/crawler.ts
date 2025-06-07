@@ -83,6 +83,8 @@ export interface CrawlResponse {
   success: boolean;
   id?: string;
   url?: string;
+  message?: string;
+  outputDirectory?: string;
   error?: string;
 }
 
@@ -125,6 +127,11 @@ export interface CrawlStatusResponse {
     error?: string;
   }[];
   count?: number;
+  exportedFiles?: {
+    count: number;
+    outputDirectory: string;
+    files: string[];
+  };
   error?: string;
 }
 

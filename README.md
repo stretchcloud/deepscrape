@@ -202,7 +202,7 @@ Extract complex data structure from any medium articles
 
 ### Web Crawling
 
-Start a multi-page crawl:
+Start a multi-page crawl (automatically exports markdown files):
 
 ```bash
 curl -X POST http://localhost:3000/api/crawl \
@@ -220,11 +220,38 @@ curl -X POST http://localhost:3000/api/crawl \
   }'
 ```
 
-Check crawl status:
+Response includes output directory:
+```json
+{
+  "success": true,
+  "id": "abc123-def456",
+  "url": "http://localhost:3000/api/crawl/abc123-def456",
+  "message": "Crawl initiated successfully. Individual pages will be exported as markdown files.",
+  "outputDirectory": "./crawl-output/abc123-def456"
+}
+```
+
+Check crawl status (includes exported files info):
 
 ```bash
 curl http://localhost:3000/api/crawl/{job-id} \
   -H "X-API-KEY: your-secret-key"
+```
+
+Status response shows exported files:
+```json
+{
+  "success": true,
+  "status": "completed",
+  "crawl": {...},
+  "jobs": [...],
+  "count": 15,
+  "exportedFiles": {
+    "count": 15,
+    "outputDirectory": "./crawl-output/abc123-def456",
+    "files": ["./crawl-output/abc123-def456/2024-01-15_abc123_example.com_page1.md", ...]
+  }
+}
 ```
 
 ## API Endpoints
@@ -260,6 +287,9 @@ CACHE_DIRECTORY=./cache
 # Redis (for job queue)
 REDIS_HOST=localhost
 REDIS_PORT=6379
+
+# Crawl file export
+CRAWL_OUTPUT_DIR=./crawl-output
 ```
 
 ### Scraper Options
@@ -320,6 +350,52 @@ Interact with dynamic content:
 - Start with simple schemas and iterate
 - Lower `temperature` values for consistent results
 - Include examples in descriptions for better accuracy
+
+### Crawl File Export
+
+Each crawled page is automatically exported as a markdown file with:
+
+- **Filename format**: `YYYY-MM-DD_crawlId_hostname_path.md`
+- **YAML frontmatter** with metadata (URL, title, crawl date, status)
+- **Organized structure**: `./crawl-output/{crawl-id}/`
+- **Automatic summary**: Generated when crawl completes
+
+**Example file structure:**
+```
+crawl-output/
+├── abc123-def456/
+│   ├── 2024-01-15_abc123_docs.example.com_getting-started.md
+│   ├── 2024-01-15_abc123_docs.example.com_api-reference.md
+│   ├── 2024-01-15_abc123_docs.example.com_tutorials.md
+│   ├── abc123-def456_summary.md
+│   ├── abc123-def456_consolidated.md    # 🆕 All pages in one file
+│   └── abc123-def456_consolidated.json  # 🆕 Structured JSON export
+└── xyz789-ghi012/
+    └── ...
+```
+
+**Consolidated Export Features:**
+- **Single Markdown**: All crawled pages combined into one readable file
+- **JSON Export**: Structured data with metadata for programmatic use
+- **Auto-Generated**: Created automatically when crawl completes
+- **Rich Metadata**: Preserves all page metadata and crawl statistics
+
+**File content example:**
+```markdown
+---
+url: "https://docs.example.com/getting-started"
+title: "Getting Started Guide"
+crawled_at: "2024-01-15T10:30:00.000Z"
+status: 200
+content_type: "markdown"
+load_time: 1250ms
+browser_mode: false
+---
+
+# Getting Started Guide
+
+Welcome to the getting started guide...
+```
 
 ## 🏗️ Architecture
 
