@@ -54,7 +54,7 @@ Test: `curl http://localhost:3000/health`
 ```bash
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   -d '{
     "url": "https://example.com",
     "options": { "extractorFormat": "markdown" }
@@ -68,7 +68,7 @@ Extract structured data using JSON Schema:
 ```bash
 curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   -d '{
     "url": "https://news.example.com/article",
     "schema": {
@@ -210,7 +210,7 @@ Process multiple URLs efficiently with controlled concurrency, automatic retries
 ```bash
 curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   -d '{
     "urls": [
       "https://example.com/page1",
@@ -244,7 +244,7 @@ Response:
 
 ```bash
 curl -X GET http://localhost:3000/api/batch/scrape/{batchId}/status \
-  -H "X-API-KEY: your-secret-key"
+  -H "X-API-Key: your-secret-key"
 ```
 
 Response:
@@ -268,7 +268,7 @@ Response:
 ```bash
 # Download all results as markdown files in a ZIP
 curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/zip?format=markdown" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   --output "batch_results.zip"
 
 # Extract the ZIP to get individual files
@@ -288,7 +288,7 @@ batch_summary.json
 ```bash
 # Get job IDs from status endpoint, then download individual files
 curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/{jobId}?format=markdown" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   --output "page1.md"
 ```
 
@@ -296,7 +296,7 @@ curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/{jobId}?f
 ```bash
 # All results in a single JSON file
 curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   --output "batch_results.json"
 ```
 
@@ -305,7 +305,7 @@ curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/json" \
 ```bash
 curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   -d '{
     "urls": ["https://example.com", "https://example.org"],
     "concurrency": 5,
@@ -331,7 +331,7 @@ curl -X POST http://localhost:3000/api/batch/scrape \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/batch/scrape/{batchId} \
-  -H "X-API-KEY: your-secret-key"
+  -H "X-API-Key: your-secret-key"
 ```
 
 ### Web Crawling
@@ -341,7 +341,7 @@ Start a multi-page crawl (automatically exports markdown files):
 ```bash
 curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-secret-key" \
+  -H "X-API-Key: your-secret-key" \
   -d '{
     "url": "https://docs.example.com",
     "limit": 50,
@@ -369,7 +369,7 @@ Check crawl status (includes exported files info):
 
 ```bash
 curl http://localhost:3000/api/crawl/{job-id} \
-  -H "X-API-KEY: your-secret-key"
+  -H "X-API-Key: your-secret-key"
 ```
 
 Status response shows exported files:

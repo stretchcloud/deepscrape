@@ -340,7 +340,7 @@ docker-compose exec deepscrape env
 # Simple HTML extraction
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "url": "https://example.com",
     "options": {
@@ -351,7 +351,7 @@ curl -X POST http://localhost:3000/api/scrape \
 # Markdown conversion
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "url": "https://news.ycombinator.com",
     "options": {
@@ -366,7 +366,7 @@ curl -X POST http://localhost:3000/api/scrape \
 # Structured data extraction
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: your-api-key" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "url": "https://example-ecommerce.com/product/123",
     "options": {

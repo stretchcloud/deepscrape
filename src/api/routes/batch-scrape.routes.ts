@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { validateRequest } from '../middleware/validation';
+import { handleValidationErrors } from '../middleware/validation';
+import { apiKeyAuth } from '../middleware/auth.middleware';
 import { batchScrapeController } from '../controllers/batch-scrape.controller';
 
 const router = Router();
@@ -79,8 +80,9 @@ const cleanupValidation = [
  */
 router.post(
   '/scrape',
+  apiKeyAuth,
   batchScrapeValidation,
-  validateRequest,
+  handleValidationErrors,
   batchScrapeController.initiateBatch.bind(batchScrapeController)
 );
 
@@ -90,8 +92,9 @@ router.post(
  */
 router.get(
   '/scrape/:batchId/status',
+  apiKeyAuth,
   batchIdValidation,
-  validateRequest,
+  handleValidationErrors,
   batchScrapeController.getBatchStatus.bind(batchScrapeController)
 );
 
@@ -101,9 +104,40 @@ router.get(
  */
 router.delete(
   '/scrape/:batchId',
+  apiKeyAuth,
   batchIdValidation,
-  validateRequest,
+  handleValidationErrors,
   batchScrapeController.cancelBatch.bind(batchScrapeController)
+);
+
+/**
+ * GET /api/batch/scrape/:batchId/download/zip
+ * Download all results as a ZIP file
+ */
+router.get(
+  '/scrape/:batchId/download/zip',
+  apiKeyAuth,
+  [
+    ...batchIdValidation,
+    query('format')
+      .optional()
+      .isIn(['json', 'markdown', 'html', 'text'])
+      .withMessage('Format must be one of: json, markdown, html, text')
+  ],
+  handleValidationErrors,
+  batchScrapeController.downloadBatchZip.bind(batchScrapeController)
+);
+
+/**
+ * GET /api/batch/scrape/:batchId/download/json
+ * Download all results in a single JSON file
+ */
+router.get(
+  '/scrape/:batchId/download/json',
+  apiKeyAuth,
+  batchIdValidation,
+  handleValidationErrors,
+  batchScrapeController.downloadBatchJson.bind(batchScrapeController)
 );
 
 /**
@@ -112,6 +146,7 @@ router.delete(
  */
 router.get(
   '/scrape/:batchId/download/:jobId',
+  apiKeyAuth,
   [
     ...batchIdValidation,
     param('jobId')
@@ -122,36 +157,8 @@ router.get(
       .isIn(['json', 'markdown', 'html', 'text'])
       .withMessage('Format must be one of: json, markdown, html, text')
   ],
-  validateRequest,
+  handleValidationErrors,
   batchScrapeController.downloadResult.bind(batchScrapeController)
-);
-
-/**
- * GET /api/batch/scrape/:batchId/download/zip
- * Download all results as a ZIP file
- */
-router.get(
-  '/scrape/:batchId/download/zip',
-  [
-    ...batchIdValidation,
-    query('format')
-      .optional()
-      .isIn(['json', 'markdown', 'html', 'text'])
-      .withMessage('Format must be one of: json, markdown, html, text')
-  ],
-  validateRequest,
-  batchScrapeController.downloadBatchZip.bind(batchScrapeController)
-);
-
-/**
- * GET /api/batch/scrape/:batchId/download/json
- * Download all results in a single JSON file
- */
-router.get(
-  '/scrape/:batchId/download/json',
-  batchIdValidation,
-  validateRequest,
-  batchScrapeController.downloadBatchJson.bind(batchScrapeController)
 );
 
 /**
@@ -160,8 +167,9 @@ router.get(
  */
 router.post(
   '/cleanup',
+  apiKeyAuth,
   cleanupValidation,
-  validateRequest,
+  handleValidationErrors,
   batchScrapeController.cleanup.bind(batchScrapeController)
 );
 
