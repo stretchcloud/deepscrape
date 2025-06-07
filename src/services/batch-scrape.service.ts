@@ -324,7 +324,7 @@ export class BatchScrapeService {
           job.status = 'failed';
           job.error = (error as Error).message;
           job.endTime = Date.now();
-          job.processingTime = job.endTime - job.startTime!;
+          job.processingTime = job.endTime - (job.startTime ?? job.endTime);
           
           logger.error(`Job ${job.id} failed after ${maxRetries + 1} attempts`, {
             error: (error as Error).message
