@@ -46,12 +46,8 @@ export class FileExportService {
       let filename = parsedUrl.hostname;
       
       if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
-        // Clean up the pathname to be filesystem-safe
-        const cleanPath = parsedUrl.pathname
-          .replace(/^\/+/, '') // Remove leading slashes (non-backtracking)
-          .replace(/\/+$/, '') // Remove trailing slashes (non-backtracking)
-          .replace(/[^a-zA-Z0-9\-_.]/g, '_') // Replace unsafe characters with underscore
-          .replace(/_+/g, '_') // Replace multiple underscores with single
+        // Clean up the pathname to be filesystem-safe (ReDoS-safe)
+        const cleanPath = this.sanitizePathForFilename(parsedUrl.pathname)
           .substring(0, 100); // Limit length
         
         if (cleanPath) {
@@ -61,11 +57,11 @@ export class FileExportService {
       
       // Add query parameters if present (truncated)
       if (parsedUrl.search) {
-        const queryString = parsedUrl.search
-          .substring(1) // Remove leading ?
-          .replace(/[^a-zA-Z0-9\-_.=&]/g, '_')
+        const queryString = this.sanitizeStringForFilename(parsedUrl.search.substring(1))
           .substring(0, 50); // Limit length
-        filename += '_' + queryString;
+        if (queryString) {
+          filename += '_' + queryString;
+        }
       }
       
       // Ensure the filename is not too long
@@ -74,14 +70,14 @@ export class FileExportService {
       }
       
       // Add timestamp and crawl ID for uniqueness
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const timestamp = this.formatTimestampForFilename(new Date().toISOString());
       filename = `${timestamp}_${crawlId.substring(0, 8)}_${filename}`;
       
       return filename + '.md';
     } catch (error) {
       // Fallback to a simple filename if URL parsing fails
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-      const hash = Buffer.from(url).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+      const timestamp = this.formatTimestampForFilename(new Date().toISOString());
+      const hash = this.sanitizeStringForFilename(Buffer.from(url).toString('base64')).substring(0, 16);
       return `${timestamp}_${crawlId.substring(0, 8)}_${hash}.md`;
     }
   }
@@ -129,6 +125,130 @@ export class FileExportService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Format timestamp for safe filename usage (ReDoS-safe)
+   */
+  private formatTimestampForFilename(isoString: string): string {
+    // Manual replacement of colons and periods to avoid regex
+    let formatted = '';
+    for (let i = 0; i < isoString.length; i++) {
+      const char = isoString[i];
+      if (char === ':' || char === '.') {
+        formatted += '-';
+      } else {
+        formatted += char;
+      }
+    }
+    
+    // Return just the date part (before 'T')
+    const tIndex = formatted.indexOf('T');
+    return tIndex > 0 ? formatted.substring(0, tIndex) : formatted;
+  }
+
+  /**
+   * Sanitize a file path for safe filename usage (ReDoS-safe)
+   */
+  private sanitizePathForFilename(path: string): string {
+    if (!path || path === '/') {
+      return '';
+    }
+    
+    let sanitized = '';
+    let lastWasUnderscore = false;
+    
+    // Manual character-by-character processing to avoid regex
+    for (let i = 0; i < path.length; i++) {
+      const char = path[i];
+      
+      // Skip leading and trailing slashes
+      if (char === '/' && (i === 0 || i === path.length - 1)) {
+        continue;
+      }
+      
+      // Allow alphanumeric, dash, dot, underscore
+      if ((char >= 'a' && char <= 'z') || 
+          (char >= 'A' && char <= 'Z') || 
+          (char >= '0' && char <= '9') || 
+          char === '-' || char === '.') {
+        sanitized += char;
+        lastWasUnderscore = false;
+      } else {
+        // Replace other characters with underscore, but avoid consecutive underscores
+        if (!lastWasUnderscore) {
+          sanitized += '_';
+          lastWasUnderscore = true;
+        }
+      }
+    }
+    
+    // Remove trailing underscore if present
+    if (sanitized.endsWith('_')) {
+      sanitized = sanitized.substring(0, sanitized.length - 1);
+    }
+    
+    return sanitized;
+  }
+
+  /**
+   * Sanitize a general string for filename usage (ReDoS-safe)
+   */
+  private sanitizeStringForFilename(str: string): string {
+    if (!str) {
+      return '';
+    }
+    
+    let sanitized = '';
+    let lastWasUnderscore = false;
+    
+    // Manual character-by-character processing
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i];
+      
+      // Allow alphanumeric, dash, dot, underscore, equals, ampersand (for query params)
+      if ((char >= 'a' && char <= 'z') || 
+          (char >= 'A' && char <= 'Z') || 
+          (char >= '0' && char <= '9') || 
+          char === '-' || char === '.' || char === '=' || char === '&') {
+        sanitized += char;
+        lastWasUnderscore = false;
+      } else {
+        // Replace other characters with underscore, but avoid consecutive underscores
+        if (!lastWasUnderscore) {
+          sanitized += '_';
+          lastWasUnderscore = true;
+        }
+      }
+    }
+    
+    // Remove trailing underscore if present
+    if (sanitized.endsWith('_')) {
+      sanitized = sanitized.substring(0, sanitized.length - 1);
+    }
+    
+    return sanitized;
+  }
+
+  /**
+   * Validate metadata key contains only word characters (ReDoS-safe)
+   */
+  private isValidMetadataKey(key: string): boolean {
+    if (!key) return false;
+    
+    // Manual validation to avoid regex
+    for (let i = 0; i < key.length; i++) {
+      const char = key[i];
+      const isValid = (char >= 'a' && char <= 'z') || 
+                     (char >= 'A' && char <= 'Z') || 
+                     (char >= '0' && char <= '9') || 
+                     char === '_';
+      if (!isValid) {
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   /**
@@ -345,7 +465,7 @@ export class FileExportService {
                       value = value.slice(1, -1);
                     }
                     
-                    if (key && /^\w+$/.test(key)) { // Only allow word characters in keys
+                    if (key && this.isValidMetadataKey(key)) { // Only allow word characters in keys
                       (metadata as any)[key] = value;
                     }
                   }
