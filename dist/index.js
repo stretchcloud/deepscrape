@@ -12,6 +12,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const scraper_1 = __importDefault(require("./api/routes/scraper"));
 const crawler_routes_1 = __importDefault(require("./api/routes/crawler.routes"));
+const batch_scrape_routes_1 = __importDefault(require("./api/routes/batch-scrape.routes"));
 const logger_1 = require("./utils/logger");
 const queue_service_1 = require("./services/queue.service");
 // Load environment variables
@@ -35,6 +36,7 @@ app.use((0, morgan_1.default)('combined', { stream: accessLogStream })); // HTTP
 // API Routes
 app.use('/api', scraper_1.default);
 app.use('/api/crawl', crawler_routes_1.default);
+app.use('/api/batch', batch_scrape_routes_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'UP', message: 'Service is running' });
