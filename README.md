@@ -7,9 +7,11 @@ Transform any website into structured data using Playwright automation and GPT-4
 ## ✨ Features
 
 - **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI
+- **📦 Batch Processing** - Process multiple URLs efficiently with controlled concurrency
 - **🧬 API-first** - REST endpoints secured with API keys, documented with Swagger.
 - **🎭 Browser Automation** - Full Playwright support with stealth mode  
 - **📝 Multiple Formats** - Output as HTML, Markdown, or plain text
+- **📥 Download Options** - Individual files, ZIP archives, or consolidated JSON
 - **⚡ Smart Caching** - File-based caching with configurable TTL
 - **🔄 Job Queue** - Background processing with BullMQ and Redis
 - **🕷️ Web Crawling** - Multi-page crawling with configurable strategies
@@ -199,6 +201,138 @@ Extract complex data structure from any medium articles
   }' | jq -r '.extractedData' > output.md
 ```
 
+## 📦 Batch Processing
+
+Process multiple URLs efficiently with controlled concurrency, automatic retries, and comprehensive download options.
+
+### Start Batch Processing
+
+```bash
+curl -X POST http://localhost:3000/api/batch/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-secret-key" \
+  -d '{
+    "urls": [
+      "https://example.com/page1",
+      "https://example.com/page2", 
+      "https://example.com/page3",
+      "https://docs.example.com/api",
+      "https://blog.example.com/post1"
+    ],
+    "concurrency": 3,
+    "webhook": "https://your-webhook.com/batch-complete",
+    "options": {
+      "extractorFormat": "markdown",
+      "waitForTimeout": 2000,
+      "stealthMode": true
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "batchId": "550e8400-e29b-41d4-a716-446655440000",
+  "totalUrls": 5,
+  "estimatedTime": 50000,
+  "statusUrl": "http://localhost:3000/api/batch/scrape/550e8400.../status"
+}
+```
+
+### Monitor Batch Progress
+
+```bash
+curl -X GET http://localhost:3000/api/batch/scrape/{batchId}/status \
+  -H "X-API-KEY: your-secret-key"
+```
+
+Response:
+```json
+{
+  "success": true,
+  "batchId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "totalUrls": 5,
+  "completedUrls": 4,
+  "failedUrls": 1,
+  "progress": 100,
+  "processingTime": 45230,
+  "results": [...]
+}
+```
+
+### Download Results
+
+#### 1. Download as ZIP Archive (Recommended)
+```bash
+# Download all results as markdown files in a ZIP
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/zip?format=markdown" \
+  -H "X-API-KEY: your-secret-key" \
+  --output "batch_results.zip"
+
+# Extract the ZIP to get individual files
+unzip batch_results.zip
+```
+
+ZIP Contents:
+```
+1_example_com_page1.md
+2_example_com_page2.md  
+3_example_com_page3.md
+4_docs_example_com_api.md
+batch_summary.json
+```
+
+#### 2. Download Individual Results
+```bash
+# Get job IDs from status endpoint, then download individual files
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/{jobId}?format=markdown" \
+  -H "X-API-KEY: your-secret-key" \
+  --output "page1.md"
+```
+
+#### 3. Download Consolidated JSON
+```bash
+# All results in a single JSON file
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/json" \
+  -H "X-API-KEY: your-secret-key" \
+  --output "batch_results.json"
+```
+
+### Advanced Batch Options
+
+```bash
+curl -X POST http://localhost:3000/api/batch/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-secret-key" \
+  -d '{
+    "urls": ["https://example.com", "https://example.org"],
+    "concurrency": 5,
+    "timeout": 300000,
+    "maxRetries": 3,
+    "failFast": false,
+    "webhook": "https://your-app.com/webhook",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "waitForTimeout": 5000,
+      "blockAds": true,
+      "actions": [
+        {"type": "click", "selector": ".accept-cookies", "optional": true},
+        {"type": "wait", "timeout": 2000}
+      ]
+    }
+  }'
+```
+
+### Cancel Batch Processing
+
+```bash
+curl -X DELETE http://localhost:3000/api/batch/scrape/{batchId} \
+  -H "X-API-KEY: your-secret-key"
+```
 
 ### Web Crawling
 
@@ -261,6 +395,12 @@ Status response shows exported files:
 | `/api/scrape` | POST | Scrape single URL |
 | `/api/extract-schema` | POST | Extract structured data |
 | `/api/summarize` | POST | Generate content summary |
+| `/api/batch/scrape` | POST | Start batch processing |
+| `/api/batch/scrape/:id/status` | GET | Get batch status |
+| `/api/batch/scrape/:id/download/zip` | GET | Download batch as ZIP |
+| `/api/batch/scrape/:id/download/json` | GET | Download batch as JSON |
+| `/api/batch/scrape/:id/download/:jobId` | GET | Download individual result |
+| `/api/batch/scrape/:id` | DELETE | Cancel batch processing |
 | `/api/crawl` | POST | Start web crawl |
 | `/api/crawl/:id` | GET | Get crawl status |
 | `/api/cache` | DELETE | Clear cache |
@@ -422,11 +562,15 @@ Welcome to the getting started guide...
 
 ## 🛣️ Roadmap
 
+- [x] 📦 Batch processing with controlled concurrency
+- [x] 📥 Multiple download formats (ZIP, JSON, individual files)
 - [ ] 🚸 Browser pooling & warm-up
 - [ ] 🧠 Automatic schema generation (LLM)
 - [ ] 📊 Prometheus metrics & Grafana dashboard
 - [ ] 🌐 Cloud-native cache backends (S3/Redis)
 - [ ] 🌈 Web UI playground
+- [ ] 🔔 Advanced webhook payloads with retry logic
+- [ ] 📈 Batch processing analytics and insights
 
 ---
 

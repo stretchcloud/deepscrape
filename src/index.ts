@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import scraperRoutes from './api/routes/scraper';
 import crawlerRoutes from './api/routes/crawler.routes';
+import batchScrapeRoutes from './api/routes/batch-scrape.routes';
 import { apiKeyAuth } from './api/middleware/auth.middleware';
 import { logger } from './utils/logger';
 import { initQueue, initializeWorker, closeQueue } from './services/queue.service';
@@ -41,6 +42,7 @@ app.use(morgan('combined', { stream: accessLogStream })); // HTTP request loggin
 // API Routes
 app.use('/api', scraperRoutes);
 app.use('/api/crawl', crawlerRoutes);
+app.use('/api/batch', batchScrapeRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

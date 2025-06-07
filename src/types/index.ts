@@ -97,6 +97,56 @@ export interface ApiResponse<T> {
   };
 }
 
+// Batch scraping interfaces
+export interface BatchScrapeRequest {
+  urls: string[];
+  options?: ScraperOptions;
+  concurrency?: number;
+  webhook?: string;
+  timeout?: number;
+  failFast?: boolean;
+  maxRetries?: number;
+}
+
+export interface BatchScrapeJob {
+  id: string;
+  url: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: ScraperResponse;
+  error?: string;
+  startTime?: number;
+  endTime?: number;
+  processingTime?: number;
+  retryCount?: number;
+}
+
+export interface BatchScrapeResponse {
+  success: boolean;
+  batchId: string;
+  totalUrls: number;
+  message: string;
+  statusUrl: string;
+  webhook?: string;
+  estimatedTime?: number;
+}
+
+export interface BatchScrapeStatusResponse {
+  success: boolean;
+  batchId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  totalUrls: number;
+  completedUrls: number;
+  failedUrls: number;
+  pendingUrls: number;
+  jobs: BatchScrapeJob[];
+  results?: ScraperResponse[];
+  startTime: number;
+  endTime?: number;
+  processingTime?: number;
+  progress: number; // Percentage completion
+  error?: string;
+}
+
 // Ad blocking domains adapted from FireCrawl
 export const AD_SERVING_DOMAINS = [
   'googlesyndication.com',
