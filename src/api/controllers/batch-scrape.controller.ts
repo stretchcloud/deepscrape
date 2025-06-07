@@ -3,7 +3,6 @@ import { logger } from '../../utils/logger';
 import { batchScrapeService } from '../../services/batch-scrape.service';
 import { BatchScrapeRequest } from '../../types';
 import archiver from 'archiver';
-import path from 'path';
 
 /**
  * Controller for batch scraping operations
