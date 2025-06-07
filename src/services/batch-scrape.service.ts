@@ -34,8 +34,8 @@ export class BatchScrapeService {
     this.validateBatchRequest(request);
 
     const batchId = uuidv4();
-    const concurrency = Math.min(request.concurrency || BatchScrapeService.DEFAULT_CONCURRENCY, BatchScrapeService.MAX_CONCURRENCY);
-    const timeout = request.timeout || BatchScrapeService.DEFAULT_TIMEOUT;
+    const concurrency = Math.min(request.concurrency ?? BatchScrapeService.DEFAULT_CONCURRENCY, BatchScrapeService.MAX_CONCURRENCY);
+    const timeout = request.timeout ?? BatchScrapeService.DEFAULT_TIMEOUT;
     
     // Estimate processing time based on URL count and concurrency
     const estimatedTime = Math.ceil((request.urls.length / concurrency) * 30000); // ~30s per URL
@@ -52,9 +52,9 @@ export class BatchScrapeService {
       concurrency,
       timeout,
       webhook: request.webhook,
-      failFast: request.failFast || false,
-      maxRetries: request.maxRetries || 3,
-      options: request.options || {}
+      failFast: request.failFast ?? false,
+      maxRetries: request.maxRetries ?? 3,
+      options: request.options ?? {}
     };
 
     // Store batch metadata in Redis
@@ -83,7 +83,7 @@ export class BatchScrapeService {
 
     // Start processing asynchronously
     setImmediate(() => {
-      this.processBatch(batchId, request.options || {}, concurrency, timeout)
+      this.processBatch(batchId, request.options ?? {}, concurrency, timeout)
         .catch(error => {
           logger.error(`Batch processing failed for ${batchId}`, { error: (error as Error).message });
         });
