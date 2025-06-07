@@ -48,7 +48,8 @@ export class FileExportService {
       if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
         // Clean up the pathname to be filesystem-safe
         const cleanPath = parsedUrl.pathname
-          .replace(/^\/+|\/+$/g, '') // Remove leading/trailing slashes
+          .replace(/^\/+/, '') // Remove leading slashes (non-backtracking)
+          .replace(/\/+$/, '') // Remove trailing slashes (non-backtracking)
           .replace(/[^a-zA-Z0-9\-_.]/g, '_') // Replace unsafe characters with underscore
           .replace(/_+/g, '_') // Replace multiple underscores with single
           .substring(0, 100); // Limit length
@@ -128,6 +129,34 @@ export class FileExportService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Safely remove YAML frontmatter from content (ReDoS-safe)
+   */
+  private removeFrontmatter(content: string): string {
+    if (!content.startsWith('---\n')) {
+      return content;
+    }
+    
+    // Find the end of frontmatter by looking for the closing ---
+    const lines = content.split('\n');
+    let endIndex = -1;
+    
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i] === '---') {
+        endIndex = i;
+        break;
+      }
+    }
+    
+    if (endIndex === -1) {
+      // No closing frontmatter found, return original content
+      return content;
+    }
+    
+    // Return content after frontmatter (skip the closing --- line and following newline)
+    return lines.slice(endIndex + 1).join('\n');
   }
 
   /**
@@ -248,14 +277,31 @@ export class FileExportService {
           const filePath = path.join(crawlDir, file);
           const content = await fs.promises.readFile(filePath, 'utf8');
           
-          // Extract title from frontmatter or filename
-          const titleMatch = content.match(/^title: "(.*?)"$/m);
-          const title = titleMatch ? titleMatch[1] : file.replace('.md', '');
+          // Extract title from frontmatter or filename (safe parsing)
+          let title = file.replace('.md', ''); // Default fallback
+          
+          if (content.startsWith('---\n')) {
+            const lines = content.split('\n');
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i] === '---') break;
+              
+              if (lines[i].startsWith('title: ')) {
+                let titleValue = lines[i].substring(7).trim();
+                if (titleValue.startsWith('"') && titleValue.endsWith('"')) {
+                  titleValue = titleValue.slice(1, -1);
+                }
+                if (titleValue) {
+                  title = titleValue;
+                }
+                break;
+              }
+            }
+          }
           
           consolidatedContent += `## ${title}\n\n`;
           
-          // Remove frontmatter and add content
-          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n/, '');
+          // Remove frontmatter and add content (safe regex)
+          const contentWithoutFrontmatter = this.removeFrontmatter(content);
           consolidatedContent += contentWithoutFrontmatter + '\n\n---\n\n';
         }
         
@@ -272,25 +318,45 @@ export class FileExportService {
           const filePath = path.join(crawlDir, file);
           const content = await fs.promises.readFile(filePath, 'utf8');
           
-          // Parse frontmatter
-          const frontmatterMatch = content.match(/^---([\s\S]*?)---/);
+          // Parse frontmatter safely
           let metadata = {};
-          if (frontmatterMatch) {
+          if (content.startsWith('---\n')) {
             try {
-              // Simple YAML parsing for basic frontmatter
-              const frontmatter = frontmatterMatch[1];
-              frontmatter.split('\n').forEach(line => {
-                const match = line.match(/^(\w+):\s*"?(.*?)"?$/);
-                if (match) {
-                  (metadata as any)[match[1]] = match[2];
+              const lines = content.split('\n');
+              let endIndex = -1;
+              
+              for (let i = 1; i < lines.length; i++) {
+                if (lines[i] === '---') {
+                  endIndex = i;
+                  break;
                 }
-              });
+              }
+              
+              if (endIndex > 0) {
+                const frontmatterLines = lines.slice(1, endIndex);
+                frontmatterLines.forEach(line => {
+                  const colonIndex = line.indexOf(':');
+                  if (colonIndex > 0) {
+                    const key = line.substring(0, colonIndex).trim();
+                    let value = line.substring(colonIndex + 1).trim();
+                    
+                    // Remove quotes if present
+                    if (value.startsWith('"') && value.endsWith('"')) {
+                      value = value.slice(1, -1);
+                    }
+                    
+                    if (key && /^\w+$/.test(key)) { // Only allow word characters in keys
+                      (metadata as any)[key] = value;
+                    }
+                  }
+                });
+              }
             } catch (e) {
               // Ignore parsing errors
             }
           }
           
-          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n/, '');
+          const contentWithoutFrontmatter = this.removeFrontmatter(content);
           
           (jsonData.pages as any).push({
             filename: file,
