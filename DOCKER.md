@@ -63,9 +63,6 @@ CACHE_DIRECTORY=/app/cache
 
 # Logging Configuration
 LOG_DIRECTORY=/app/logs
-
-# Browser Configuration
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ```
 
 ### 3. Build and Start Services
@@ -282,8 +279,6 @@ docker run -d \
 | `CACHE_ENABLED` | Enable caching | `true` | No |
 | `CACHE_TTL` | Cache TTL (seconds) | `3600` | No |
 | `CACHE_DIRECTORY` | Cache directory | `/app/cache` | No |
-| **Browser Configuration** |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Chromium path | `/usr/bin/chromium-browser` | No |
 
 ---
 
