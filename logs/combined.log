@@ -1,0 +1,336 @@
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 16:40:23"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 16:40:23"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 16:40:23"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 16:40:23"}
+{"level":"warn","message":"Invalid API key provided: your-secret-key","timestamp":"2025-06-07 16:41:38"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 16:42:28"}
+{"level":"info","message":"API request received to scrape URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform","timestamp":"2025-06-07 16:42:28"}
+{"level":"info","message":"Starting scraping process for URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform","timestamp":"2025-06-07 16:42:28"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 16:42:28"}
+{"level":"error","message":"Error scraping URL: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:42:28"}
+{"level":"warn","message":"Playwright failed, falling back to HTTP scraper: Scraping error: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:42:28"}
+{"level":"info","message":"HTTP scraping URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform","timestamp":"2025-06-07 16:42:28"}
+{"level":"info","message":"HTTP scraping completed for https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform in 883ms","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"HTTP scraper fallback successful","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Cleaning HTML content for URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Found 8 headings in the document","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Found main content using selector: main with 3 headings","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Final cleaned HTML contains 3 headings","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Original HTML contains 3 headings","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Cleaned HTML contains 5 headings","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Markdown contains 5 heading lines","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Markdown conversion complete. Content length: 13711","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Cache set for key: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 16:42:29"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://cloud.google.com/vertex-ai/docs/start/introduction-unified-platform in 1179ms","timestamp":"2025-06-07 16:42:29"}
+{"level":"warn","message":"Invalid API key provided: your-secret-key","timestamp":"2025-06-07 16:42:54"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"API request received to summarize URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"Starting scraping process for URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 16:43:20"}
+{"level":"error","message":"Error scraping URL: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:43:20"}
+{"level":"warn","message":"Playwright failed, falling back to HTTP scraper: Scraping error: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"HTTP scraping URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"HTTP scraping completed for https://en.wikipedia.org/wiki/Large_language_model in 720ms","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"HTTP scraper fallback successful","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"Cleaning HTML content for URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:20"}
+{"level":"info","message":"Found 45 headings in the document","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Found main content using selector: main with 44 headings","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Final cleaned HTML contains 43 headings","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Original HTML contains 43 headings","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Cleaned HTML contains 16 headings","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Markdown contains 16 heading lines","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Markdown conversion complete. Content length: 9582","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Creating OpenAI service with model: gpt-4o","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"LLM extractor initialized successfully","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Applying LLM extraction with schema","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Starting LLM extraction for URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"Sending request to OpenAI: gpt-4o","timestamp":"2025-06-07 16:43:21"}
+{"level":"info","message":"LLM extraction completed successfully in 10372ms","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Cache set for key: https://en.wikipedia.org/wiki/Large_language_model:{\"extractorFormat\":\"markdown\",\"waitForSelector\":\"body\"} (TTL: 3600s)","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://en.wikipedia.org/wiki/Large_language_model in 11740ms","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Response data fields: url, title, content, contentType, metadata, structuredData, extractionResult","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Response structuredData: present","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Response extractedData: missing","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Using structuredData","timestamp":"2025-06-07 16:43:31"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 16:48:40"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 16:48:40"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 16:48:40"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 16:48:40"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 16:52:22"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 16:52:22"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 16:52:22"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"API request received to summarize URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Starting scraping process for URL: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Cache hit for key: https://en.wikipedia.org/wiki/Large_language_model:{\"extractorFormat\":\"markdown\",\"waitForSelector\":\"body\"}","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Retrieved from cache: https://en.wikipedia.org/wiki/Large_language_model","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Response data fields: url, title, content, contentType, metadata, structuredData, extractionResult","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Response structuredData: present","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Response extractedData: missing","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"Using structuredData","timestamp":"2025-06-07 16:53:41"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 16:54:36"}
+{"level":"info","message":"API request received to extract structured data from URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:36"}
+{"level":"info","message":"Starting scraping process for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:36"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 16:54:36"}
+{"level":"error","message":"Error scraping URL: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:54:36"}
+{"level":"warn","message":"Playwright failed, falling back to HTTP scraper: Scraping error: browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium-browser","timestamp":"2025-06-07 16:54:36"}
+{"level":"info","message":"HTTP scraping URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:36"}
+{"level":"info","message":"HTTP scraping completed for https://docs.github.com/en/rest/overview/permissions-required-for-github-apps in 1978ms","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"HTTP scraper fallback successful","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Cleaning HTML content for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Found 73 headings in the document","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Found main content using selector: main with 67 headings","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Final cleaned HTML contains 67 headings","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:38"}
+{"level":"info","message":"Original HTML contains 67 headings","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Cleaned HTML contains 67 headings","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Markdown contains 67 heading lines","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Markdown conversion complete. Content length: 1055748","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Creating OpenAI service with model: gpt-4o","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"LLM extractor initialized successfully","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Applying LLM extraction with schema","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Starting LLM extraction for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"Sending request to OpenAI: gpt-4o","timestamp":"2025-06-07 16:54:39"}
+{"level":"info","message":"LLM extraction completed successfully in 19935ms","timestamp":"2025-06-07 16:54:59"}
+{"level":"info","message":"Cache set for key: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 16:54:59"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps in 23215ms","timestamp":"2025-06-07 16:54:59"}
+{"level":"info","message":"Using structured data from successful LLM extraction","timestamp":"2025-06-07 16:54:59"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:07:19"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:07:19"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 17:07:19"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 17:07:19"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 17:10:46"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Environment: production","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 17:10:47"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 17:10:47"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 17:11:52"}
+{"level":"info","message":"API request received to extract structured data from URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:11:52"}
+{"level":"info","message":"Starting scraping process for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:11:52"}
+{"level":"info","message":"Cache hit for key: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 17:11:52"}
+{"level":"info","message":"Retrieved from cache: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:11:52"}
+{"level":"info","message":"Using structured data from successful LLM extraction","timestamp":"2025-06-07 17:11:52"}
+{"level":"warn","message":"Invalid API key provided: your-secret-api-key-change-this","timestamp":"2025-06-07 17:12:30"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 17:12:52"}
+{"level":"info","message":"API request received to scrape URL: https://example.com","timestamp":"2025-06-07 17:12:52"}
+{"level":"info","message":"Starting scraping process for URL: https://example.com","timestamp":"2025-06-07 17:12:52"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 17:12:52"}
+{"level":"info","message":"Navigating to URL: https://example.com","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Page loaded in 740ms","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Cleaning HTML content for URL: https://example.com","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Found 1 headings in the document","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"No main content with headings found, using text density analysis","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Using largest text block with score 1199 and 1 headings","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Final cleaned HTML contains 1 headings","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://example.com","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Original HTML contains 1 headings","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Cleaned HTML contains 1 headings","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Markdown contains 1 heading lines","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Markdown conversion complete. Content length: 231","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Cache set for key: https://example.com:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://example.com in 800ms","timestamp":"2025-06-07 17:12:53"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"API request received to scrape URL: https://news.ycombinator.com","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Starting scraping process for URL: https://news.ycombinator.com","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Navigating to URL: https://news.ycombinator.com","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Page loaded in 770ms","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Cleaning HTML content for URL: https://news.ycombinator.com","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Found 0 headings in the document","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Found potential main content using selector: body (no headings)","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"No main content with headings found, using text density analysis","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Creating artificial main content container with all heading sections","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Final cleaned HTML contains 0 headings","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://news.ycombinator.com","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Original HTML contains 0 headings","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Cleaned HTML contains 0 headings","timestamp":"2025-06-07 17:13:08"}
+{"level":"info","message":"Markdown contains 0 heading lines","timestamp":"2025-06-07 17:13:09"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 17:13:09"}
+{"level":"info","message":"Markdown conversion complete. Content length: 21104","timestamp":"2025-06-07 17:13:09"}
+{"level":"info","message":"Cache set for key: https://news.ycombinator.com:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 17:13:09"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://news.ycombinator.com in 951ms","timestamp":"2025-06-07 17:13:09"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"API request received to extract structured data from URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"Starting scraping process for URL: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"Cache hit for key: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps:{\"extractorFormat\":\"markdown\"}","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"Retrieved from cache: https://docs.github.com/en/rest/overview/permissions-required-for-github-apps","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"Using structured data from successful LLM extraction","timestamp":"2025-06-07 17:14:39"}
+{"level":"info","message":"API key validated successfully","timestamp":"2025-06-07 17:15:35"}
+{"level":"info","message":"API request received to extract structured data from URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:35"}
+{"level":"info","message":"Starting scraping process for URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:35"}
+{"level":"info","message":"Launching browser with options: {}","timestamp":"2025-06-07 17:15:35"}
+{"level":"info","message":"Navigating to URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:35"}
+{"level":"info","message":"Page loaded in 797ms","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Closing browser","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Cleaning HTML content for URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Found 15 headings in the document","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Found main content using selector: main with 14 headings","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Final cleaned HTML contains 13 headings","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"HTML content cleaning complete","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Processing response. Content type: html, Extractor format: markdown","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Converting HTML to Markdown","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Transforming HTML to Markdown for URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Original HTML contains 13 headings","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Cleaned HTML contains 9 headings","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Markdown contains 9 heading lines","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"HTML to Markdown transformation complete","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Markdown conversion complete. Content length: 8901","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Creating OpenAI service with model: gpt-4o","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"LLM extractor initialized successfully","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Applying LLM extraction with schema","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Starting LLM extraction for URL: https://arxiv.org/abs/2005.14165","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"Sending request to OpenAI: gpt-4o","timestamp":"2025-06-07 17:15:36"}
+{"level":"info","message":"LLM extraction completed successfully in 8308ms","timestamp":"2025-06-07 17:15:44"}
+{"level":"info","message":"Cache set for key: https://arxiv.org/abs/2005.14165:{\"extractorFormat\":\"markdown\"} (TTL: 3600s)","timestamp":"2025-06-07 17:15:44"}
+{"level":"info","message":"Scraping process completed successfully for URL: https://arxiv.org/abs/2005.14165 in 9255ms","timestamp":"2025-06-07 17:15:44"}
+{"level":"info","message":"Using structured data from successful LLM extraction","timestamp":"2025-06-07 17:15:44"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:28:41"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 17:28:41"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 17:28:41"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 17:28:41"}
+{"level":"info","message":"Created crawl output directory: ./crawl-output","timestamp":"2025-06-07 18:31:25"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:31:26"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:31:26"}
+{"level":"info","message":"Environment: development","timestamp":"2025-06-07 18:31:26"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:26"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:27"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:27"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:27"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:28"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:28"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:29"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:29"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:30"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:30"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:31"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:32"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:33"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:34"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:34"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:35"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:36"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:37"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:39"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:40"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:41"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:42"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:44"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:45"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:46"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:48"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:49"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:51"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:52"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:54"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:56"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:57"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:31:59"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:01"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:03"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:05"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:07"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:09"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:11"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:13"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:15"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:17"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:19"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:21"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:23"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:25"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:27"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:29"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:31"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:33"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:35"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:37"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:39"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:41"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:43"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:45"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:47"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:49"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:51"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:53"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:55"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:57"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:32:59"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:01"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:03"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:05"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:07"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:09"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:11"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:13"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:15"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:17"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:19"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:21"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:23"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:25"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:27"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:29"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:31"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:33"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:35"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:37"}
+{"error":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":6379,"syscall":"connect"},"level":"error","message":"Redis connection error","timestamp":"2025-06-07 18:33:39"}
+{"config":{"concurrency":5,"enableDynamicScaling":false,"lockDuration":300000,"lockRenewTime":60000,"maxConcurrency":20,"maxJobs":1000,"minConcurrency":1,"retryAttempts":3,"retryDelay":5000},"level":"info","message":"Enhanced queue service initialized: deepscrape-crawler-queue","queueName":"deepscrape-crawler-queue","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Server running on port 3000","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Environment: development","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Initializing enhanced crawler queue","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Connected to Redis","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Enhanced crawler queue initialized","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Worker initialized with concurrency: 5","timestamp":"2025-06-07 18:34:04"}
+{"concurrency":5,"dynamicScaling":false,"level":"info","lockDuration":300000,"message":"Enhanced crawler worker initialized with advanced features","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Crawl queue and worker initialized successfully","timestamp":"2025-06-07 18:34:04"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:37:06"}
+{"level":"info","message":"Shutting down enhanced queue service...","timestamp":"2025-06-07 18:37:06"}
+{"level":"info","message":"Worker closed","timestamp":"2025-06-07 18:37:06"}
+{"level":"info","message":"Enhanced queue service shutdown complete","timestamp":"2025-06-07 18:37:06"}

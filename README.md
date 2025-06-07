@@ -117,7 +117,7 @@ Extract key information from technical documentation:
 
 ```bash
 
-curl -X POST http://20.106.223.252:3000/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: test-key" \
   -d '{
@@ -152,7 +152,7 @@ curl -X POST http://20.106.223.252:3000/api/extract-schema \
 Extract and compare methodologies from research papers:
 
 ```bash
-curl -X POST http://20.106.223.252:3000/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: test-key" \
   -d '{
@@ -180,7 +180,7 @@ curl -X POST http://20.106.223.252:3000/api/extract-schema \
 Extract complex data structure from any medium articles
 
 ```bash
-   curl -X POST http://20.106.223.252:3000/api/extract-schema \
+   curl -X POST http://localhost:3000/api/extract-schema \
      -H "Content-Type: application/json" \
      -H "X-API-Key: test-key" \
      -d '{

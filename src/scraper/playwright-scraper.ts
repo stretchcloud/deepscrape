@@ -67,9 +67,9 @@ export class PlaywrightScraper {
           launchOptions.headless = false;
         }
         
-        // Force use of system chromium in Docker
-        if (process.env.NODE_ENV === 'production' || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-          launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser';
+        // Only use custom executable path if explicitly provided
+        if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+          launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
         }
         
         browser = await chromium.launch(launchOptions);
