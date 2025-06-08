@@ -33,11 +33,13 @@ services:
       - LOG_DIRECTORY=/app/logs
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CRAWL_OUTPUT_DIR=/crawl-output
     env_file:
       - .env
     volumes:
       - ./cache:/app/cache
       - ./logs:/app/logs
+      - ./crawl-output:/crawl-output
     depends_on:
       redis:
         condition: service_healthy

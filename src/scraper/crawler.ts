@@ -98,6 +98,111 @@ export class WebCrawler {
     }
   }
 
+  /**
+   * Check if link matches exclude patterns
+   */
+  private isExcludedByPatterns(link: string, path: string): boolean {
+    if (this.excludes.length === 0 || this.excludes[0] === "") {
+      return false;
+    }
+
+    const testPath = this.regexOnFullURL ? link : path;
+    return this.excludes.some((excludePattern) =>
+      new RegExp(excludePattern).test(testPath)
+    );
+  }
+
+  /**
+   * Check if link matches include patterns
+   */
+  private isIncludedByPatterns(link: string, path: string): boolean {
+    if (this.includes.length === 0 || this.includes[0] === "") {
+      return true;
+    }
+
+    const testPath = this.regexOnFullURL ? link : path;
+    return this.includes.some((includePattern) =>
+      new RegExp(includePattern).test(testPath)
+    );
+  }
+
+  /**
+   * Check backward crawling restrictions
+   */
+  private isBackwardCrawlingAllowed(normalizedLink: string): boolean {
+    if (this.allowBackwardCrawling) {
+      return true;
+    }
+
+    try {
+      const normalizedInitialUrl = new URL(this.initialUrl);
+      const normalizedLinkUrl = new URL(normalizedLink);
+      return normalizedLinkUrl.pathname.startsWith(normalizedInitialUrl.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Check robots.txt allowance
+   */
+  private isAllowedByRobots(normalizedLink: string): boolean {
+    if (this.ignoreRobotsTxt) {
+      return true;
+    }
+
+    const isAllowed = this.robots.isAllowed(normalizedLink, "DeepScrapeCrawler") ?? true;
+    
+    if (!isAllowed) {
+      this.logger.debug(`Link disallowed by robots.txt: ${normalizedLink}`);
+    }
+    
+    return isAllowed;
+  }
+
+  /**
+   * Validate a single link against all filtering criteria
+   */
+  private isLinkValid(link: string, maxDepth: number): boolean {
+    let url: URL;
+    try {
+      url = new URL(link.trim(), this.baseUrl);
+    } catch (error) {
+      this.logger.debug(`Error processing link: ${link}`, { link, error });
+      return false;
+    }
+    
+    const normalizedLink = this.urlNormalizationService.normalizeUrl(url.toString());
+    
+    // Check if URL already visited
+    if (this.isUrlVisited(normalizedLink)) {
+      return false;
+    }
+    
+    // Check depth
+    const depth = this.getURLDepth(normalizedLink);
+    if (depth > maxDepth) {
+      return false;
+    }
+
+    const path = url.pathname;
+
+    // Check include/exclude patterns
+    if (this.isExcludedByPatterns(normalizedLink, path)) return false;
+    if (!this.isIncludedByPatterns(normalizedLink, path)) return false;
+
+    // Check backward crawling
+    if (!this.isBackwardCrawlingAllowed(normalizedLink)) return false;
+
+    // Check robots.txt
+    if (!this.isAllowedByRobots(normalizedLink)) return false;
+
+    // Check if it's a file
+    if (this.isFile(normalizedLink)) return false;
+
+    return true;
+  }
+
   public filterLinks(
     links: string[],
     limit: number,
@@ -105,7 +210,10 @@ export class WebCrawler {
     fromMap: boolean = false,
   ): string[] {
     if (this.currentDiscoveryDepth === this.maxDiscoveryDepth) {
-      this.logger.debug("Max discovery depth hit, filtering off all links", { currentDiscoveryDepth: this.currentDiscoveryDepth, maxDiscoveryDepth: this.maxDiscoveryDepth });
+      this.logger.debug("Max discovery depth hit, filtering off all links", { 
+        currentDiscoveryDepth: this.currentDiscoveryDepth, 
+        maxDiscoveryDepth: this.maxDiscoveryDepth 
+      });
       return [];
     }
 
@@ -114,91 +222,7 @@ export class WebCrawler {
     }
 
     return links
-      .filter((link) => {
-        let url: URL;
-        try {
-          url = new URL(link.trim(), this.baseUrl);
-        } catch (error) {
-          this.logger.debug(`Error processing link: ${link}`, {
-            link,
-            error,
-          });
-          return false;
-        }
-        
-        // Normalize the URL for consistent processing
-        const normalizedLink = this.urlNormalizationService.normalizeUrl(url.toString());
-        
-        // Check if this URL or similar URLs have already been visited
-        if (this.isUrlVisited(normalizedLink)) {
-          return false;
-        }
-        
-        const path = url.pathname;
-        const depth = this.getURLDepth(normalizedLink);
-
-        if (depth > maxDepth) {
-          return false;
-        }
-
-        const excincPath = this.regexOnFullURL ? normalizedLink : path;
-
-        if (this.excludes.length > 0 && this.excludes[0] !== "") {
-          if (
-            this.excludes.some((excludePattern) =>
-              new RegExp(excludePattern).test(excincPath),
-            )
-          ) {
-            return false;
-          }
-        }
-
-        if (this.includes.length > 0 && this.includes[0] !== "") {
-          if (
-            !this.includes.some((includePattern) =>
-              new RegExp(includePattern).test(excincPath),
-            )
-          ) {
-            return false;
-          }
-        }
-
-        const normalizedInitialUrl = new URL(this.initialUrl);
-        let normalizedLinkUrl;
-        try {
-          normalizedLinkUrl = new URL(normalizedLink);
-        } catch (_) {
-          return false;
-        }
-        const initialHostname = normalizedInitialUrl.hostname.replace(
-          /^www\./,
-          "",
-        );
-        const linkHostname = normalizedLinkUrl.hostname.replace(/^www\./, "");
-
-        if (!this.allowBackwardCrawling) {
-          if (
-            !normalizedLinkUrl.pathname.startsWith(normalizedInitialUrl.pathname)
-          ) {
-            return false;
-          }
-        }
-
-        const isAllowed = this.ignoreRobotsTxt
-          ? true
-          : ((this.robots.isAllowed(normalizedLink, "DeepScrapeCrawler")) ?? true);
-        
-        if (!isAllowed) {
-          this.logger.debug(`Link disallowed by robots.txt: ${normalizedLink}`);
-          return false;
-        }
-
-        if (this.isFile(normalizedLink)) {
-          return false;
-        }
-
-        return true;
-      })
+      .filter(link => this.isLinkValid(link, maxDepth))
       .slice(0, limit);
   }
 
@@ -353,11 +377,10 @@ export class WebCrawler {
     }
   }
 
-  public async crawlPage(url: string, skipTlsVerification = false): Promise<{html: string, links: string[]}> {
-    // Normalize URL for consistent processing
-    const normalizedUrl = this.urlNormalizationService.normalizeUrl(url);
-    
-    // Execute before crawl hook
+  /**
+   * Execute before crawl hook
+   */
+  private async executeBeforeCrawlHook(normalizedUrl: string): Promise<void> {
     if (this.hooks.beforeCrawl) {
       await this.hooks.beforeCrawl(normalizedUrl, {
         jobId: this.jobId,
@@ -366,118 +389,161 @@ export class WebCrawler {
         excludes: this.excludes
       });
     }
+  }
+
+  /**
+   * Apply content processing hooks to HTML
+   */
+  private async applyContentHooks(html: string, normalizedUrl: string): Promise<string> {
+    let processedHtml = html;
     
-    // Check if URL has been visited (including similar URLs if deduplication is enabled)
+    if (this.hooks.afterPageLoad) {
+      processedHtml = await this.hooks.afterPageLoad(processedHtml, normalizedUrl);
+    }
+    
+    if (this.hooks.beforeContentExtraction) {
+      processedHtml = await this.hooks.beforeContentExtraction(processedHtml, normalizedUrl);
+    }
+    
+    return processedHtml;
+  }
+
+  /**
+   * Execute error hook
+   */
+  private async executeErrorHook(error: Error, normalizedUrl: string): Promise<void> {
+    if (this.hooks.onError) {
+      await this.hooks.onError(error, normalizedUrl);
+    }
+  }
+
+  /**
+   * Configure Playwright options
+   */
+  private getPlaywrightOptions(): PlaywrightOptions {
+    return {
+      waitTime: 2000,
+      blockResources: true,
+      stealthMode: true,
+      maxScrolls: 3,
+      ignoreRobotsTxt: this.ignoreRobotsTxt,
+      logRequests: false,
+      viewport: { width: 1920, height: 1080 }
+    };
+  }
+
+  /**
+   * Initialize Playwright service if needed
+   */
+  private async initializePlaywrightService(options: PlaywrightOptions): Promise<void> {
+    if (!this.playwrightService) {
+      this.playwrightService = new PlaywrightService();
+      await this.playwrightService.initialize(options);
+    }
+  }
+
+  /**
+   * Crawl page using Playwright
+   */
+  private async crawlWithPlaywright(normalizedUrl: string): Promise<{html: string, links: string[]}> {
+    try {
+      const playwrightOptions = this.getPlaywrightOptions();
+      await this.initializePlaywrightService(playwrightOptions);
+
+      logger.info(`Crawling page with Playwright: ${normalizedUrl}`);
+      const response = await this.playwrightService!.crawlPage(normalizedUrl, playwrightOptions);
+      
+      const html = await this.applyContentHooks(response.content, normalizedUrl);
+      
+      logger.info(`Crawled page with Playwright: ${normalizedUrl} - Found ${response.links.length} links`);
+      return { html, links: response.links };
+    } catch (error) {
+      await this.executeErrorHook(error as Error, normalizedUrl);
+      logger.error(`Error crawling ${normalizedUrl} with Playwright`, { error, url: normalizedUrl });
+      return { html: '', links: [] };
+    }
+  }
+
+  /**
+   * Build Axios request configuration
+   */
+  private buildAxiosConfig(normalizedUrl: string, skipTlsVerification: boolean): any {
+    const config: any = {
+      timeout: 30000,
+    };
+
+    if (skipTlsVerification) {
+      config.httpsAgent = new https.Agent({
+        rejectUnauthorized: false,
+      });
+    }
+
+    return config;
+  }
+
+  /**
+   * Handle redirect mapping
+   */
+  private handleRedirect(response: any, normalizedUrl: string): void {
+    if (response.request?.res?.responseUrl && response.request.res.responseUrl !== normalizedUrl) {
+      this.addRedirectMapping(normalizedUrl, response.request.res.responseUrl);
+    }
+  }
+
+  /**
+   * Crawl page using Axios
+   */
+  private async crawlWithAxios(normalizedUrl: string, skipTlsVerification: boolean): Promise<{html: string, links: string[]}> {
+    try {
+      const config = this.buildAxiosConfig(normalizedUrl, skipTlsVerification);
+      const response = await axios.get(normalizedUrl, config);
+      
+      this.handleRedirect(response, normalizedUrl);
+      
+      const html = await this.applyContentHooks(response.data, normalizedUrl);
+      const links = await this.extractLinksFromHtml(html, normalizedUrl);
+      
+      return { html, links };
+    } catch (error) {
+      await this.executeErrorHook(error as Error, normalizedUrl);
+      logger.error(`Error crawling ${normalizedUrl}`, { error, url: normalizedUrl });
+      return { html: '', links: [] };
+    }
+  }
+
+  /**
+   * Check if URL can be crawled
+   */
+  private canCrawlUrl(normalizedUrl: string): boolean {
     if (this.isUrlVisited(normalizedUrl)) {
-      return { html: '', links: [] };
+      return false;
     }
     
-    // Try to lock the URL to prevent concurrent processing
     if (!this.lockUrl(normalizedUrl)) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  public async crawlPage(url: string, skipTlsVerification = false): Promise<{html: string, links: string[]}> {
+    const normalizedUrl = this.urlNormalizationService.normalizeUrl(url);
+    
+    await this.executeBeforeCrawlHook(normalizedUrl);
+    
+    if (!this.canCrawlUrl(normalizedUrl)) {
       return { html: '', links: [] };
     }
     
-    // Mark as visited
     this.visited.add(normalizedUrl);
     
     try {
-      // If using browser-based crawling with Playwright
       if (this.useBrowser && this.playwrightService) {
-        try {
-          // Configure playwright options
-          const playwrightOptions: PlaywrightOptions = {
-            waitTime: 2000,
-            blockResources: true,
-            stealthMode: true,
-            maxScrolls: 3,
-            ignoreRobotsTxt: this.ignoreRobotsTxt,
-            logRequests: false,
-            viewport: { width: 1920, height: 1080 }
-          };
-
-          // Initialize PlaywrightService if not already initialized
-          if (!this.playwrightService) {
-            this.playwrightService = new PlaywrightService();
-            await this.playwrightService.initialize(playwrightOptions);
-          }
-
-          // Crawl the page using Playwright
-          logger.info(`Crawling page with Playwright: ${normalizedUrl}`);
-          const response = await this.playwrightService.crawlPage(normalizedUrl, playwrightOptions);
-          
-          // Apply afterPageLoad hook
-          let html = response.content;
-          
-          if (this.hooks.afterPageLoad) {
-            html = await this.hooks.afterPageLoad(html, normalizedUrl);
-          }
-          
-          // Apply beforeContentExtraction hook
-          if (this.hooks.beforeContentExtraction) {
-            html = await this.hooks.beforeContentExtraction(html, normalizedUrl);
-          }
-          
-          logger.info(`Crawled page with Playwright: ${normalizedUrl} - Found ${response.links.length} links`);
-          return { html, links: response.links };
-        } catch (error) {
-          // Execute error hook
-          if (this.hooks.onError) {
-            await this.hooks.onError(error as Error, normalizedUrl);
-          }
-          
-          logger.error(`Error crawling ${normalizedUrl} with Playwright`, { error, url: normalizedUrl });
-          return { html: '', links: [] };
-        }
+        return await this.crawlWithPlaywright(normalizedUrl);
       } else {
-        // Fallback to standard Axios-based crawling
-        try {
-          let extraArgs = {};
-          if (skipTlsVerification) {
-            extraArgs = {
-              httpsAgent: new https.Agent({
-                rejectUnauthorized: false,
-              })
-            };
-          }
-          
-          const response = await axios.get(normalizedUrl, {
-            timeout: 30000,
-            ...extraArgs,
-          });
-          
-          // Handle redirects by storing the mapping
-          if (response.request?.res?.responseUrl && response.request.res.responseUrl !== normalizedUrl) {
-            this.addRedirectMapping(normalizedUrl, response.request.res.responseUrl);
-          }
-          
-          let html = response.data;
-          
-          // Apply afterPageLoad hook
-          if (this.hooks.afterPageLoad) {
-            html = await this.hooks.afterPageLoad(html, normalizedUrl);
-          }
-          
-          // Apply beforeContentExtraction hook
-          if (this.hooks.beforeContentExtraction) {
-            html = await this.hooks.beforeContentExtraction(html, normalizedUrl);
-          }
-          
-          // Extract links
-          const links = await this.extractLinksFromHtml(html, normalizedUrl);
-          
-          return { html, links };
-        } catch (error) {
-          // Execute error hook
-          if (this.hooks.onError) {
-            await this.hooks.onError(error as Error, normalizedUrl);
-          }
-          
-          logger.error(`Error crawling ${normalizedUrl}`, { error, url: normalizedUrl });
-          return { html: '', links: [] };
-        }
+        return await this.crawlWithAxios(normalizedUrl, skipTlsVerification);
       }
     } finally {
-      // Always unlock the URL after processing (regardless of success/failure)
       this.unlockUrl(normalizedUrl);
     }
   }

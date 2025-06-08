@@ -363,58 +363,15 @@ export class HtmlToMarkdownTransformer {
    * Extract headings and their content
    */
   private extractHeadingsAndContent($: cheerio.CheerioAPI): string {
-    // Create a container for the extracted content
-    const $result = cheerio.load('<div class="heading-based-content"></div>');
-    const $container = $result('.heading-based-content');
+    const $container = this.createContentContainer();
+    const headings = this.getTopLevelHeadings($);
     
-    // Get all h1 and h2 headings
-    const headings = $('h1, h2').toArray();
-    
-    if (headings.length === 0) {
-      logger.debug('No h1/h2 headings found for extraction');
+    if (!this.hasValidHeadings(headings)) {
       return '';
     }
     
-    logger.debug(`Found ${headings.length} h1/h2 headings for extraction`);
-    
-    // For each heading, add it and its content until the next heading
-    for (let i = 0; i < headings.length; i++) {
-      const heading = $(headings[i]);
-      const nextHeading = i < headings.length - 1 ? $(headings[i + 1]) : null;
-      
-      // Add the heading
-      $container.append(heading.clone());
-      
-      // Get all elements between this heading and the next
-      if (nextHeading) {
-        let current = heading[0].nextSibling;
-        while (current && current !== nextHeading[0]) {
-          if (current.nodeType === 1) { // Element node
-            $container.append($(current).clone());
-          }
-          current = current.nextSibling;
-        }
-      } else {
-        // For the last heading, get content until we hit another heading or end
-        let current = heading[0].nextSibling;
-        let contentAdded = 0;
-        
-        while (current && contentAdded < 10000) { // Limit to prevent infinite loops
-          if (current.nodeType === 1) { // Element node
-            const tagName = (current as any).tagName?.toLowerCase();
-            // Stop if we hit another heading of same or higher level
-            if (tagName && tagName.match(/^h[1-2]$/)) {
-              break;
-            }
-            $container.append($(current).clone());
-            contentAdded += $(current).text().length;
-          }
-          current = current.nextSibling;
-        }
-      }
-    }
-    
-    return $result.html();
+    this.processHeadings($, headings, $container);
+    return this.getContainerHtml($container);
   }
 
   /**
@@ -427,6 +384,135 @@ export class HtmlToMarkdownTransformer {
 
     // Remove navigation elements, headers, footers, sidebars
     $('nav, .nav, .navbar, .navigation, .menu-container, .site-navigation').remove();
+
+  /**
+   * Create content container for extracted headings
+   */
+  private createContentContainer(): cheerio.Cheerio<any> {
+    const $result = cheerio.load('<div class="heading-based-content"></div>');
+    return $result('.heading-based-content');
+  }
+
+  /**
+   * Get top-level headings from document
+   */
+  private getTopLevelHeadings($: cheerio.CheerioAPI): any[] {
+    return $('h1, h2').toArray();
+  }
+
+  /**
+   * Check if headings are valid for extraction
+   */
+  private hasValidHeadings(headings: any[]): boolean {
+    if (headings.length === 0) {
+      logger.debug('No h1/h2 headings found for extraction');
+      return false;
+    }
+    
+    logger.debug(`Found ${headings.length} h1/h2 headings for extraction`);
+    return true;
+  }
+
+  /**
+   * Process all headings and extract their content
+   */
+  private processHeadings($: cheerio.CheerioAPI, headings: any[], $container: cheerio.Cheerio<any>): void {
+    for (let i = 0; i < headings.length; i++) {
+      const heading = $(headings[i]);
+      const nextHeading = this.getNextHeading(headings, i);
+      
+      this.extractHeadingSection($, heading, nextHeading, $container);
+    }
+  }
+
+  /**
+   * Get next heading in the sequence
+   */
+  private getNextHeading(headings: any[], currentIndex: number): cheerio.Cheerio<any> | null {
+    return currentIndex < headings.length - 1 ? cheerio.load('')(headings[currentIndex + 1]) : null;
+  }
+
+  /**
+   * Extract content for a single heading section
+   */
+  private extractHeadingSection(
+    $: cheerio.CheerioAPI, 
+    heading: cheerio.Cheerio<any>, 
+    nextHeading: cheerio.Cheerio<any> | null, 
+    $container: cheerio.Cheerio<any>
+  ): void {
+    $container.append(heading.clone());
+    
+    if (nextHeading) {
+      this.extractContentUntilNextHeading(heading, nextHeading, $container);
+    } else {
+      this.extractContentUntilEnd($, heading, $container);
+    }
+  }
+
+  /**
+   * Extract content until next heading
+   */
+  private extractContentUntilNextHeading(
+    heading: cheerio.Cheerio<any>, 
+    nextHeading: cheerio.Cheerio<any>, 
+    $container: cheerio.Cheerio<any>
+  ): void {
+    let current = heading[0].nextSibling;
+    while (current && current !== nextHeading[0]) {
+      if (this.isElementNode(current)) {
+        $container.append(cheerio.load('')(current).clone());
+      }
+      current = current.nextSibling;
+    }
+  }
+
+  /**
+   * Extract content until end of document or next heading
+   */
+  private extractContentUntilEnd(
+    $: cheerio.CheerioAPI, 
+    heading: cheerio.Cheerio<any>, 
+    $container: cheerio.Cheerio<any>
+  ): void {
+    let current = heading[0].nextSibling;
+    let contentAdded = 0;
+    
+    while (current && contentAdded < 10000) {
+      if (this.isElementNode(current)) {
+        if (this.shouldStopAtHeading(current)) {
+          break;
+        }
+        
+        $container.append($(current).clone());
+        contentAdded += $(current).text().length;
+      }
+      current = current.nextSibling;
+    }
+  }
+
+  /**
+   * Check if node is an element node
+   */
+  private isElementNode(node: any): boolean {
+    return node.nodeType === 1;
+  }
+
+  /**
+   * Check if we should stop at this heading
+   */
+  private shouldStopAtHeading(node: any): boolean {
+    const tagName = (node as any).tagName?.toLowerCase();
+    return tagName && tagName.match(/^h[1-2]$/);
+  }
+
+  /**
+   * Get HTML from container
+   */
+  private getContainerHtml($container: cheerio.Cheerio<any>): string {
+    const $result = $container.parent();
+    return $result.html() || '';
+  }
     $('header:not(:has(h1,h2,h3,h4,h5,h6)), footer, aside, .sidebar, .left-sidebar, .right-sidebar').remove();
     $('.menu:not(article .menu), .main-menu, .top-menu, .footer-menu, .utility-nav').remove();
 
@@ -457,6 +543,7 @@ export class HtmlToMarkdownTransformer {
     $('[data-track], [data-tracking], [data-analytics], [class*="analytics"], [id*="analytics"]').remove();
     $('iframe[src*="analytics"], iframe[src*="tracking"], iframe[src*="pixel"]').remove();
     $('img[src*="pixel"], img[src*="tracker"], img[src*="tracking"]').remove();
+  }
 
     // Remove dynamic loading indicators
     $('.loading, .spinner, .loader, [class*="loading"], [class*="spinner"], [class*="loader"]').remove();

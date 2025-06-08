@@ -56,76 +56,11 @@ export class UrlNormalizationService {
     try {
       const parsedUrl = new URL(normalized);
       
-      // Add variation with trailing slash
-      const withSlash = new URL(normalized);
-      if (!withSlash.pathname.endsWith('/')) {
-        withSlash.pathname += '/';
-        variations.push(withSlash.href);
-      }
+      this.addSlashVariations(normalized, variations);
+      this.addWwwVariations(parsedUrl, normalized, variations);
+      this.addProtocolVariations(parsedUrl, normalized, variations);
+      this.addIndexHtmlVariations(parsedUrl, normalized, variations);
       
-      // Add variation without trailing slash
-      const withoutSlash = new URL(normalized);
-      if (withoutSlash.pathname.endsWith('/') && withoutSlash.pathname.length > 1) {
-        withoutSlash.pathname = withoutSlash.pathname.slice(0, -1);
-        variations.push(withoutSlash.href);
-      }
-      
-      // Add variation without www
-      if (parsedUrl.hostname.startsWith('www.')) {
-        const withoutWww = new URL(normalized);
-        withoutWww.hostname = withoutWww.hostname.replace('www.', '');
-        variations.push(withoutWww.href);
-        
-        // Also add www-less version with different slash handling
-        const withoutWwwWithSlash = new URL(withoutWww.href);
-        if (!withoutWwwWithSlash.pathname.endsWith('/')) {
-          withoutWwwWithSlash.pathname += '/';
-          variations.push(withoutWwwWithSlash.href);
-        }
-      }
-      
-      // Add variation with www
-      if (!parsedUrl.hostname.startsWith('www.')) {
-        const withWww = new URL(normalized);
-        withWww.hostname = 'www.' + withWww.hostname;
-        variations.push(withWww.href);
-        
-        // Also add www version with different slash handling
-        const withWwwWithSlash = new URL(withWww.href);
-        if (!withWwwWithSlash.pathname.endsWith('/')) {
-          withWwwWithSlash.pathname += '/';
-          variations.push(withWwwWithSlash.href);
-        }
-      }
-      
-      // Add HTTP/HTTPS variations
-      if (parsedUrl.protocol === 'https:') {
-        const httpVersion = new URL(normalized);
-        httpVersion.protocol = 'http:';
-        variations.push(httpVersion.href);
-      } else if (parsedUrl.protocol === 'http:') {
-        const httpsVersion = new URL(normalized);
-        httpsVersion.protocol = 'https:';
-        variations.push(httpsVersion.href);
-      }
-      
-      // Add index.html variations
-      if (!parsedUrl.pathname.includes('.')) {
-        const withIndex = new URL(normalized);
-        withIndex.pathname = withIndex.pathname.endsWith('/') 
-          ? withIndex.pathname + 'index.html'
-          : withIndex.pathname + '/index.html';
-        variations.push(withIndex.href);
-      }
-      
-      // Remove the index.html if present
-      if (parsedUrl.pathname.endsWith('/index.html')) {
-        const withoutIndex = new URL(normalized);
-        withoutIndex.pathname = withoutIndex.pathname.replace('/index.html', '/');
-        variations.push(withoutIndex.href);
-      }
-      
-      // Remove duplicates and return
       return [...new Set(variations)];
     } catch (error) {
       logger.warn(`Failed to generate similar URLs for: ${url}`, { error: (error as Error).message });
@@ -228,6 +163,98 @@ export class UrlNormalizationService {
       return path.split('/').filter(Boolean).length;
     } catch (error) {
       return 0;
+    }
+  }
+
+  /**
+   * Add trailing slash variations
+   */
+  private static addSlashVariations(normalized: string, variations: string[]): void {
+    const withSlash = new URL(normalized);
+    if (!withSlash.pathname.endsWith('/')) {
+      withSlash.pathname += '/';
+      variations.push(withSlash.href);
+    }
+    
+    const withoutSlash = new URL(normalized);
+    if (withoutSlash.pathname.endsWith('/') && withoutSlash.pathname.length > 1) {
+      withoutSlash.pathname = withoutSlash.pathname.slice(0, -1);
+      variations.push(withoutSlash.href);
+    }
+  }
+
+  /**
+   * Add www subdomain variations
+   */
+  private static addWwwVariations(parsedUrl: URL, normalized: string, variations: string[]): void {
+    if (parsedUrl.hostname.startsWith('www.')) {
+      this.addWithoutWwwVariations(normalized, variations);
+    } else {
+      this.addWithWwwVariations(normalized, variations);
+    }
+  }
+
+  /**
+   * Add variations without www subdomain
+   */
+  private static addWithoutWwwVariations(normalized: string, variations: string[]): void {
+    const withoutWww = new URL(normalized);
+    withoutWww.hostname = withoutWww.hostname.replace('www.', '');
+    variations.push(withoutWww.href);
+    
+    const withoutWwwWithSlash = new URL(withoutWww.href);
+    if (!withoutWwwWithSlash.pathname.endsWith('/')) {
+      withoutWwwWithSlash.pathname += '/';
+      variations.push(withoutWwwWithSlash.href);
+    }
+  }
+
+  /**
+   * Add variations with www subdomain
+   */
+  private static addWithWwwVariations(normalized: string, variations: string[]): void {
+    const withWww = new URL(normalized);
+    withWww.hostname = 'www.' + withWww.hostname;
+    variations.push(withWww.href);
+    
+    const withWwwWithSlash = new URL(withWww.href);
+    if (!withWwwWithSlash.pathname.endsWith('/')) {
+      withWwwWithSlash.pathname += '/';
+      variations.push(withWwwWithSlash.href);
+    }
+  }
+
+  /**
+   * Add HTTP/HTTPS protocol variations
+   */
+  private static addProtocolVariations(parsedUrl: URL, normalized: string, variations: string[]): void {
+    if (parsedUrl.protocol === 'https:') {
+      const httpVersion = new URL(normalized);
+      httpVersion.protocol = 'http:';
+      variations.push(httpVersion.href);
+    } else if (parsedUrl.protocol === 'http:') {
+      const httpsVersion = new URL(normalized);
+      httpsVersion.protocol = 'https:';
+      variations.push(httpsVersion.href);
+    }
+  }
+
+  /**
+   * Add index.html file variations
+   */
+  private static addIndexHtmlVariations(parsedUrl: URL, normalized: string, variations: string[]): void {
+    if (!parsedUrl.pathname.includes('.')) {
+      const withIndex = new URL(normalized);
+      withIndex.pathname = withIndex.pathname.endsWith('/') 
+        ? withIndex.pathname + 'index.html'
+        : withIndex.pathname + '/index.html';
+      variations.push(withIndex.href);
+    }
+    
+    if (parsedUrl.pathname.endsWith('/index.html')) {
+      const withoutIndex = new URL(normalized);
+      withoutIndex.pathname = withoutIndex.pathname.replace('/index.html', '/');
+      variations.push(withoutIndex.href);
     }
   }
 }
