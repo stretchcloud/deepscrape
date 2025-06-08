@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from './redis.service';
 import { logger } from '../utils/logger';
 import { markCrawlJobDone, addCrawlJob } from './redis.service';
-import { processCrawlJob } from '../scraper/crawler-processor';
+import { processCrawlJob, setAddJobsToQueueFn } from '../scraper/crawler-processor';
 import { EnhancedQueueService } from './enhanced-queue.service';
 
 const QUEUE_NAME = 'deepscrape-crawler-queue';
@@ -27,6 +27,9 @@ const crawlQueue = enhancedQueue.bullQueue;
 // Initialize the queue
 export async function initQueue(): Promise<void> {
   logger.info('Initializing enhanced crawler queue');
+  
+  // Inject the queue function to break circular dependency
+  setAddJobsToQueueFn(addCrawlJobsToQueue);
   
   // Ensure the queue is empty when starting - access through enhancedQueue
   await crawlQueue.obliterate({ force: true });

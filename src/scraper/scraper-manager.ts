@@ -87,6 +87,162 @@ export class ScraperManager {
   /**
    * Scrape a URL and apply transformations based on options
    */
+  /**
+   * Check cache for existing response
+   */
+  private async checkCache(cacheKey: string, url: string, skipCache: boolean): Promise<ScraperResponse | null> {
+    if (skipCache) {
+      return null;
+    }
+    
+    const cachedResponse = await this.cacheService.get<ScraperResponse>(cacheKey);
+    if (cachedResponse) {
+      logger.info(`Retrieved from cache: ${url}`);
+    }
+    return cachedResponse;
+  }
+
+  /**
+   * Get raw content using scrapers with fallback
+   */
+  private async getRawContent(url: string, options: ScraperOptions): Promise<ScraperResponse> {
+    let scraperResponse = await this.playwriteScraper.scrape(url, options);
+    
+    // Try HTTP scraper as fallback if Playwright fails
+    if (scraperResponse.error?.includes('browserType.launch')) {
+      logger.warn(`Playwright failed, falling back to HTTP scraper: ${scraperResponse.error}`);
+      scraperResponse = await this.httpScraper.scrape(url, options);
+      
+      if (!scraperResponse.error) {
+        logger.info('HTTP scraper fallback successful');
+      }
+    }
+    
+    return scraperResponse;
+  }
+
+  /**
+   * Clean HTML content
+   */
+  private cleanHtmlContent(scraperResponse: ScraperResponse): ScraperResponse {
+    const cleanedResponse = this.contentCleaner.clean(scraperResponse);
+    
+    if (cleanedResponse.error && !scraperResponse.error) {
+      logger.error(`Error occurred during content cleaning: ${cleanedResponse.error}`);
+    }
+    
+    return cleanedResponse;
+  }
+
+  /**
+   * Apply content transformations based on options
+   */
+  private applyContentTransformations(cleanedResponse: ScraperResponse, options: ScraperOptions): ScraperResponse {
+    let processedResponse = cleanedResponse;
+    
+    logger.info(`Processing response. Content type: ${cleanedResponse.contentType}, Extractor format: ${options.extractorFormat}`);
+
+    if (options.extractorFormat === 'markdown') {
+      processedResponse = this.convertToMarkdown(cleanedResponse);
+    } else if (options.extractorFormat === 'text') {
+      processedResponse = this.extractTextOnly(cleanedResponse);
+    }
+    
+    return processedResponse;
+  }
+
+  /**
+   * Convert content to markdown format
+   */
+  private convertToMarkdown(response: ScraperResponse): ScraperResponse {
+    logger.info('Converting HTML to Markdown');
+    
+    if (response.contentType !== 'html') {
+      logger.warn(`Content type is not HTML (${response.contentType}), forcing conversion to HTML`);
+      response.contentType = 'html';
+    }
+    
+    if (!response.content || response.content.trim() === '') {
+      logger.warn('Content is empty, cannot convert to Markdown');
+      return response;
+    }
+    
+    const processedResponse = this.markdownTransformer.transform(response);
+    logger.info(`Markdown conversion complete. Content length: ${processedResponse.content.length}`);
+    return processedResponse;
+  }
+
+  /**
+   * Apply LLM extraction if enabled
+   */
+  private async applyLLMExtraction<T>(
+    processedResponse: ScraperResponse, 
+    options: ScraperOptions & { extractionOptions?: ExtractionOptions }
+  ): Promise<ScraperResponse> {
+    if (!options.extractionOptions) {
+      return processedResponse;
+    }
+    
+    await this.ensureLLMExtractor();
+    
+    if (this.llmExtractor) {
+      logger.info('Applying LLM extraction with schema');
+      const extractionResult = await this.llmExtractor.extract<T>(
+        processedResponse, 
+        options.extractionOptions
+      );
+      return extractionResult;
+    } else {
+      logger.warn('Extraction options provided but LLM extractor failed to initialize');
+      return processedResponse;
+    }
+  }
+
+  /**
+   * Finalize response with metadata and caching
+   */
+  private async finalizeResponse(
+    processedResponse: ScraperResponse,
+    url: string,
+    startTime: number,
+    cacheKey: string,
+    options: ScraperOptions & { skipCache?: boolean; cacheTtl?: number }
+  ): Promise<ScraperResponse> {
+    // Add performance metrics
+    processedResponse.metadata.processingTime = Date.now() - startTime;
+    
+    // Cache if no errors and caching enabled
+    if (!processedResponse.error && !options.skipCache) {
+      await this.cacheService.set(cacheKey, processedResponse, {
+        url,
+        contentType: processedResponse.contentType,
+        customTtl: options.cacheTtl
+      });
+    }
+    
+    logger.info(`Scraping process completed successfully for URL: ${url} in ${Date.now() - startTime}ms`);
+    return processedResponse;
+  }
+
+  /**
+   * Create error response
+   */
+  private createErrorResponse(url: string, error: any, startTime: number): ScraperResponse {
+    return {
+      url,
+      title: '',
+      content: '',
+      contentType: 'html',
+      metadata: {
+        timestamp: new Date().toISOString(),
+        status: 0,
+        headers: {},
+        processingTime: Date.now() - startTime
+      },
+      error: `Scraping process error: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+
   async scrape<T = any>(url: string, options: ScraperOptions & { 
     extractionOptions?: ExtractionOptions;
     skipCache?: boolean;
@@ -98,118 +254,37 @@ export class ScraperManager {
     try {
       logger.info(`Starting scraping process for URL: ${url}`);
       
-      // Check cache first unless skipCache is true
-      if (!options.skipCache) {
-        const cachedResponse = await this.cacheService.get<ScraperResponse>(cacheKey);
-        if (cachedResponse) {
-          logger.info(`Retrieved from cache: ${url}`);
-          return cachedResponse;
-        }
+      // Check cache first
+      const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache || false);
+      if (cachedResponse) {
+        return cachedResponse;
       }
       
-      // Step 1: Get raw HTML using Playwright scraper (with HTTP fallback)
-      let scraperResponse = await this.playwriteScraper.scrape(url, options);
-      
-      // If Playwright fails, try HTTP scraper as fallback
-      if (scraperResponse.error?.includes('browserType.launch')) {
-        logger.warn(`Playwright failed, falling back to HTTP scraper: ${scraperResponse.error}`);
-        scraperResponse = await this.httpScraper.scrape(url, options);
-        
-        if (!scraperResponse.error) {
-          logger.info('HTTP scraper fallback successful');
-        }
-      }
-      
-      // If there was still an error, return immediately
+      // Get raw content with fallback
+      const scraperResponse = await this.getRawContent(url, options);
       if (scraperResponse.error) {
         logger.error(`Error occurred during scraping: ${scraperResponse.error}`);
         return scraperResponse;
       }
 
-      // Step 2: Clean HTML content
-      const cleanedResponse = this.contentCleaner.clean(scraperResponse);
-      
-      // If cleaning resulted in an error, return immediately
+      // Clean content
+      const cleanedResponse = this.cleanHtmlContent(scraperResponse);
       if (cleanedResponse.error && !scraperResponse.error) {
-        logger.error(`Error occurred during content cleaning: ${cleanedResponse.error}`);
         return cleanedResponse;
       }
 
-      // Step 3: Apply transformations based on options
-      let processedResponse = cleanedResponse;
+      // Apply transformations
+      let processedResponse = this.applyContentTransformations(cleanedResponse, options);
       
-      // Debug logging for content type and extraction format
-      logger.info(`Processing response. Content type: ${cleanedResponse.contentType}, Extractor format: ${options.extractorFormat}`);
-
-      // Convert to markdown if requested
-      if (options.extractorFormat === 'markdown') {
-        logger.info('Converting HTML to Markdown');
-        if (cleanedResponse.contentType !== 'html') {
-          logger.warn(`Content type is not HTML (${cleanedResponse.contentType}), forcing conversion to HTML`);
-          cleanedResponse.contentType = 'html';
-        }
-        
-        // Ensure content is not empty
-        if (!cleanedResponse.content || cleanedResponse.content.trim() === '') {
-          logger.warn('Content is empty, cannot convert to Markdown');
-        } else {
-          processedResponse = this.markdownTransformer.transform(cleanedResponse);
-          logger.info(`Markdown conversion complete. Content length: ${processedResponse.content.length}`);
-        }
-      }
-      // Convert to text if requested (simple text extraction)
-      else if (options.extractorFormat === 'text') {
-        processedResponse = this.extractTextOnly(cleanedResponse);
-      }
-
-      // Step 4: Apply LLM extraction if requested
-      if (options.extractionOptions) {
-        await this.ensureLLMExtractor();
-        
-        if (this.llmExtractor) {
-          logger.info('Applying LLM extraction with schema');
-          
-          const extractionResult = await this.llmExtractor.extract<T>(
-            processedResponse, 
-            options.extractionOptions
-          );
-          
-          processedResponse = extractionResult;
-        } else {
-          logger.warn('Extraction options provided but LLM extractor failed to initialize');
-        }
-      }
+      // Apply LLM extraction
+      processedResponse = await this.applyLLMExtraction<T>(processedResponse, options);
       
-      // Add performance metrics
-      processedResponse.metadata.processingTime = Date.now() - startTime;
+      // Finalize and cache
+      return await this.finalizeResponse(processedResponse, url, startTime, cacheKey, options);
       
-      // Store in cache if no errors occurred
-      if (!processedResponse.error && !options.skipCache) {
-        await this.cacheService.set(cacheKey, processedResponse, {
-          url,
-          contentType: processedResponse.contentType,
-          customTtl: options.cacheTtl
-        });
-      }
-      
-      logger.info(`Scraping process completed successfully for URL: ${url} in ${Date.now() - startTime}ms`);
-      return processedResponse;
     } catch (error) {
       logger.error(`Unexpected error during scraping process: ${error instanceof Error ? error.message : String(error)}`);
-      
-      return {
-        url,
-        title: '',
-        content: '',
-        contentType: 'html',
-        metadata: {
-          timestamp: new Date().toISOString(),
-          status: 0,
-          headers: {},
-          processingTime: Date.now() - startTime
-        },
-        error: `Scraping process error: ${error instanceof Error ? error.message : String(error)}`
-      };
+      return this.createErrorResponse(url, error, startTime);
     }
   }
 

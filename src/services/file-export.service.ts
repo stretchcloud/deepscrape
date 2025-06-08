@@ -372,6 +372,173 @@ export class FileExportService {
   }
 
   /**
+   * Validate crawl directory exists and get markdown files
+   */
+  private async validateAndGetMarkdownFiles(crawlDir: string): Promise<string[]> {
+    if (!fs.existsSync(crawlDir)) {
+      throw new Error(`Crawl directory not found: ${crawlDir}`);
+    }
+
+    const files = await fs.promises.readdir(crawlDir);
+    return files.filter(file => file.endsWith('.md') && !file.includes('_summary.md'));
+  }
+
+  /**
+   * Extract title from frontmatter content
+   */
+  private extractTitleFromFrontmatter(content: string, filename: string): string {
+    let title = filename.replace('.md', ''); // Default fallback
+    
+    if (!content.startsWith('---\n')) {
+      return title;
+    }
+    
+    const lines = content.split('\n');
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i] === '---') break;
+      
+      if (lines[i].startsWith('title: ')) {
+        let titleValue = lines[i].substring(7).trim();
+        if (titleValue.startsWith('"') && titleValue.endsWith('"')) {
+          titleValue = titleValue.slice(1, -1);
+        }
+        if (titleValue) {
+          title = titleValue;
+        }
+        break;
+      }
+    }
+    
+    return title;
+  }
+
+  /**
+   * Generate markdown header for consolidated file
+   */
+  private generateMarkdownHeader(crawlId: string, fileCount: number): string {
+    return `# Consolidated Crawl Results\n\n**Crawl ID:** ${crawlId}\n**Generated:** ${new Date().toISOString()}\n**Total Files:** ${fileCount}\n\n---\n\n`;
+  }
+
+  /**
+   * Process single markdown file for consolidation
+   */
+  private async processMarkdownFile(filePath: string, filename: string): Promise<string> {
+    const content = await fs.promises.readFile(filePath, 'utf8');
+    const title = this.extractTitleFromFrontmatter(content, filename);
+    const contentWithoutFrontmatter = this.removeFrontmatter(content);
+    
+    return `## ${title}\n\n${contentWithoutFrontmatter}\n\n---\n\n`;
+  }
+
+  /**
+   * Export crawl as consolidated markdown file
+   */
+  private async exportAsMarkdown(crawlId: string, markdownFiles: string[], crawlDir: string, consolidatedPath: string): Promise<void> {
+    let consolidatedContent = this.generateMarkdownHeader(crawlId, markdownFiles.length);
+    
+    for (const file of markdownFiles) {
+      const filePath = path.join(crawlDir, file);
+      const fileContent = await this.processMarkdownFile(filePath, file);
+      consolidatedContent += fileContent;
+    }
+    
+    await fs.promises.writeFile(consolidatedPath, consolidatedContent, 'utf8');
+  }
+
+  /**
+   * Parse frontmatter metadata from content
+   */
+  private parseFrontmatterMetadata(content: string): Record<string, any> {
+    let metadata = {};
+    
+    if (!content.startsWith('---\n')) {
+      return metadata;
+    }
+    
+    try {
+      const lines = content.split('\n');
+      let endIndex = -1;
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i] === '---') {
+          endIndex = i;
+          break;
+        }
+      }
+      
+      if (endIndex > 0) {
+        const frontmatterLines = lines.slice(1, endIndex);
+        metadata = this.parseFrontmatterLines(frontmatterLines);
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    
+    return metadata;
+  }
+
+  /**
+   * Parse individual frontmatter lines into metadata object
+   */
+  private parseFrontmatterLines(lines: string[]): Record<string, any> {
+    const metadata: Record<string, any> = {};
+    
+    lines.forEach(line => {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const key = line.substring(0, colonIndex).trim();
+        let value = line.substring(colonIndex + 1).trim();
+        
+        // Remove quotes if present
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1);
+        }
+        
+        if (key && this.isValidMetadataKey(key)) {
+          metadata[key] = value;
+        }
+      }
+    });
+    
+    return metadata;
+  }
+
+  /**
+   * Process single file for JSON export
+   */
+  private async processFileForJson(filePath: string, filename: string): Promise<any> {
+    const content = await fs.promises.readFile(filePath, 'utf8');
+    const metadata = this.parseFrontmatterMetadata(content);
+    const contentWithoutFrontmatter = this.removeFrontmatter(content);
+    
+    return {
+      filename,
+      metadata,
+      content: contentWithoutFrontmatter
+    };
+  }
+
+  /**
+   * Export crawl as consolidated JSON file
+   */
+  private async exportAsJson(crawlId: string, markdownFiles: string[], crawlDir: string, consolidatedPath: string): Promise<void> {
+    const jsonData = {
+      crawlId,
+      generatedAt: new Date().toISOString(),
+      totalFiles: markdownFiles.length,
+      pages: []
+    };
+    
+    for (const file of markdownFiles) {
+      const filePath = path.join(crawlDir, file);
+      const pageData = await this.processFileForJson(filePath, file);
+      (jsonData.pages as any).push(pageData);
+    }
+    
+    await fs.promises.writeFile(consolidatedPath, JSON.stringify(jsonData, null, 2), 'utf8');
+  }
+
+  /**
    * Export crawl as a single consolidated markdown file
    */
   async exportCrawlAsConsolidatedFile(
@@ -380,112 +547,15 @@ export class FileExportService {
   ): Promise<string> {
     try {
       const crawlDir = path.join(this.outputDir, crawlId);
-      if (!fs.existsSync(crawlDir)) {
-        throw new Error(`Crawl directory not found: ${crawlDir}`);
-      }
-
-      const files = await fs.promises.readdir(crawlDir);
-      const markdownFiles = files.filter(file => file.endsWith('.md') && !file.includes('_summary.md'));
+      const markdownFiles = await this.validateAndGetMarkdownFiles(crawlDir);
       
       const consolidatedFilename = `${crawlId}_consolidated.${format}`;
       const consolidatedPath = path.join(crawlDir, consolidatedFilename);
       
       if (format === 'markdown') {
-        let consolidatedContent = `# Consolidated Crawl Results\n\n**Crawl ID:** ${crawlId}\n**Generated:** ${new Date().toISOString()}\n**Total Files:** ${markdownFiles.length}\n\n---\n\n`;
-        
-        for (const file of markdownFiles) {
-          const filePath = path.join(crawlDir, file);
-          const content = await fs.promises.readFile(filePath, 'utf8');
-          
-          // Extract title from frontmatter or filename (safe parsing)
-          let title = file.replace('.md', ''); // Default fallback
-          
-          if (content.startsWith('---\n')) {
-            const lines = content.split('\n');
-            for (let i = 1; i < lines.length; i++) {
-              if (lines[i] === '---') break;
-              
-              if (lines[i].startsWith('title: ')) {
-                let titleValue = lines[i].substring(7).trim();
-                if (titleValue.startsWith('"') && titleValue.endsWith('"')) {
-                  titleValue = titleValue.slice(1, -1);
-                }
-                if (titleValue) {
-                  title = titleValue;
-                }
-                break;
-              }
-            }
-          }
-          
-          consolidatedContent += `## ${title}\n\n`;
-          
-          // Remove frontmatter and add content (safe regex)
-          const contentWithoutFrontmatter = this.removeFrontmatter(content);
-          consolidatedContent += contentWithoutFrontmatter + '\n\n---\n\n';
-        }
-        
-        await fs.promises.writeFile(consolidatedPath, consolidatedContent, 'utf8');
+        await this.exportAsMarkdown(crawlId, markdownFiles, crawlDir, consolidatedPath);
       } else if (format === 'json') {
-        const jsonData = {
-          crawlId,
-          generatedAt: new Date().toISOString(),
-          totalFiles: markdownFiles.length,
-          pages: []
-        };
-        
-        for (const file of markdownFiles) {
-          const filePath = path.join(crawlDir, file);
-          const content = await fs.promises.readFile(filePath, 'utf8');
-          
-          // Parse frontmatter safely
-          let metadata = {};
-          if (content.startsWith('---\n')) {
-            try {
-              const lines = content.split('\n');
-              let endIndex = -1;
-              
-              for (let i = 1; i < lines.length; i++) {
-                if (lines[i] === '---') {
-                  endIndex = i;
-                  break;
-                }
-              }
-              
-              if (endIndex > 0) {
-                const frontmatterLines = lines.slice(1, endIndex);
-                frontmatterLines.forEach(line => {
-                  const colonIndex = line.indexOf(':');
-                  if (colonIndex > 0) {
-                    const key = line.substring(0, colonIndex).trim();
-                    let value = line.substring(colonIndex + 1).trim();
-                    
-                    // Remove quotes if present
-                    if (value.startsWith('"') && value.endsWith('"')) {
-                      value = value.slice(1, -1);
-                    }
-                    
-                    if (key && this.isValidMetadataKey(key)) { // Only allow word characters in keys
-                      (metadata as any)[key] = value;
-                    }
-                  }
-                });
-              }
-            } catch (e) {
-              // Ignore parsing errors
-            }
-          }
-          
-          const contentWithoutFrontmatter = this.removeFrontmatter(content);
-          
-          (jsonData.pages as any).push({
-            filename: file,
-            metadata,
-            content: contentWithoutFrontmatter
-          });
-        }
-        
-        await fs.promises.writeFile(consolidatedPath, JSON.stringify(jsonData, null, 2), 'utf8');
+        await this.exportAsJson(crawlId, markdownFiles, crawlDir, consolidatedPath);
       }
       
       logger.info(`Exported consolidated ${format} file: ${consolidatedPath}`, { crawlId, format });
