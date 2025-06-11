@@ -9,6 +9,9 @@ dist/
 # Logs
 *.log
 logs/*.log
+logs/combined.log
+logs/error.log
+
 
 # Cache
 cache/

@@ -15,6 +15,8 @@ const apiKeyAuth = (req, res, next) => {
             return next();
         }
         // Get API key from request
+        // Express normalizes header names to lowercase, so we check 'x-api-key'
+        // This accepts any capitalization: X-API-Key, X-API-KEY, x-api-key, etc.
         const apiKey = req.headers['x-api-key'] || req.query.apiKey;
         // Validate API key
         if (!apiKey || apiKey !== validApiKey) {

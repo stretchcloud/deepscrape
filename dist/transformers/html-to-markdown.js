@@ -361,51 +361,13 @@ class HtmlToMarkdownTransformer {
      * Extract headings and their content
      */
     extractHeadingsAndContent($) {
-        // Create a container for the extracted content
-        const $result = cheerio.load('<div class="heading-based-content"></div>');
-        const $container = $result('.heading-based-content');
-        // Get all h1 and h2 headings
-        const headings = $('h1, h2').toArray();
-        if (headings.length === 0) {
-            logger_1.logger.debug('No h1/h2 headings found for extraction');
+        const $container = this.createContentContainer();
+        const headings = this.getTopLevelHeadings($);
+        if (!this.hasValidHeadings(headings)) {
             return '';
         }
-        logger_1.logger.debug(`Found ${headings.length} h1/h2 headings for extraction`);
-        // For each heading, add it and its content until the next heading
-        for (let i = 0; i < headings.length; i++) {
-            const heading = $(headings[i]);
-            const nextHeading = i < headings.length - 1 ? $(headings[i + 1]) : null;
-            // Add the heading
-            $container.append(heading.clone());
-            // Get all elements between this heading and the next
-            if (nextHeading) {
-                let current = heading[0].nextSibling;
-                while (current && current !== nextHeading[0]) {
-                    if (current.nodeType === 1) { // Element node
-                        $container.append($(current).clone());
-                    }
-                    current = current.nextSibling;
-                }
-            }
-            else {
-                // For the last heading, get content until we hit another heading or end
-                let current = heading[0].nextSibling;
-                let contentAdded = 0;
-                while (current && contentAdded < 10000) { // Limit to prevent infinite loops
-                    if (current.nodeType === 1) { // Element node
-                        const tagName = current.tagName?.toLowerCase();
-                        // Stop if we hit another heading of same or higher level
-                        if (tagName && tagName.match(/^h[1-2]$/)) {
-                            break;
-                        }
-                        $container.append($(current).clone());
-                        contentAdded += $(current).text().length;
-                    }
-                    current = current.nextSibling;
-                }
-            }
-        }
-        return $result.html();
+        this.processHeadings($, headings, $container);
+        return this.getContainerHtml($container);
     }
     /**
      * Remove common unwanted elements from HTML
@@ -482,6 +444,107 @@ class HtmlToMarkdownTransformer {
                 $(table).prepend(thead);
             }
         });
+    }
+    /**
+     * Create content container for extracted headings
+     */
+    createContentContainer() {
+        const $result = cheerio.load('<div class="heading-based-content"></div>');
+        return $result('.heading-based-content');
+    }
+    /**
+     * Get top-level headings from document
+     */
+    getTopLevelHeadings($) {
+        return $('h1, h2').toArray();
+    }
+    /**
+     * Check if headings are valid for extraction
+     */
+    hasValidHeadings(headings) {
+        if (headings.length === 0) {
+            logger_1.logger.debug('No h1/h2 headings found for extraction');
+            return false;
+        }
+        logger_1.logger.debug(`Found ${headings.length} h1/h2 headings for extraction`);
+        return true;
+    }
+    /**
+     * Process all headings and extract their content
+     */
+    processHeadings($, headings, $container) {
+        for (let i = 0; i < headings.length; i++) {
+            const heading = $(headings[i]);
+            const nextHeading = this.getNextHeading(headings, i);
+            this.extractHeadingSection($, heading, nextHeading, $container);
+        }
+    }
+    /**
+     * Get next heading in the sequence
+     */
+    getNextHeading(headings, currentIndex) {
+        return currentIndex < headings.length - 1 ? cheerio.load('')(headings[currentIndex + 1]) : null;
+    }
+    /**
+     * Extract content for a single heading section
+     */
+    extractHeadingSection($, heading, nextHeading, $container) {
+        $container.append(heading.clone());
+        if (nextHeading) {
+            this.extractContentUntilNextHeading(heading, nextHeading, $container);
+        }
+        else {
+            this.extractContentUntilEnd($, heading, $container);
+        }
+    }
+    /**
+     * Extract content until next heading
+     */
+    extractContentUntilNextHeading(heading, nextHeading, $container) {
+        let current = heading[0].nextSibling;
+        while (current && current !== nextHeading[0]) {
+            if (this.isElementNode(current)) {
+                $container.append(cheerio.load('')(current).clone());
+            }
+            current = current.nextSibling;
+        }
+    }
+    /**
+     * Extract content until end of document or next heading
+     */
+    extractContentUntilEnd($, heading, $container) {
+        let current = heading[0].nextSibling;
+        let contentAdded = 0;
+        while (current && contentAdded < 10000) {
+            if (this.isElementNode(current)) {
+                if (this.shouldStopAtHeading(current)) {
+                    break;
+                }
+                $container.append($(current).clone());
+                contentAdded += $(current).text().length;
+            }
+            current = current.nextSibling;
+        }
+    }
+    /**
+     * Check if node is an element node
+     */
+    isElementNode(node) {
+        return node.nodeType === 1;
+    }
+    /**
+     * Check if we should stop at this heading
+     */
+    shouldStopAtHeading(node) {
+        const tagName = node.tagName?.toLowerCase();
+        return tagName && tagName.match(/^h[1-2]$/);
+    }
+    /**
+     * Get HTML from container
+     */
+    getContainerHtml($container) {
+        const $result = $container.parent();
+        return $result.html() || '';
     }
     /**
      * Extract main content using multiple strategies

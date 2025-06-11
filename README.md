@@ -213,14 +213,13 @@ curl -X POST http://localhost:3000/api/batch/scrape \
   -H "X-API-Key: your-secret-key" \
   -d '{
     "urls": [
-      "https://example.com/page1",
-      "https://example.com/page2", 
-      "https://example.com/page3",
-      "https://docs.example.com/api",
-      "https://blog.example.com/post1"
+      "https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart",
+      "https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/deploy-vais-prompt", 
+      "https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/overview",
+      "https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-studio-express-mode-quickstart",
+      "https://cloud.google.com/vertex-ai/generative-ai/docs/start/express-mode/vertex-ai-express-mode-api-quickstart"
     ],
     "concurrency": 3,
-    "webhook": "https://your-webhook.com/batch-complete",
     "options": {
       "extractorFormat": "markdown",
       "waitForTimeout": 2000,
