@@ -43,166 +43,19 @@ class ContentCleaner {
     clean(scraperResponse) {
         try {
             logger_1.logger.info(`Cleaning HTML content for URL: ${scraperResponse.url}`);
-            if (scraperResponse.contentType !== 'html' || !scraperResponse.content) {
+            if (!this.isValidHtmlContent(scraperResponse)) {
                 logger_1.logger.warn('Content is not HTML or is empty, skipping cleaning');
                 return scraperResponse;
             }
-            // Load HTML with cheerio
             const $ = cheerio.load(scraperResponse.content);
-            // Find all heading elements for potential section identification
-            const headings = $('h1, h2, h3, h4, h5, h6').toArray();
-            logger_1.logger.info(`Found ${headings.length} headings in the document`);
-            // Try to find main content first
-            const mainContentSelectors = [
-                'main',
-                'article',
-                '#main-content',
-                '.main-content',
-                '.article-content',
-                '.post-content',
-                '.entry-content',
-                '[role="main"]',
-                '#content',
-                '.content',
-                '.post',
-                '.article',
-                '.entry',
-                // Add more generic selectors that might contain the whole document body
-                '.doc',
-                '.document',
-                '.documentation',
-                '#document-content',
-                '.page-content',
-                '.body-content',
-                'body',
-                '.body'
-            ];
-            let mainContent = null;
-            // Try to find main content using selectors
-            for (const selector of mainContentSelectors) {
-                const element = $(selector);
-                // Check if the element exists and contains substantial content
-                if (element.length && element.text().trim().length > 300) {
-                    // Check if it contains headings - prioritize content with headings
-                    const foundHeadings = element.find('h1, h2, h3, h4, h5, h6').length;
-                    if (foundHeadings > 0) {
-                        mainContent = element;
-                        logger_1.logger.info(`Found main content using selector: ${selector} with ${foundHeadings} headings`);
-                        break;
-                    }
-                    else if (!mainContent && element.text().trim().length > 500) {
-                        // Keep as a candidate if it has substantial text
-                        mainContent = element;
-                        logger_1.logger.info(`Found potential main content using selector: ${selector} (no headings)`);
-                    }
-                }
-            }
-            // If no main content found or no headings in main content, try fallback to largest text block
-            if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
-                logger_1.logger.info('No main content with headings found, using text density analysis');
-                // Find divs/sections with substantial text
-                const textBlocks = [];
-                $('div, section, article').each((_, element) => {
-                    const text = $(element).text().trim();
-                    const headingCount = $(element).find('h1, h2, h3, h4, h5, h6').length;
-                    // Score based on text length and presence of headings
-                    const score = text.length + (headingCount * 1000); // Prioritize blocks with headings
-                    if (text.length > 300 || headingCount > 0) {
-                        textBlocks.push({ element, textLength: score });
-                    }
-                });
-                // Sort by score (descending)
-                textBlocks.sort((a, b) => b.textLength - a.textLength);
-                // Use the largest text block if available
-                if (textBlocks.length > 0) {
-                    mainContent = $(textBlocks[0].element);
-                    const headingCount = mainContent.find('h1, h2, h3, h4, h5, h6').length;
-                    logger_1.logger.info(`Using largest text block with score ${textBlocks[0].textLength} and ${headingCount} headings`);
-                }
-            }
-            // If still no good content found or no headings, try to construct a content wrapper with all headings and their content
-            if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
-                logger_1.logger.info('Creating artificial main content container with all heading sections');
-                // Create a new container for our constructed content
-                const contentContainer = $('<div class="constructed-content"></div>');
-                // Find all top-level headings
-                const topHeadings = $('h1, h2').toArray();
-                if (topHeadings.length > 0) {
-                    logger_1.logger.info(`Found ${topHeadings.length} top-level headings to extract content from`);
-                    // For each heading, add it and all content until the next heading
-                    for (let i = 0; i < topHeadings.length; i++) {
-                        const heading = $(topHeadings[i]);
-                        const nextHeading = i < topHeadings.length - 1 ? $(topHeadings[i + 1]) : null;
-                        // Add the heading
-                        contentContainer.append(heading.clone());
-                        // Get all elements between this heading and the next
-                        if (nextHeading) {
-                            let current = heading[0].nextSibling;
-                            while (current && current !== nextHeading[0]) {
-                                if (current.nodeType === 1) { // Element node
-                                    contentContainer.append($(current).clone());
-                                }
-                                current = current.nextSibling;
-                            }
-                        }
-                        else {
-                            // For the last heading, get all following siblings until a new section or the end
-                            let current = heading[0].nextSibling;
-                            while (current) {
-                                if (current.nodeType === 1) { // Element node
-                                    // Stop if we find another heading of the same level or higher
-                                    const nodeName = current.tagName?.toLowerCase();
-                                    if (nodeName && nodeName.match(/^h[1-2]$/)) {
-                                        break;
-                                    }
-                                    contentContainer.append($(current).clone());
-                                }
-                                current = current.nextSibling;
-                            }
-                        }
-                    }
-                    mainContent = contentContainer;
-                }
-            }
-            // Remove common ads and tracking elements
-            this.removeAdsAndTracking($);
-            // Remove unnecessary attributes
-            this.removeAttributes($);
-            // Remove hidden elements
-            this.removeHiddenElements($);
-            // If main content was found, use it
-            let cleanedHtml = '';
-            if (mainContent) {
-                // Clone the main content and wrap it in a div to preserve structure
-                const $mainContentWrapper = $('<div class="main-content-wrapper"></div>');
-                $mainContentWrapper.append(mainContent.clone());
-                const mainContentHtml = $mainContentWrapper.html();
-                cleanedHtml = mainContentHtml || '';
-                // Count headings in the final content
-                const $finalCheck = cheerio.load(cleanedHtml);
-                const finalHeadings = $finalCheck('h1, h2, h3, h4, h5, h6').length;
-                logger_1.logger.info(`Final cleaned HTML contains ${finalHeadings} headings`);
-            }
-            else {
-                // Get the cleaned HTML of the entire document
-                cleanedHtml = $.html();
-                logger_1.logger.info('No main content found, using entire cleaned document');
-            }
-            // Return new response with cleaned content
-            const result = {
-                ...scraperResponse,
-                content: cleanedHtml
-            };
-            logger_1.logger.info('HTML content cleaning complete');
-            return result;
+            this.logHeadingInfo($);
+            const mainContent = this.findMainContent($);
+            this.cleanDocument($);
+            const cleanedHtml = this.extractCleanedHtml($, mainContent);
+            return this.createCleanedResponse(scraperResponse, cleanedHtml);
         }
         catch (error) {
-            logger_1.logger.error(`Error cleaning HTML content: ${error instanceof Error ? error.message : String(error)}`);
-            // Return original response with error
-            return {
-                ...scraperResponse,
-                error: `Content cleaning error: ${error instanceof Error ? error.message : String(error)}`
-            };
+            return this.createErrorResponse(scraperResponse, error);
         }
     }
     /**
@@ -254,6 +107,211 @@ class ContentCleaner {
         $('[style*="display: none"], [style*="display:none"], [style*="visibility: hidden"], [style*="visibility:hidden"]').remove();
         // Remove common hidden element classes
         $('.hidden, .hide, .invisible, .visually-hidden, .sr-only').remove();
+    }
+    /**
+     * Check if content is valid HTML
+     */
+    isValidHtmlContent(scraperResponse) {
+        return scraperResponse.contentType === 'html' && !!scraperResponse.content;
+    }
+    /**
+     * Log heading information
+     */
+    logHeadingInfo($) {
+        const headings = $('h1, h2, h3, h4, h5, h6').toArray();
+        logger_1.logger.info(`Found ${headings.length} headings in the document`);
+    }
+    /**
+     * Find main content using various strategies
+     */
+    findMainContent($) {
+        let mainContent = this.findMainContentBySelectors($);
+        if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
+            mainContent = this.findMainContentByTextDensity($);
+        }
+        if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
+            mainContent = this.constructContentFromHeadings($);
+        }
+        return mainContent;
+    }
+    /**
+     * Find main content using CSS selectors
+     */
+    findMainContentBySelectors($) {
+        const mainContentSelectors = [
+            'main', 'article', '#main-content', '.main-content', '.article-content',
+            '.post-content', '.entry-content', '[role="main"]', '#content', '.content',
+            '.post', '.article', '.entry', '.doc', '.document', '.documentation',
+            '#document-content', '.page-content', '.body-content', 'body', '.body'
+        ];
+        let mainContent = null;
+        for (const selector of mainContentSelectors) {
+            const element = $(selector);
+            if (this.isValidContentElement(element)) {
+                const foundHeadings = element.find('h1, h2, h3, h4, h5, h6').length;
+                if (foundHeadings > 0) {
+                    mainContent = element;
+                    logger_1.logger.info(`Found main content using selector: ${selector} with ${foundHeadings} headings`);
+                    break;
+                }
+                else if (!mainContent && element.text().trim().length > 500) {
+                    mainContent = element;
+                    logger_1.logger.info(`Found potential main content using selector: ${selector} (no headings)`);
+                }
+            }
+        }
+        return mainContent;
+    }
+    /**
+     * Check if element is valid content element
+     */
+    isValidContentElement(element) {
+        return element.length > 0 && element.text().trim().length > 300;
+    }
+    /**
+     * Find main content by analyzing text density
+     */
+    findMainContentByTextDensity($) {
+        logger_1.logger.info('No main content with headings found, using text density analysis');
+        const textBlocks = this.analyzeTextBlocks($);
+        if (textBlocks.length > 0) {
+            const mainContent = $(textBlocks[0].element);
+            const headingCount = mainContent.find('h1, h2, h3, h4, h5, h6').length;
+            logger_1.logger.info(`Using largest text block with score ${textBlocks[0].textLength} and ${headingCount} headings`);
+            return mainContent;
+        }
+        return null;
+    }
+    /**
+     * Analyze text blocks and return scored elements
+     */
+    analyzeTextBlocks($) {
+        const textBlocks = [];
+        $('div, section, article').each((_, element) => {
+            const text = $(element).text().trim();
+            const headingCount = $(element).find('h1, h2, h3, h4, h5, h6').length;
+            const score = text.length + (headingCount * 1000);
+            if (text.length > 300 || headingCount > 0) {
+                textBlocks.push({ element, textLength: score });
+            }
+        });
+        return textBlocks.sort((a, b) => b.textLength - a.textLength);
+    }
+    /**
+     * Construct content container from headings
+     */
+    constructContentFromHeadings($) {
+        logger_1.logger.info('Creating artificial main content container with all heading sections');
+        const contentContainer = $('<div class="constructed-content"></div>');
+        const topHeadings = $('h1, h2').toArray();
+        if (topHeadings.length > 0) {
+            logger_1.logger.info(`Found ${topHeadings.length} top-level headings to extract content from`);
+            this.extractHeadingSections($, topHeadings, contentContainer);
+            return contentContainer;
+        }
+        return null;
+    }
+    /**
+     * Extract content sections around headings
+     */
+    extractHeadingSections($, topHeadings, contentContainer) {
+        for (let i = 0; i < topHeadings.length; i++) {
+            const heading = $(topHeadings[i]);
+            const nextHeading = i < topHeadings.length - 1 ? $(topHeadings[i + 1]) : null;
+            contentContainer.append(heading.clone());
+            this.extractContentBetweenHeadings(heading, nextHeading, contentContainer);
+        }
+    }
+    /**
+     * Extract content between two headings
+     */
+    extractContentBetweenHeadings(heading, nextHeading, contentContainer) {
+        if (nextHeading) {
+            this.extractContentUntilElement(heading[0], nextHeading[0], contentContainer);
+        }
+        else {
+            this.extractContentUntilEnd(heading[0], contentContainer);
+        }
+    }
+    /**
+     * Extract content until specific element
+     */
+    extractContentUntilElement(startElement, endElement, container) {
+        let current = startElement.nextSibling;
+        while (current && current !== endElement) {
+            if (current.nodeType === 1) {
+                container.append(cheerio.load('')(current).clone());
+            }
+            current = current.nextSibling;
+        }
+    }
+    /**
+     * Extract content until end or next heading
+     */
+    extractContentUntilEnd(startElement, container) {
+        let current = startElement.nextSibling;
+        while (current) {
+            if (current.nodeType === 1) {
+                const nodeName = current.tagName?.toLowerCase();
+                if (nodeName && nodeName.match(/^h[1-2]$/)) {
+                    break;
+                }
+                container.append(cheerio.load('')(current).clone());
+            }
+            current = current.nextSibling;
+        }
+    }
+    /**
+     * Clean document by removing unwanted elements
+     */
+    cleanDocument($) {
+        this.removeAdsAndTracking($);
+        this.removeAttributes($);
+        this.removeHiddenElements($);
+    }
+    /**
+     * Extract cleaned HTML from document
+     */
+    extractCleanedHtml($, mainContent) {
+        if (mainContent) {
+            return this.extractMainContentHtml(mainContent);
+        }
+        else {
+            logger_1.logger.info('No main content found, using entire cleaned document');
+            return $.html();
+        }
+    }
+    /**
+     * Extract HTML from main content
+     */
+    extractMainContentHtml(mainContent) {
+        const $mainContentWrapper = cheerio.load('')('<div class="main-content-wrapper"></div>');
+        $mainContentWrapper.append(mainContent.clone());
+        const mainContentHtml = $mainContentWrapper.html() || '';
+        const $finalCheck = cheerio.load(mainContentHtml);
+        const finalHeadings = $finalCheck('h1, h2, h3, h4, h5, h6').length;
+        logger_1.logger.info(`Final cleaned HTML contains ${finalHeadings} headings`);
+        return mainContentHtml;
+    }
+    /**
+     * Create cleaned response object
+     */
+    createCleanedResponse(scraperResponse, cleanedHtml) {
+        logger_1.logger.info('HTML content cleaning complete');
+        return {
+            ...scraperResponse,
+            content: cleanedHtml
+        };
+    }
+    /**
+     * Create error response object
+     */
+    createErrorResponse(scraperResponse, error) {
+        logger_1.logger.error(`Error cleaning HTML content: ${error instanceof Error ? error.message : String(error)}`);
+        return {
+            ...scraperResponse,
+            error: `Content cleaning error: ${error instanceof Error ? error.message : String(error)}`
+        };
     }
 }
 exports.ContentCleaner = ContentCleaner;

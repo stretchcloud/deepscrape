@@ -384,6 +384,88 @@ export class HtmlToMarkdownTransformer {
 
     // Remove navigation elements, headers, footers, sidebars
     $('nav, .nav, .navbar, .navigation, .menu-container, .site-navigation').remove();
+    $('header:not(:has(h1,h2,h3,h4,h5,h6)), footer, aside, .sidebar, .left-sidebar, .right-sidebar').remove();
+    $('.menu:not(article .menu), .main-menu, .top-menu, .footer-menu, .utility-nav').remove();
+
+    // Remove ads and banners
+    $('.ad, .ads, .advertisement, .banner, .sponsored, [id*="ad-"], [class*="ad-"]').remove();
+    $('[id*="banner"], [class*="banner"], [id*="ads"], [class*="advertisement"]').remove();
+
+    // Remove comment sections
+    $('.comments, .comment-section, .disqus, #disqus_thread, [id*="comment"], [class*="comment"]').remove();
+
+    // Remove social sharing widgets
+    $('.social, .social-share, .share-buttons, .social-links, .social-icons, [class*="share"], [class*="social"]').remove();
+
+    // Remove forms, sign-up, subscription elements
+    $('form, .form, .login, .signup, .register, .subscribe, .newsletter, [class*="form-"], [id*="form-"]').remove();
+    $('[class*="login"], [class*="signup"], [class*="subscribe"], [class*="newsletter"]').remove();
+
+    // Remove related content, suggestions, recommendations
+    $('.related, .suggested, .recommendations, .read-more, .more-articles, [class*="related-"], [class*="suggested-"]').remove();
+
+    // Remove popups, modals, overlays
+    $('.popup, .modal, .overlay, .lightbox, [class*="popup"], [class*="modal"], [class*="overlay"]').remove();
+
+    // Remove hidden elements
+    $('[style*="display: none"], [style*="display:none"], [style*="visibility: hidden"], [style*="visibility:hidden"], [hidden], .hidden, .invisible').remove();
+
+    // Remove tracking elements
+    $('[data-track], [data-tracking], [data-analytics], [class*="analytics"], [id*="analytics"]').remove();
+    $('iframe[src*="analytics"], iframe[src*="tracking"], iframe[src*="pixel"]').remove();
+    $('img[src*="pixel"], img[src*="tracker"], img[src*="tracking"]').remove();
+
+    // Remove dynamic loading indicators
+    $('.loading, .spinner, .loader, [class*="loading"], [class*="spinner"], [class*="loader"]').remove();
+
+    // Clean attributes that aren't necessary for markdown
+    $('*').each((_, el) => {
+      // Using type assertion to access attribs
+      const element = el as any;
+      
+      // Skip if element doesn't have attributes
+      if (!element.attribs) return;
+      
+      const attrs = element.attribs;
+      Object.keys(attrs).forEach(attr => {
+        // Keep only essential attributes
+        if (!['href', 'src', 'alt', 'title', 'colspan', 'rowspan'].includes(attr)) {
+          $(element).removeAttr(attr);
+        }
+      });
+    });
+
+    // Handle empty elements
+    $('p, div, span').each((_, el) => {
+      if ($(el).text().trim() === '' && !$(el).find('img').length) {
+        $(el).remove();
+      }
+    });
+
+    // Fix spacing and formatting for headings
+    $('h1, h2, h3, h4, h5, h6').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text) {
+        $(el).html(text);
+      }
+    });
+
+    // Improve table formatting
+    $('table').each((_, table) => {
+      // Ensure tables have headers if they don't
+      if ($(table).find('thead').length === 0 && $(table).find('th').length === 0) {
+        const firstRow = $(table).find('tr').first();
+        firstRow.find('td').each((_, cell) => {
+          const content = $(cell).html() || '';
+          $(cell).replaceWith(`<th>${content}</th>`);
+        });
+        
+        const thead = $('<thead></thead>');
+        thead.append(firstRow);
+        $(table).prepend(thead);
+      }
+    });
+  }
 
   /**
    * Create content container for extracted headings
@@ -512,89 +594,6 @@ export class HtmlToMarkdownTransformer {
   private getContainerHtml($container: cheerio.Cheerio<any>): string {
     const $result = $container.parent();
     return $result.html() || '';
-  }
-    $('header:not(:has(h1,h2,h3,h4,h5,h6)), footer, aside, .sidebar, .left-sidebar, .right-sidebar').remove();
-    $('.menu:not(article .menu), .main-menu, .top-menu, .footer-menu, .utility-nav').remove();
-
-    // Remove ads and banners
-    $('.ad, .ads, .advertisement, .banner, .sponsored, [id*="ad-"], [class*="ad-"]').remove();
-    $('[id*="banner"], [class*="banner"], [id*="ads"], [class*="advertisement"]').remove();
-
-    // Remove comment sections
-    $('.comments, .comment-section, .disqus, #disqus_thread, [id*="comment"], [class*="comment"]').remove();
-
-    // Remove social sharing widgets
-    $('.social, .social-share, .share-buttons, .social-links, .social-icons, [class*="share"], [class*="social"]').remove();
-
-    // Remove forms, sign-up, subscription elements
-    $('form, .form, .login, .signup, .register, .subscribe, .newsletter, [class*="form-"], [id*="form-"]').remove();
-    $('[class*="login"], [class*="signup"], [class*="subscribe"], [class*="newsletter"]').remove();
-
-    // Remove related content, suggestions, recommendations
-    $('.related, .suggested, .recommendations, .read-more, .more-articles, [class*="related-"], [class*="suggested-"]').remove();
-
-    // Remove popups, modals, overlays
-    $('.popup, .modal, .overlay, .lightbox, [class*="popup"], [class*="modal"], [class*="overlay"]').remove();
-
-    // Remove hidden elements
-    $('[style*="display: none"], [style*="display:none"], [style*="visibility: hidden"], [style*="visibility:hidden"], [hidden], .hidden, .invisible').remove();
-
-    // Remove tracking elements
-    $('[data-track], [data-tracking], [data-analytics], [class*="analytics"], [id*="analytics"]').remove();
-    $('iframe[src*="analytics"], iframe[src*="tracking"], iframe[src*="pixel"]').remove();
-    $('img[src*="pixel"], img[src*="tracker"], img[src*="tracking"]').remove();
-  }
-
-    // Remove dynamic loading indicators
-    $('.loading, .spinner, .loader, [class*="loading"], [class*="spinner"], [class*="loader"]').remove();
-
-    // Clean attributes that aren't necessary for markdown
-    $('*').each((_, el) => {
-      // Using type assertion to access attribs
-      const element = el as any;
-      
-      // Skip if element doesn't have attributes
-      if (!element.attribs) return;
-      
-      const attrs = element.attribs;
-      Object.keys(attrs).forEach(attr => {
-        // Keep only essential attributes
-        if (!['href', 'src', 'alt', 'title', 'colspan', 'rowspan'].includes(attr)) {
-          $(element).removeAttr(attr);
-        }
-      });
-    });
-
-    // Handle empty elements
-    $('p, div, span').each((_, el) => {
-      if ($(el).text().trim() === '' && !$(el).find('img').length) {
-        $(el).remove();
-      }
-    });
-
-    // Fix spacing and formatting for headings
-    $('h1, h2, h3, h4, h5, h6').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text) {
-        $(el).html(text);
-      }
-    });
-
-    // Improve table formatting
-    $('table').each((_, table) => {
-      // Ensure tables have headers if they don't
-      if ($(table).find('thead').length === 0 && $(table).find('th').length === 0) {
-        const firstRow = $(table).find('tr').first();
-        firstRow.find('td').each((_, cell) => {
-          const content = $(cell).html() || '';
-          $(cell).replaceWith(`<th>${content}</th>`);
-        });
-        
-        const thead = $('<thead></thead>');
-        thead.append(firstRow);
-        $(table).prepend(thead);
-      }
-    });
   }
   
   /**

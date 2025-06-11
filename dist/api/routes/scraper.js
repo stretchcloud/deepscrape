@@ -178,65 +178,89 @@ router.post('/extract-schema', auth_middleware_1.apiKeyAuth, (0, validation_1.va
     }
 });
 /**
- * Format extracted data as Markdown
+ * Format a header section with title and URL
  */
-function formatResponseAsMarkdown(url, title, schema, extractedData, warningMessage) {
-    // Start with title and URL
+function formatMarkdownHeader(url, title, warningMessage) {
     let markdown = `# ${title || 'Extracted Content'}\n\n`;
     markdown += `URL: ${url}\n\n`;
-    // Add warning if LLM extraction wasn't available
     if (warningMessage) {
         markdown += `> ⚠️ **Note**: ${warningMessage}\n\n`;
     }
-    // Add extracted data section
+    return markdown;
+}
+/**
+ * Format code examples as markdown code blocks
+ */
+function formatCodeExamples(value) {
+    let markdown = '';
+    value.forEach((item, index) => {
+        markdown += `#### Example ${index + 1}\n\n`;
+        markdown += '```typescript\n' + item + '\n```\n\n';
+    });
+    return markdown;
+}
+/**
+ * Format array of objects as nested markdown structure
+ */
+function formatObjectArray(value) {
+    let markdown = '';
+    value.forEach((item, index) => {
+        markdown += `#### Item ${index + 1}\n\n`;
+        for (const [objKey, objValue] of Object.entries(item)) {
+            markdown += `**${objKey.charAt(0).toUpperCase() + objKey.slice(1)}**:\n`;
+            if (Array.isArray(objValue)) {
+                objValue.forEach(v => markdown += `- ${v}\n`);
+            }
+            else {
+                markdown += `${objValue}\n`;
+            }
+            markdown += '\n';
+        }
+    });
+    return markdown;
+}
+/**
+ * Format simple array as bullet list
+ */
+function formatSimpleArray(value) {
+    let markdown = '';
+    value.forEach(item => {
+        markdown += `- ${item}\n`;
+    });
+    return markdown + '\n';
+}
+/**
+ * Format a single field value based on its type
+ */
+function formatFieldValue(key, value) {
+    if (value === null || value === undefined) {
+        return '*No data available*\n\n';
+    }
+    if (Array.isArray(value)) {
+        const isCodeField = key.toLowerCase().includes('code') || key.toLowerCase().includes('example');
+        if (isCodeField) {
+            return formatCodeExamples(value);
+        }
+        if (value.length > 0 && typeof value[0] === 'object') {
+            return formatObjectArray(value);
+        }
+        return formatSimpleArray(value);
+    }
+    if (typeof value === 'object') {
+        return '```json\n' + JSON.stringify(value, null, 2) + '\n```\n\n';
+    }
+    return `${value}\n\n`;
+}
+/**
+ * Format extracted data as Markdown
+ */
+function formatResponseAsMarkdown(url, title, schema, extractedData, warningMessage) {
+    let markdown = formatMarkdownHeader(url, title, warningMessage);
     markdown += `## Extracted Data\n\n`;
-    // Format each field from the schema
     if (Object.keys(extractedData).length > 0) {
         for (const [key, value] of Object.entries(extractedData)) {
             markdown += `### ${key.charAt(0).toUpperCase() + key.slice(1)}\n\n`;
-            if (value === null || value === undefined) {
-                markdown += '*No data available*\n\n';
-            }
-            else if (Array.isArray(value)) {
-                // Handle arrays
-                if (key.toLowerCase().includes('code') || key.toLowerCase().includes('example')) {
-                    // For code examples, format each item as a code block
-                    value.forEach((item, index) => {
-                        markdown += `#### Example ${index + 1}\n\n`;
-                        markdown += '```typescript\n' + item + '\n```\n\n';
-                    });
-                }
-                else if (value.length > 0 && typeof value[0] === 'object') {
-                    // For arrays of objects, format each object as a nested structure
-                    value.forEach((item, index) => {
-                        markdown += `#### Item ${index + 1}\n\n`;
-                        for (const [objKey, objValue] of Object.entries(item)) {
-                            markdown += `**${objKey.charAt(0).toUpperCase() + objKey.slice(1)}**:\n`;
-                            if (Array.isArray(objValue)) {
-                                objValue.forEach(v => markdown += `- ${v}\n`);
-                            }
-                            else {
-                                markdown += `${objValue}\n`;
-                            }
-                            markdown += '\n';
-                        }
-                    });
-                }
-                else {
-                    // For other arrays, format as a bullet list
-                    value.forEach(item => {
-                        markdown += `- ${item}\n`;
-                    });
-                    markdown += '\n';
-                }
-            }
-            else if (typeof value === 'object') {
-                // For objects that aren't arrays, format as JSON
-                markdown += '```json\n' + JSON.stringify(value, null, 2) + '\n```\n\n';
-            }
-            else {
-                markdown += `${value}\n\n`;
-            }
+            markdown += formatFieldValue(key, value);
         }
     }
     else {

@@ -34,6 +34,8 @@ exports.crawlQueue = crawlQueue;
 // Initialize the queue
 async function initQueue() {
     logger_1.logger.info('Initializing enhanced crawler queue');
+    // Inject the queue function to break circular dependency
+    (0, crawler_processor_1.setAddJobsToQueueFn)(addCrawlJobsToQueue);
     // Ensure the queue is empty when starting - access through enhancedQueue
     await crawlQueue.obliterate({ force: true });
     logger_1.logger.info('Enhanced crawler queue initialized');

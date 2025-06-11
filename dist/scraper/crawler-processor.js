@@ -3,14 +3,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.setAddJobsToQueueFn = setAddJobsToQueueFn;
 exports.processCrawlJob = processCrawlJob;
 const logger_1 = require("../utils/logger");
 const crawler_1 = require("./crawler");
 const redis_service_1 = require("../services/redis.service");
-const queue_service_1 = require("../services/queue.service");
 const scraper_manager_1 = require("./scraper-manager");
 const file_export_service_1 = require("../services/file-export.service");
 const axios_1 = __importDefault(require("axios"));
+// Store the queue function to avoid circular import
+let addJobsToQueueFn = null;
+/**
+ * Set the queue function to break circular dependency
+ */
+function setAddJobsToQueueFn(fn) {
+    addJobsToQueueFn = fn;
+}
 /**
  * Process a crawl job
  */
@@ -139,8 +147,11 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
             useBrowser: crawl.crawlerOptions.useBrowser || false
         }
     }));
-    // Add jobs to the queue
-    const jobIds = await (0, queue_service_1.addCrawlJobsToQueue)(crawlId, jobsData);
+    // Add jobs to the queue using injected function
+    if (!addJobsToQueueFn) {
+        throw new Error('Queue function not initialized. Call setAddJobsToQueueFn first.');
+    }
+    const jobIds = await addJobsToQueueFn(crawlId, jobsData);
     // Track jobs in Redis
     await (0, redis_service_1.addCrawlJobs)(crawlId, jobIds);
     // Ensure to close browser if we used it
@@ -167,88 +178,72 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
     };
 }
 /**
- * Handle scraping of an individual page during crawling
+ * Build enhanced scraping options based on input options and browser usage
  */
-async function handlePageScrape(url, scrapeOptions, crawlId) {
-    // Create scraper manager instance
-    const scraperManager = new scraper_manager_1.ScraperManager();
-    // Check if we should use browser-based scraping
-    const useBrowser = scrapeOptions.useBrowser === true;
-    // Log scraping approach
-    logger_1.logger.info(`Crawl ${crawlId}: Scraping page ${url} using ${useBrowser ? 'browser-based' : 'standard'} approach`);
-    // Ensure we have the correct options for consistent processing
-    const enhancedOptions = {
+function buildEnhancedScrapeOptions(scrapeOptions, useBrowser) {
+    return {
         ...scrapeOptions,
-        // Default to markdown format for consistent processing across all pages
         extractorFormat: scrapeOptions.extractorFormat || 'markdown',
-        // Enable caching for crawled pages
         skipCache: false,
-        // Run content cleaning
-        onlyMainContent: scrapeOptions.onlyMainContent !== false, // Default to true if not specified
-        // Add any additional options needed for thorough processing
-        waitForTimeout: scrapeOptions.waitForTimeout || 2000, // Give pages time to load
-        // Browser options
+        onlyMainContent: scrapeOptions.onlyMainContent !== false,
+        waitForTimeout: scrapeOptions.waitForTimeout || 2000,
         useBrowser: useBrowser,
         stealthMode: useBrowser ? true : undefined,
         blockResources: useBrowser ? true : undefined,
         maxScrolls: useBrowser ? 3 : undefined,
-        // Rate limiting options for browser
-        minDelay: useBrowser ? 3000 : undefined, // Minimum 3 seconds between requests
-        maxDelay: useBrowser ? 30000 : undefined, // Maximum 30 seconds for backoff
-        maxRetries: useBrowser ? 3 : undefined, // Try up to 3 times
-        backoffFactor: useBrowser ? 2 : undefined, // Double the delay on each retry
-        rotateUserAgent: useBrowser ? true : undefined // Rotate user agents on retry
+        minDelay: useBrowser ? 3000 : undefined,
+        maxDelay: useBrowser ? 30000 : undefined,
+        maxRetries: useBrowser ? 3 : undefined,
+        backoffFactor: useBrowser ? 2 : undefined,
+        rotateUserAgent: useBrowser ? true : undefined
     };
-    // Perform the scrape with enhanced options
-    const result = await scraperManager.scrape(url, enhancedOptions);
-    // Log the completion of this page's scraping
-    logger_1.logger.info(`Crawl ${crawlId}: Completed scraping page ${url}`, {
-        contentLength: result.content?.length || 0,
-        contentType: result.contentType,
-        status: result.metadata?.status,
-        usedBrowser: useBrowser
-    });
-    // Store the original HTML if we're in markdown mode, we need to preserve it
-    const originalHtml = result.contentType === 'markdown' && result.metadata?.originalHtml
+}
+/**
+ * Extract original HTML from scrape result
+ */
+function extractOriginalHtml(result) {
+    return result.contentType === 'markdown' && result.metadata?.originalHtml
         ? result.metadata.originalHtml
         : (result.contentType === 'html' ? result.content : null);
-    // Make sure to log the content we're returning
-    logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
-    // Export page content to markdown file if content exists
-    if (result.content && result.contentType === 'markdown') {
-        try {
-            const exportedFilePath = await file_export_service_1.fileExportService.exportPage(url, result.content, result.title || 'Untitled', crawlId, {
-                status: result.metadata?.status,
-                contentType: result.contentType,
-                loadTime: result.metadata?.loadTime,
-                usedBrowser: useBrowser,
-                processingTime: result.metadata?.processingTime,
-                timestamp: new Date().toISOString()
-            });
-            // Track the exported file
-            await (0, redis_service_1.addExportedFile)(crawlId, exportedFilePath);
-            logger_1.logger.info(`Page exported to file: ${exportedFilePath}`, {
-                url,
-                crawlId,
-                contentLength: result.content.length
-            });
-        }
-        catch (exportError) {
-            logger_1.logger.error(`Failed to export page to file: ${url}`, {
-                error: exportError,
-                crawlId
-            });
-            // Don't fail the crawl if file export fails, just log it
-        }
+}
+/**
+ * Export page content to file and track it
+ */
+async function exportPageContent(url, result, crawlId, useBrowser) {
+    if (!result.content || result.contentType !== 'markdown') {
+        return;
     }
-    // Return both a document structure AND the content directly
-    // This ensures the content is accessible in the crawler API response
-    return {
-        // Document structure for consistent API
+    try {
+        const exportedFilePath = await file_export_service_1.fileExportService.exportPage(url, result.content, result.title || 'Untitled', crawlId, {
+            status: result.metadata?.status,
+            contentType: result.contentType,
+            loadTime: result.metadata?.loadTime,
+            usedBrowser: useBrowser,
+            processingTime: result.metadata?.processingTime,
+            timestamp: new Date().toISOString()
+        });
+        await (0, redis_service_1.addExportedFile)(crawlId, exportedFilePath);
+        logger_1.logger.info(`Page exported to file: ${exportedFilePath}`, {
+            url,
+            crawlId,
+            contentLength: result.content.length
+        });
+    }
+    catch (exportError) {
+        logger_1.logger.error(`Failed to export page to file: ${url}`, {
+            error: exportError,
+            crawlId
+        });
+    }
+}
+/**
+ * Build the response object for scraped page
+ */
+function buildPageScrapeResponse(result, originalHtml, useBrowser) {
+    const baseResponse = {
         url: result.url,
         title: result.title,
         html: originalHtml,
-        // Content must be accessible at the top level AND in document
         content: result.content,
         contentType: result.contentType,
         links: [],
@@ -256,20 +251,30 @@ async function handlePageScrape(url, scrapeOptions, crawlId) {
         metadata: {
             ...result.metadata,
             usedBrowser: useBrowser
-        },
-        // Also include a document property with the same content for backwards compatibility
-        document: {
-            url: result.url,
-            title: result.title,
-            html: originalHtml,
-            content: result.content,
-            contentType: result.contentType,
-            links: [],
-            discoveredCount: 0,
-            metadata: {
-                ...result.metadata,
-                usedBrowser: useBrowser
-            }
         }
     };
+    return {
+        ...baseResponse,
+        document: { ...baseResponse }
+    };
+}
+/**
+ * Handle scraping of an individual page during crawling
+ */
+async function handlePageScrape(url, scrapeOptions, crawlId) {
+    const scraperManager = new scraper_manager_1.ScraperManager();
+    const useBrowser = scrapeOptions.useBrowser === true;
+    logger_1.logger.info(`Crawl ${crawlId}: Scraping page ${url} using ${useBrowser ? 'browser-based' : 'standard'} approach`);
+    const enhancedOptions = buildEnhancedScrapeOptions(scrapeOptions, useBrowser);
+    const result = await scraperManager.scrape(url, enhancedOptions);
+    logger_1.logger.info(`Crawl ${crawlId}: Completed scraping page ${url}`, {
+        contentLength: result.content?.length || 0,
+        contentType: result.contentType,
+        status: result.metadata?.status,
+        usedBrowser: useBrowser
+    });
+    const originalHtml = extractOriginalHtml(result);
+    logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
+    await exportPageContent(url, result, crawlId, useBrowser);
+    return buildPageScrapeResponse(result, originalHtml, useBrowser);
 }

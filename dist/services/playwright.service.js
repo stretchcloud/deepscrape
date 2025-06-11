@@ -97,13 +97,9 @@ class PlaywrightService extends events_1.EventEmitter {
         return proxy;
     }
     /**
-     * Initialize the browser and browser context with specified options
-     * @param options The playwright options
-     * @returns The initialized browser and context
+     * Update rate limiting configuration from options
      */
-    async initialize(options = {}) {
-        logger_1.logger.info('Initializing Playwright browser...');
-        // Update rate limiting configuration if provided
+    updateRateLimitConfig(options) {
         if (options.minDelay)
             this.rateLimit.minDelay = options.minDelay;
         if (options.maxDelay)
@@ -112,10 +108,19 @@ class PlaywrightService extends events_1.EventEmitter {
             this.rateLimit.maxRetries = options.maxRetries;
         if (options.backoffFactor)
             this.rateLimit.backoffFactor = options.backoffFactor;
-        // Add proxies if provided
+    }
+    /**
+     * Add proxies if provided in options
+     */
+    addProxiesIfProvided(options) {
         if (options.proxyList && options.proxyList.length > 0) {
             this.addProxies(options.proxyList);
         }
+    }
+    /**
+     * Launch browser with default options
+     */
+    async launchBrowser() {
         const launchOptions = {
             headless: true,
             args: [
@@ -127,12 +132,19 @@ class PlaywrightService extends events_1.EventEmitter {
                 '--disable-features=IsolateOrigins,site-per-process'
             ]
         };
-        this.browser = await playwright_1.chromium.launch(launchOptions);
-        logger_1.logger.info('Browser launched successfully');
-        // Get user agent - either use provided, rotate, or generate a new one
-        const userAgent = options.userAgent ||
+        return await playwright_1.chromium.launch(launchOptions);
+    }
+    /**
+     * Get user agent based on options
+     */
+    getUserAgent(options) {
+        return options.userAgent ||
             (options.rotateUserAgent ? this.getNextUserAgent() : new user_agents_1.default().toString());
-        // Prepare context options
+    }
+    /**
+     * Build browser context options
+     */
+    buildContextOptions(options, userAgent) {
         const contextOptions = {
             userAgent,
             viewport: options.viewport || { width: 1920, height: 1080 },
@@ -141,7 +153,13 @@ class PlaywrightService extends events_1.EventEmitter {
             javaScriptEnabled: true,
             extraHTTPHeaders: options.referrer ? { referer: options.referrer } : undefined
         };
-        // Add proxy if specified or get from rotation pool if enabled
+        this.addProxyToContext(contextOptions, options);
+        return contextOptions;
+    }
+    /**
+     * Add proxy configuration to context options
+     */
+    addProxyToContext(contextOptions, options) {
         let proxyUrl = options.proxy;
         if (!proxyUrl && options.proxyRotation && this.proxyList.length > 0) {
             const nextProxy = this.getNextProxy();
@@ -153,26 +171,274 @@ class PlaywrightService extends events_1.EventEmitter {
             contextOptions.proxy = {
                 server: proxyUrl
             };
-            // Add authentication if provided
             if (options.proxyUsername && options.proxyPassword) {
                 contextOptions.proxy.username = options.proxyUsername;
                 contextOptions.proxy.password = options.proxyPassword;
             }
             logger_1.logger.info(`Using proxy: ${proxyUrl}`);
         }
-        // Create browser context with custom settings
-        this.context = await this.browser.newContext(contextOptions);
-        logger_1.logger.info(`Created browser context with user agent: ${userAgent}`);
-        // Set up stealth mode if requested
+    }
+    /**
+     * Setup context features like stealth mode and resource blocking
+     */
+    async setupContextFeatures(options) {
         if (options.stealthMode) {
             await this._setupStealthMode(this.context);
             logger_1.logger.info('Stealth mode configured for browser context');
         }
-        // Set up resource blocking if requested
         if (options.blockResources === true) {
             await this._setupResourceBlocking(this.context, options.logRequests || false);
             logger_1.logger.info('Resource blocking configured');
         }
+    }
+    /**
+     * Apply rate limiting delay before making requests
+     */
+    async applyRateLimit() {
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        if (this.lastRequestTime > 0 && timeSinceLastRequest < this.rateLimit.minDelay) {
+            const waitTime = this.rateLimit.minDelay - timeSinceLastRequest;
+            if (waitTime > 0) {
+                logger_1.logger.debug(`Rate limiting: Waiting ${waitTime}ms before next request`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
+    }
+    /**
+     * Handle retry delay with randomization
+     */
+    async handleRetryDelay(retries, delay, url) {
+        if (retries > 0) {
+            const randomizedDelay = delay * (0.8 + Math.random() * 0.4);
+            logger_1.logger.info(`Retry ${retries}: Waiting ${Math.round(randomizedDelay)}ms before requesting ${url}`);
+            await new Promise(resolve => setTimeout(resolve, randomizedDelay));
+        }
+    }
+    /**
+     * Check if error is rate limiting related
+     */
+    isRateLimitError(error) {
+        return error.message.includes('429') ||
+            error.message.includes('Too Many Requests') ||
+            error.message.includes('too many requests');
+    }
+    /**
+     * Handle rate limit retry logic
+     */
+    async handleRateLimitRetry(url, retries, delay, options) {
+        retries++;
+        if (retries > this.rateLimit.maxRetries) {
+            logger_1.logger.error(`Rate limit exceeded for ${url} after ${retries} retries`);
+            return { shouldContinue: false, retries, delay };
+        }
+        delay = Math.min(this.rateLimit.maxDelay, delay * this.rateLimit.backoffFactor);
+        logger_1.logger.warn(`Rate limited on ${url}, retry ${retries}/${this.rateLimit.maxRetries} after ${delay}ms backoff`);
+        await this.rotateUserAgentAndProxy(options);
+        return { shouldContinue: true, retries, delay };
+    }
+    /**
+     * Rotate user agent and proxy if needed
+     */
+    async rotateUserAgentAndProxy(options) {
+        let needContextReinit = false;
+        if (options.rotateUserAgent) {
+            const newUserAgent = this.getNextUserAgent();
+            logger_1.logger.info(`Rotating user agent to: ${newUserAgent}`);
+            options.userAgent = newUserAgent;
+            needContextReinit = true;
+        }
+        if (options.proxyRotation && this.proxyList.length > 0) {
+            const newProxy = this.getNextProxy();
+            if (newProxy) {
+                logger_1.logger.info(`Rotating proxy to: ${newProxy}`);
+                options.proxy = newProxy;
+                needContextReinit = true;
+            }
+        }
+        if (needContextReinit) {
+            await this.reinitializeContext(options);
+        }
+    }
+    /**
+     * Reinitialize browser context with new settings
+     */
+    async reinitializeContext(options) {
+        if (!this.browser || !this.context)
+            return;
+        await this.context.close();
+        const contextOptions = this.buildContextOptionsForRetry(options);
+        this.context = await this.browser.newContext(contextOptions);
+        await this.reapplyContextSettings(options);
+    }
+    /**
+     * Build context options for retry attempts
+     */
+    buildContextOptionsForRetry(options) {
+        const contextOptions = {
+            userAgent: options.userAgent,
+            viewport: options.viewport || { width: 1920, height: 1080 },
+            ignoreHTTPSErrors: true,
+            bypassCSP: true,
+            javaScriptEnabled: true,
+            extraHTTPHeaders: options.referrer ? { referer: options.referrer } : undefined
+        };
+        if (options.proxy) {
+            contextOptions.proxy = {
+                server: options.proxy
+            };
+            if (options.proxyUsername && options.proxyPassword) {
+                contextOptions.proxy.username = options.proxyUsername;
+                contextOptions.proxy.password = options.proxyPassword;
+            }
+        }
+        return contextOptions;
+    }
+    /**
+     * Reapply stealth and blocking settings to new context
+     */
+    async reapplyContextSettings(options) {
+        if (options.stealthMode) {
+            await this._setupStealthMode(this.context);
+        }
+        if (options.blockResources === true) {
+            await this._setupResourceBlocking(this.context, options.logRequests || false);
+        }
+    }
+    /**
+     * Ensure browser and context are initialized
+     */
+    async ensureBrowserContext(options) {
+        if (!this.browser || !this.context) {
+            await this.initialize(options);
+        }
+        if (!this.context) {
+            throw new Error('Browser context not initialized');
+        }
+    }
+    /**
+     * Navigate to URL with timeout retry logic
+     */
+    async navigateWithRetry(page, url) {
+        let timeoutRetries = 0;
+        const maxTimeoutRetries = 2;
+        let response;
+        while (timeoutRetries <= maxTimeoutRetries) {
+            try {
+                response = await page.goto(url, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 45000
+                });
+                break;
+            }
+            catch (error) {
+                if (this.isTimeoutError(error)) {
+                    timeoutRetries++;
+                    if (timeoutRetries > maxTimeoutRetries) {
+                        throw error;
+                    }
+                    logger_1.logger.warn(`Navigation timeout for ${url}, retrying (${timeoutRetries}/${maxTimeoutRetries})...`);
+                    response = await this.retryWithDifferentStrategy(page, url);
+                    if (response)
+                        break;
+                }
+                else {
+                    throw error;
+                }
+            }
+        }
+        return response;
+    }
+    /**
+     * Check if error is a timeout error
+     */
+    isTimeoutError(error) {
+        return error instanceof Error && error.message.includes('timeout');
+    }
+    /**
+     * Retry navigation with different strategy
+     */
+    async retryWithDifferentStrategy(page, url) {
+        try {
+            const response = await page.goto(url, {
+                waitUntil: 'load',
+                timeout: 60000
+            });
+            logger_1.logger.info(`Retry succeeded with 'load' strategy for ${url}`);
+            return response;
+        }
+        catch (retryError) {
+            if (this.isTimeoutError(retryError)) {
+                logger_1.logger.warn(`Retry failed with 'load' strategy for ${url}, trying again...`);
+                return null;
+            }
+            throw retryError;
+        }
+    }
+    /**
+     * Handle error status codes
+     */
+    handleErrorStatus(url, status) {
+        if (status === 429) {
+            throw new Error(`Too Many Requests (429) for URL: ${url}`);
+        }
+        logger_1.logger.warn(`Error status code: ${status} for URL: ${url}`);
+        return {
+            content: '',
+            links: [],
+            url,
+            status
+        };
+    }
+    /**
+     * Wait for page load and perform scrolling
+     */
+    async waitAndScroll(page, options) {
+        const waitTime = options.waitTime || 1000;
+        await page.waitForTimeout(waitTime);
+        logger_1.logger.debug(`Waited for ${waitTime}ms after page load`);
+        await this._simulateHumanScrolling(page, options.maxScrolls || 3);
+    }
+    /**
+     * Extract page content, title, and links
+     */
+    async extractPageData(page) {
+        const links = await page.evaluate(() => {
+            const anchors = Array.from(document.querySelectorAll('a[href]'));
+            return anchors
+                .map(anchor => anchor.href)
+                .filter(href => href && typeof href === 'string' && !href.startsWith('javascript:'))
+                .map(href => {
+                try {
+                    return new URL(href).toString();
+                }
+                catch {
+                    return null;
+                }
+            })
+                .filter((url) => url !== null);
+        });
+        logger_1.logger.info(`Extracted ${links.length} links from page`);
+        const content = await page.content();
+        const title = await page.title();
+        return { content, title, links };
+    }
+    /**
+     * Initialize the browser and browser context with specified options
+     * @param options The playwright options
+     * @returns The initialized browser and context
+     */
+    async initialize(options = {}) {
+        logger_1.logger.info('Initializing Playwright browser...');
+        this.updateRateLimitConfig(options);
+        this.addProxiesIfProvided(options);
+        this.browser = await this.launchBrowser();
+        logger_1.logger.info('Browser launched successfully');
+        const userAgent = this.getUserAgent(options);
+        const contextOptions = this.buildContextOptions(options, userAgent);
+        this.context = await this.browser.newContext(contextOptions);
+        logger_1.logger.info(`Created browser context with user agent: ${userAgent}`);
+        await this.setupContextFeatures(options);
         return { browser: this.browser, context: this.context };
     }
     /**
@@ -182,109 +448,31 @@ class PlaywrightService extends events_1.EventEmitter {
      * @returns The crawl response with content, links, etc.
      */
     async crawlPage(url, options = {}) {
+        await this.applyRateLimit();
         let retries = 0;
         let delay = this.rateLimit.minDelay;
         let lastError = null;
-        // Apply rate limiting between requests to avoid overwhelming the server
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        if (this.lastRequestTime > 0 && timeSinceLastRequest < this.rateLimit.minDelay) {
-            // Calculate how much longer we need to wait for minimum delay
-            const waitTime = this.rateLimit.minDelay - timeSinceLastRequest;
-            if (waitTime > 0) {
-                logger_1.logger.debug(`Rate limiting: Waiting ${waitTime}ms before next request`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-            }
-        }
-        // Try with retries and backoff for rate limiting errors
         while (retries <= this.rateLimit.maxRetries) {
             try {
-                // Add a randomized delay to appear more human-like
-                if (retries > 0) {
-                    const randomizedDelay = delay * (0.8 + Math.random() * 0.4);
-                    logger_1.logger.info(`Retry ${retries}: Waiting ${Math.round(randomizedDelay)}ms before requesting ${url}`);
-                    await new Promise(resolve => setTimeout(resolve, randomizedDelay));
-                }
-                // Track when we're making this request
+                await this.handleRetryDelay(retries, delay, url);
                 this.lastRequestTime = Date.now();
-                // Perform the actual crawl
-                const result = await this._performCrawl(url, options);
-                return result;
+                return await this._performCrawl(url, options);
             }
             catch (error) {
                 lastError = error;
                 logger_1.logger.error(`Error crawling ${url}: ${error.message}`);
-                // Check if this is a rate limiting error (HTTP 429 or contains "Too Many Requests")
-                const isRateLimited = error.message.includes('429') ||
-                    error.message.includes('Too Many Requests') ||
-                    error.message.includes('too many requests');
-                if (isRateLimited) {
-                    retries++;
-                    if (retries > this.rateLimit.maxRetries) {
-                        logger_1.logger.error(`Rate limit exceeded for ${url} after ${retries} retries`);
+                if (this.isRateLimitError(error)) {
+                    const retryResult = await this.handleRateLimitRetry(url, retries, delay, options);
+                    if (!retryResult.shouldContinue) {
                         break;
                     }
-                    // Calculate exponential backoff delay
-                    delay = Math.min(this.rateLimit.maxDelay, delay * this.rateLimit.backoffFactor);
-                    logger_1.logger.warn(`Rate limited on ${url}, retry ${retries}/${this.rateLimit.maxRetries} after ${delay}ms backoff`);
-                    // Rotate user agent and/or proxy for next attempt
-                    let needContextReinit = false;
-                    // Rotate user agent if enabled
-                    if (options.rotateUserAgent) {
-                        const newUserAgent = this.getNextUserAgent();
-                        logger_1.logger.info(`Rotating user agent to: ${newUserAgent}`);
-                        options.userAgent = newUserAgent;
-                        needContextReinit = true;
-                    }
-                    // Rotate proxy if enabled and we have proxies
-                    if (options.proxyRotation && this.proxyList.length > 0) {
-                        const newProxy = this.getNextProxy();
-                        if (newProxy) {
-                            logger_1.logger.info(`Rotating proxy to: ${newProxy}`);
-                            options.proxy = newProxy;
-                            needContextReinit = true;
-                        }
-                    }
-                    // Re-initialize context with new user agent/proxy if needed
-                    if (needContextReinit && this.browser && this.context) {
-                        await this.context.close();
-                        // Prepare new context options
-                        const contextOptions = {
-                            userAgent: options.userAgent,
-                            viewport: options.viewport || { width: 1920, height: 1080 },
-                            ignoreHTTPSErrors: true,
-                            bypassCSP: true,
-                            javaScriptEnabled: true,
-                            extraHTTPHeaders: options.referrer ? { referer: options.referrer } : undefined
-                        };
-                        // Add proxy if specified
-                        if (options.proxy) {
-                            contextOptions.proxy = {
-                                server: options.proxy
-                            };
-                            // Add authentication if provided
-                            if (options.proxyUsername && options.proxyPassword) {
-                                contextOptions.proxy.username = options.proxyUsername;
-                                contextOptions.proxy.password = options.proxyPassword;
-                            }
-                        }
-                        // Create new context
-                        this.context = await this.browser.newContext(contextOptions);
-                        // Re-apply stealth and blocking settings
-                        if (options.stealthMode) {
-                            await this._setupStealthMode(this.context);
-                        }
-                        if (options.blockResources === true) {
-                            await this._setupResourceBlocking(this.context, options.logRequests || false);
-                        }
-                    }
+                    retries = retryResult.retries;
+                    delay = retryResult.delay;
                     continue;
                 }
-                // For other errors, don't retry
                 throw error;
             }
         }
-        // If we've exhausted retries, throw the last error
         throw lastError || new Error(`Failed to crawl ${url} after ${retries} retries`);
     }
     /**
@@ -294,104 +482,19 @@ class PlaywrightService extends events_1.EventEmitter {
      * @returns The crawl response
      */
     async _performCrawl(url, options = {}) {
-        if (!this.browser || !this.context) {
-            await this.initialize(options);
-        }
-        if (!this.context) {
-            throw new Error('Browser context not initialized');
-        }
+        await this.ensureBrowserContext(options);
         logger_1.logger.info(`Crawling page: ${url}`);
         const page = await this.context.newPage();
-        let status = 200;
-        let timeoutRetries = 0;
-        const maxTimeoutRetries = 2; // Allow up to 2 timeout retries
         try {
-            // Add randomized human-like behavior before navigation
             await this._addHumanBehavior(page);
-            // Navigation with timeout retry logic
-            let response;
-            while (timeoutRetries <= maxTimeoutRetries) {
-                try {
-                    // Navigate to the URL with a timeout
-                    response = await page.goto(url, {
-                        waitUntil: 'domcontentloaded',
-                        timeout: 45000
-                    });
-                    break; // Break the retry loop if successful
-                }
-                catch (error) {
-                    // Check if this is a timeout error
-                    if (error instanceof Error && error.message.includes('timeout')) {
-                        timeoutRetries++;
-                        // If we've reached max retries, rethrow
-                        if (timeoutRetries > maxTimeoutRetries) {
-                            throw error;
-                        }
-                        // Log the retry attempt
-                        logger_1.logger.warn(`Navigation timeout for ${url}, retrying (${timeoutRetries}/${maxTimeoutRetries})...`);
-                        // Try with a different strategy
-                        try {
-                            response = await page.goto(url, {
-                                waitUntil: 'load', // Less strict than networkidle but more than domcontentloaded
-                                timeout: 60000 // Longer timeout for retry
-                            });
-                            logger_1.logger.info(`Retry succeeded with 'load' strategy for ${url}`);
-                            break;
-                        }
-                        catch (retryError) {
-                            // If we get another timeout, continue to next retry
-                            if (retryError instanceof Error && retryError.message.includes('timeout')) {
-                                logger_1.logger.warn(`Retry failed with 'load' strategy for ${url}, trying again...`);
-                                continue;
-                            }
-                            // For other errors, throw
-                            throw retryError;
-                        }
-                    }
-                    // For non-timeout errors, just throw
-                    throw error;
-                }
-            }
-            status = response?.status() || 200;
+            const response = await this.navigateWithRetry(page, url);
+            const status = response?.status() || 200;
             logger_1.logger.info(`Page loaded with status: ${status}`);
             if (status >= 400) {
-                if (status === 429) {
-                    throw new Error(`Too Many Requests (429) for URL: ${url}`);
-                }
-                logger_1.logger.warn(`Error status code: ${status} for URL: ${url}`);
-                return {
-                    content: '',
-                    links: [],
-                    url,
-                    status
-                };
+                return this.handleErrorStatus(url, status);
             }
-            // Wait for specified time or default to 1 second
-            const waitTime = options.waitTime || 1000;
-            await page.waitForTimeout(waitTime);
-            logger_1.logger.debug(`Waited for ${waitTime}ms after page load`);
-            // Add more human-like behavior - scrolling with random pauses
-            await this._simulateHumanScrolling(page, options.maxScrolls || 3);
-            // Extract links from the page
-            const links = await page.evaluate(() => {
-                const anchors = Array.from(document.querySelectorAll('a[href]'));
-                return anchors
-                    .map(anchor => anchor.href)
-                    .filter(href => href && typeof href === 'string' && !href.startsWith('javascript:'))
-                    .map(href => {
-                    try {
-                        return new URL(href).toString();
-                    }
-                    catch {
-                        return null;
-                    }
-                })
-                    .filter((url) => url !== null);
-            });
-            logger_1.logger.info(`Extracted ${links.length} links from page`);
-            // Get the page content and title
-            const content = await page.content();
-            const title = await page.title();
+            await this.waitAndScroll(page, options);
+            const { content, title, links } = await this.extractPageData(page);
             return {
                 content,
                 links,
@@ -402,7 +505,7 @@ class PlaywrightService extends events_1.EventEmitter {
         }
         catch (error) {
             logger_1.logger.error(`Error crawling ${url}: ${error.message}`);
-            throw error; // Re-throw to allow retry logic in crawlPage to handle it
+            throw error;
         }
         finally {
             await page.close();

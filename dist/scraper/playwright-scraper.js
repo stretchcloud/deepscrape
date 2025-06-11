@@ -14,165 +14,208 @@ class PlaywrightScraper {
         this.playwrightService = new playwright_service_1.PlaywrightService();
     }
     /**
+     * Determine if URL is an e-commerce site requiring special handling
+     */
+    isEcommerceSite(url) {
+        const isAmazon = url.includes('amazon.com') || url.includes('amazon.');
+        const isEcommerce = isAmazon || url.includes('walmart.com') || url.includes('bestbuy.com');
+        return { isEcommerce, isAmazon };
+    }
+    /**
+     * Get default scraper options
+     */
+    getDefaultOptions(options) {
+        return {
+            timeout: options.timeout || 30000,
+            blockAds: options.blockAds !== false,
+            blockResources: options.blockResources !== false,
+            userAgent: options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        };
+    }
+    /**
+     * Build browser launch options
+     */
+    buildLaunchOptions(options, isEcommerce) {
+        const launchOptions = {
+            headless: !isEcommerce, // Use non-headless for e-commerce to bypass bot detection
+            executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu'
+            ],
+            ...options.puppeteerLaunchOptions
+        };
+        if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+            launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+        }
+        return launchOptions;
+    }
+    /**
+     * Setup e-commerce specific context (cookies and headers)
+     */
+    async setupEcommerceContext(context, isEcommerce) {
+        if (!isEcommerce)
+            return;
+        const timestamp = Date.now();
+        const sessionId = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(8).toString('hex')}`;
+        const ubidValue = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(12).toString('hex')}`;
+        await context.addCookies([
+            { name: 'session-id', value: sessionId, domain: '.amazon.com', path: '/' },
+            { name: 'ubid-main', value: ubidValue, domain: '.amazon.com', path: '/' }
+        ]);
+        await context.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Ch-Ua': '"Google Chrome";v="120", "Chromium";v="120", "Not=A?Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1'
+        });
+    }
+    /**
+     * Setup page with blocking and headers
+     */
+    async setupPage(page, options, blockAds, blockResources) {
+        if (blockAds || blockResources) {
+            await this.setupResourceBlocking(page, blockAds, blockResources);
+        }
+        if (options.headers) {
+            await page.setExtraHTTPHeaders(options.headers);
+        }
+    }
+    /**
+     * Navigate to URL with Amazon-specific logic
+     */
+    async navigateToUrl(page, url, isAmazon, timeout) {
+        logger_1.logger.info(`Navigating to URL: ${url}`);
+        if (isAmazon) {
+            await page.goto('https://www.amazon.com', { timeout, waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(2000 + Math.random() * 1000);
+            await page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
+        }
+        else {
+            await page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
+        }
+    }
+    /**
+     * Handle post-navigation actions and waits
+     */
+    async handlePostNavigation(page, url, options, isAmazon, timeout) {
+        // Wait for selector if provided
+        if (options.waitForSelector) {
+            logger_1.logger.info(`Waiting for selector: ${options.waitForSelector}`);
+            try {
+                await page.waitForSelector(options.waitForSelector, { timeout });
+            }
+            catch (error) {
+                logger_1.logger.warn(`Timeout waiting for selector: ${options.waitForSelector}`);
+            }
+        }
+        // Amazon-specific scrolling
+        if (isAmazon) {
+            logger_1.logger.info('Performing random scrolling for Amazon page');
+            await this.performRandomScrolling(page);
+        }
+        // Additional wait time
+        const waitTime = options.waitForTimeout !== undefined ? options.waitForTimeout : 0;
+        if (waitTime > 0) {
+            logger_1.logger.info(`Waiting additional ${waitTime}ms`);
+            await page.waitForTimeout(waitTime);
+        }
+        // Execute actions
+        if (options.actions && options.actions.length > 0) {
+            logger_1.logger.info(`Executing ${options.actions.length} actions`);
+            await this.performActions(page, options.actions);
+        }
+    }
+    /**
+     * Extract page metadata and content
+     */
+    async extractPageData(page, url, isAmazon, options) {
+        const title = await page.title();
+        // Get response info
+        let status = 0;
+        let headers = {};
+        try {
+            const responseInfo = await page.evaluate(() => {
+                const perf = window.performance.getEntriesByType('navigation')[0];
+                return {
+                    status: perf?.responseStatus || 0,
+                    headers: {}
+                };
+            });
+            status = responseInfo.status;
+        }
+        catch (error) {
+            logger_1.logger.warn(`Could not get response info: ${error}`);
+        }
+        // Extract content
+        const content = isAmazon ?
+            await this.extractAmazonProductData(page) :
+            await page.content();
+        // Take screenshot if requested
+        let screenshot;
+        if (options.fullPage) {
+            screenshot = await page.screenshot({ fullPage: true, type: 'png' });
+        }
+        return { title, content, status, headers, screenshot };
+    }
+    /**
+     * Create error response
+     */
+    createErrorResponse(url, error) {
+        return {
+            url,
+            title: '',
+            content: '',
+            contentType: 'html',
+            metadata: {
+                timestamp: new Date().toISOString(),
+                status: 0,
+                headers: {}
+            },
+            error: `Scraping error: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+    /**
      * Scrape a URL using Playwright
      */
     async scrape(url, options = {}) {
         const startTime = Date.now();
         try {
-            // Check if we're using the enhanced browser-based approach
             if (options.useBrowser) {
                 return await this.scrapeWithPlaywrightService(url, options);
             }
-            // Original implementation for backward compatibility
+            const { isEcommerce, isAmazon } = this.isEcommerceSite(url);
+            const { timeout, blockAds, blockResources, userAgent } = this.getDefaultOptions(options);
             let browser = null;
-            let page = null;
             try {
-                // Set default options
-                const timeout = options.timeout || 30000;
-                const blockAds = options.blockAds !== false;
-                const blockResources = options.blockResources !== false;
-                const userAgent = options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-                // Check if the URL is from Amazon or other e-commerce sites that need special handling
-                const isAmazon = url.includes('amazon.com') || url.includes('amazon.');
-                const isEcommerce = isAmazon || url.includes('walmart.com') || url.includes('bestbuy.com');
-                // Launch browser
-                logger_1.logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions || {})}`);
-                const launchOptions = {
-                    headless: true,
-                    // Use system chromium in Docker/Alpine
-                    executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-                    args: [
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-accelerated-2d-canvas',
-                        '--no-first-run',
-                        '--no-zygote',
-                        '--disable-gpu'
-                    ],
-                    ...options.puppeteerLaunchOptions
-                };
-                // Use non-headless mode for e-commerce sites to bypass bot detection
                 if (isEcommerce) {
                     logger_1.logger.info('E-commerce site detected, using enhanced anti-bot measures');
-                    launchOptions.headless = false;
                 }
-                // Force use of system chromium in Docker
-                if (process.env.NODE_ENV === 'production' || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-                    launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser';
-                }
+                logger_1.logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions || {})}`);
+                const launchOptions = this.buildLaunchOptions(options, isEcommerce);
                 browser = await playwright_1.chromium.launch(launchOptions);
                 const context = await browser.newContext({
                     userAgent,
                     viewport: { width: 1920, height: 1080 },
                     ignoreHTTPSErrors: true
                 });
-                // Add special handling for Amazon and other e-commerce sites
-                if (isEcommerce) {
-                    // Set cookies to appear more like a regular user
-                    const timestamp = Date.now();
-                    const sessionId = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(8).toString('hex')}`;
-                    const ubidValue = `${timestamp.toString(36)}-${(0, crypto_1.randomBytes)(12).toString('hex')}`;
-                    await context.addCookies([
-                        { name: 'session-id', value: sessionId, domain: '.amazon.com', path: '/' },
-                        { name: 'ubid-main', value: ubidValue, domain: '.amazon.com', path: '/' }
-                    ]);
-                    // Add extra headers to appear more like a regular browser
-                    await context.setExtraHTTPHeaders({
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Sec-Ch-Ua': '"Google Chrome";v="120", "Chromium";v="120", "Not=A?Brand";v="99"',
-                        'Sec-Ch-Ua-Mobile': '?0',
-                        'Sec-Ch-Ua-Platform': '"Windows"',
-                        'Sec-Fetch-Dest': 'document',
-                        'Sec-Fetch-Mode': 'navigate',
-                        'Sec-Fetch-Site': 'none',
-                        'Sec-Fetch-User': '?1',
-                        'Upgrade-Insecure-Requests': '1'
-                    });
-                }
-                // Create new page
-                page = await context.newPage();
-                // Block ads and unnecessary resources if requested
-                if (blockAds || blockResources) {
-                    await this.setupResourceBlocking(page, blockAds, blockResources);
-                }
-                // Set custom headers if provided
-                if (options.headers) {
-                    await page.setExtraHTTPHeaders(options.headers);
-                }
-                // Navigate to URL with timeout
-                logger_1.logger.info(`Navigating to URL: ${url}`);
-                // For Amazon, use a randomized approach to loading the page
-                if (isAmazon) {
-                    // First go to the Amazon homepage to establish a session
-                    await page.goto('https://www.amazon.com', { timeout, waitUntil: 'domcontentloaded' });
-                    await page.waitForTimeout(2000 + Math.random() * 1000);
-                    // Then go to the product page
-                    await page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
-                }
-                else {
-                    await page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
-                }
-                // Wait for specific selector if provided
-                if (options.waitForSelector) {
-                    logger_1.logger.info(`Waiting for selector: ${options.waitForSelector}`);
-                    try {
-                        await page.waitForSelector(options.waitForSelector, { timeout });
-                    }
-                    catch (error) {
-                        logger_1.logger.warn(`Timeout waiting for selector: ${options.waitForSelector}`);
-                        // Continue anyway, as the content might still be usable
-                    }
-                }
-                // For Amazon, add random scrolling behavior to mimic human browsing
-                if (isAmazon) {
-                    logger_1.logger.info('Performing random scrolling for Amazon page');
-                    await this.performRandomScrolling(page);
-                }
-                // Wait additional time if specified
-                const waitTime = options.waitForTimeout !== undefined ? options.waitForTimeout : 0;
-                if (waitTime > 0) {
-                    logger_1.logger.info(`Waiting additional ${waitTime}ms`);
-                    await page.waitForTimeout(waitTime);
-                }
-                // Execute actions if provided
-                if (options.actions && options.actions.length > 0) {
-                    logger_1.logger.info(`Executing ${options.actions.length} actions`);
-                    await this.performActions(page, options.actions);
-                }
-                // Get page metadata
-                const title = await page.title();
-                // Safer way to get response info
-                let status = 0;
-                let headers = {};
-                try {
-                    const responseInfo = await page.evaluate(() => {
-                        const perf = window.performance.getEntriesByType('navigation')[0];
-                        return {
-                            status: perf?.responseStatus || 0,
-                            headers: {} // Headers not easily accessible from client side
-                        };
-                    });
-                    status = responseInfo.status;
-                }
-                catch (error) {
-                    logger_1.logger.warn(`Could not get response info: ${error}`);
-                }
-                // For Amazon, get the product data using a more specific approach
-                let content = '';
-                if (isAmazon) {
-                    content = await this.extractAmazonProductData(page);
-                }
-                else {
-                    // Get full HTML content
-                    content = await page.content();
-                }
-                // Take screenshot if requested
-                let screenshot;
-                if (options.fullPage) {
-                    screenshot = await page.screenshot({ fullPage: true, type: 'png' });
-                }
+                await this.setupEcommerceContext(context, isEcommerce);
+                const page = await context.newPage();
+                await this.setupPage(page, options, blockAds, blockResources);
+                await this.navigateToUrl(page, url, isAmazon, timeout);
+                await this.handlePostNavigation(page, url, options, isAmazon, timeout);
+                const { title, content, status, headers, screenshot } = await this.extractPageData(page, url, isAmazon, options);
                 const loadTime = Date.now() - startTime;
                 logger_1.logger.info(`Page loaded in ${loadTime}ms`);
                 return {
@@ -190,7 +233,6 @@ class PlaywrightScraper {
                 };
             }
             finally {
-                // Close browser
                 if (browser) {
                     logger_1.logger.info('Closing browser');
                     await browser.close();
@@ -199,18 +241,7 @@ class PlaywrightScraper {
         }
         catch (error) {
             logger_1.logger.error(`Error scraping URL: ${error instanceof Error ? error.message : String(error)}`);
-            return {
-                url,
-                title: '',
-                content: '',
-                contentType: 'html',
-                metadata: {
-                    timestamp: new Date().toISOString(),
-                    status: 0,
-                    headers: {}
-                },
-                error: `Scraping error: ${error instanceof Error ? error.message : String(error)}`
-            };
+            return this.createErrorResponse(url, error);
         }
     }
     /**
@@ -320,51 +351,91 @@ class PlaywrightScraper {
         await page.waitForTimeout(500 + Math.random() * 1000);
     }
     /**
+     * Execute a click action
+     */
+    async executeClickAction(page, action) {
+        if (action.selector) {
+            await page.click(action.selector);
+        }
+    }
+    /**
+     * Execute a scroll action
+     */
+    async executeScrollAction(page, action) {
+        const position = action.position || 0;
+        await page.evaluate((pos) => {
+            window.scrollTo(0, pos);
+        }, position);
+    }
+    /**
+     * Execute a wait action
+     */
+    async executeWaitAction(page, action) {
+        const timeout = action.timeout || 1000;
+        await page.waitForTimeout(timeout);
+    }
+    /**
+     * Execute a fill action
+     */
+    async executeFillAction(page, action) {
+        if (action.selector && action.value) {
+            await page.fill(action.selector, action.value);
+        }
+    }
+    /**
+     * Execute a select action
+     */
+    async executeSelectAction(page, action) {
+        if (action.selector && action.value) {
+            await page.selectOption(action.selector, action.value);
+        }
+    }
+    /**
+     * Execute a single browser action based on its type
+     */
+    async executeSingleAction(page, action) {
+        switch (action.type) {
+            case 'click':
+                await this.executeClickAction(page, action);
+                break;
+            case 'scroll':
+                await this.executeScrollAction(page, action);
+                break;
+            case 'wait':
+                await this.executeWaitAction(page, action);
+                break;
+            case 'fill':
+                await this.executeFillAction(page, action);
+                break;
+            case 'select':
+                await this.executeSelectAction(page, action);
+                break;
+        }
+    }
+    /**
+     * Handle action execution with error handling
+     */
+    async executeActionSafely(page, action) {
+        try {
+            logger_1.logger.info(`Performing action: ${action.type} ${action.selector || ''}`);
+            await this.executeSingleAction(page, action);
+            await page.waitForTimeout(500); // Small delay between actions
+        }
+        catch (error) {
+            if (action.optional) {
+                logger_1.logger.warn(`Optional action failed: ${action.type} ${action.selector || ''} - ${error instanceof Error ? error.message : String(error)}`);
+            }
+            else {
+                throw error;
+            }
+        }
+    }
+    /**
      * Execute a sequence of browser actions
      */
     async performActions(page, actions) {
         for (const action of actions) {
-            try {
-                logger_1.logger.info(`Performing action: ${action.type} ${action.selector || ''}`);
-                switch (action.type) {
-                    case 'click':
-                        if (action.selector) {
-                            await page.click(action.selector);
-                        }
-                        break;
-                    case 'scroll':
-                        const position = action.position || 0;
-                        await page.evaluate((pos) => {
-                            window.scrollTo(0, pos);
-                        }, position);
-                        break;
-                    case 'wait':
-                        const timeout = action.timeout || 1000;
-                        await page.waitForTimeout(timeout);
-                        break;
-                    case 'fill':
-                        if (action.selector && action.value) {
-                            await page.fill(action.selector, action.value);
-                        }
-                        break;
-                    case 'select':
-                        if (action.selector && action.value) {
-                            await page.selectOption(action.selector, action.value);
-                        }
-                        break;
-                }
-                // Add a small delay between actions
-                await page.waitForTimeout(500);
-            }
-            catch (error) {
-                // If action is optional, continue with other actions
-                if (action.optional) {
-                    logger_1.logger.warn(`Optional action failed: ${action.type} ${action.selector || ''} - ${error instanceof Error ? error.message : String(error)}`);
-                }
-                else {
-                    throw error;
-                }
-            }
+            await this.executeActionSafely(page, action);
         }
     }
     /**
