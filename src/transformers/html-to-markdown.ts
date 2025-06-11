@@ -789,21 +789,21 @@ export class HtmlToMarkdownTransformer {
       
       // Fix spacing around headings (ensure heading has empty lines around it)
       .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
-      .replace(/(#+\s[^\n]*?)\n([^\n])/g, '$1\n\n$2')
+      .replace(/(#+\s[^\n]*)\n([^\n])/g, '$1\n\n$2')
       
       // Improve list formatting
-      .replace(/\n(\s*[-*+])\s+/g, '\n$1 ')
+      .replace(/\n(\s*[-*+])\s{2,}/g, '\n$1 ')
       
       // Improve code block formatting
       .replace(/\n```([^`\n]*)\n/g, '\n\n```$1\n')
       .replace(/\n([^`\n]+)```\n/g, '\n$1```\n\n')
       
       // Remove trailing whitespace on lines
-      .replace(/[ \t]+$/gm, '')
+      .replace(/[ \t]*$/gm, '')
       
       // Make sure links have spaces from surrounding text when needed
-      .replace(/([a-z0-9])(\[[^\]]+\]\([^)]+\))/g, '$1 $2')
-      .replace(/(\[[^\]]+\]\([^)]+\))([a-z0-9])/g, '$1 $2')
+      .replace(/([a-z0-9])(\[[^\]]*\]\([^)]*\))/g, '$1 $2')
+      .replace(/(\[[^\]]*\]\([^)]*\))([a-z0-9])/g, '$1 $2')
       
       // Normalize URLs to absolute paths
       .replace(/\]\(([^)]+)\)/g, (match, url) => {
@@ -820,7 +820,7 @@ export class HtmlToMarkdownTransformer {
       })
       
       // Fix inconsistent table formatting
-      .replace(/\n[\s]*\|[\s]*\n/g, '\n|\n')
+      .replace(/\n\s*\|\s*\n/g, '\n|\n')
       
       // Ensure paragraphs are separated by blank lines
       .replace(/([^\n])\n([^\n\s#>*-])/g, '$1\n\n$2')
@@ -834,7 +834,7 @@ export class HtmlToMarkdownTransformer {
       .replace(/^\s+$/gm, '')
       
       // Process multi-line links by escaping newlines in link text
-      .replace(/\[([^\]]*)\n([^\]]*)\]/g, '[$1 $2]')
+      .replace(/\[([^\]\n]{0,200})\n([^\]\n]{0,200})\]/g, '[$1 $2]')
       
       // Final normalization to ensure consistent newlines
       .replace(/\n{3,}/g, '\n\n')
