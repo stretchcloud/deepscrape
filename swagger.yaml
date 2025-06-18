@@ -1,0 +1,231 @@
+openapi: 3.0.0
+info:
+  title: Xerox Scraper API
+  version: 1.0.0
+  description: API for web scraping and content extraction with support for structured data extraction and summarization
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ScraperOptions:
+      type: object
+      properties:
+        waitForSelector:
+          type: string
+          description: CSS selector to wait for before extracting content
+        waitForTimeout:
+          type: integer
+          description: Time in milliseconds to wait before extracting content
+        extractorFormat:
+          type: string
+          enum: [markdown, html]
+          default: markdown
+          description: Format of the extracted content
+        instructions:
+          type: string
+          description: Additional instructions for content extraction
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.2
+          description: Temperature for LLM extraction (0.0 to 1.0)
+        maxTokens:
+          type: integer
+          description: Maximum number of tokens for LLM extraction
+        apiKey:
+          type: string
+          description: Azure OpenAI API key
+        endpoint:
+          type: string
+          description: Azure OpenAI endpoint URL
+        apiVersion:
+          type: string
+          description: Azure OpenAI API version
+        deploymentName:
+          type: string
+          description: Azure OpenAI deployment name
+
+    SchemaDefinition:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [object, array, string, number, boolean]
+        properties:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SchemaDefinition'
+        items:
+          $ref: '#/components/schemas/SchemaDefinition'
+        required:
+          type: array
+          items:
+            type: string
+
+paths:
+  /api/scrape:
+    post:
+      summary: Scrape content from a URL
+      description: Extracts content from a webpage and returns it in the specified format
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to scrape
+                options:
+                  $ref: '#/components/schemas/ScraperOptions'
+      responses:
+        '200':
+          description: Successfully scraped content
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  content:
+                    type: string
+                  metadata:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      url:
+                        type: string
+                      timestamp:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized - Invalid API key
+        '500':
+          description: Server error
+
+  /api/extract-schema:
+    post:
+      summary: Extract structured data from a URL
+      description: Extracts structured data from a webpage based on a provided schema
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - schema
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to extract data from
+                schema:
+                  $ref: '#/components/schemas/SchemaDefinition'
+                options:
+                  $ref: '#/components/schemas/ScraperOptions'
+      responses:
+        '200':
+          description: Successfully extracted structured data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  extractedData:
+                    type: object
+                  metadata:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      url:
+                        type: string
+                      timestamp:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized - Invalid API key
+        '500':
+          description: Server error
+
+  /api/summarize:
+    post:
+      summary: Summarize content from a URL
+      description: Generates a summary of the content from a webpage
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to summarize
+                maxLength:
+                  type: integer
+                  description: Maximum length of the summary in words
+                options:
+                  $ref: '#/components/schemas/ScraperOptions'
+      responses:
+        '200':
+          description: Successfully generated summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  summary:
+                    type: string
+                  metadata:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      url:
+                        type: string
+                      timestamp:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized - Invalid API key
+        '500':
+          description: Server error 
