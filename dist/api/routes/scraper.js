@@ -101,7 +101,7 @@ router.post('/extract-schema', auth_middleware_1.apiKeyAuth, (0, validation_1.va
         // Combine options with extraction options and force markdown format
         const scrapingOptions = {
             ...options,
-            extractorFormat: options.extractorFormat || 'markdown', // Default to markdown
+            extractorFormat: options.extractorFormat ?? 'markdown', // Default to markdown
             extractionOptions: {
                 schema,
                 instructions: options.instructions,
@@ -293,11 +293,11 @@ router.post('/summarize', auth_middleware_1.apiKeyAuth, (0, validation_1.validat
         // Create summary extraction options
         const scrapingOptions = {
             ...options,
-            extractorFormat: options.extractorFormat || 'markdown',
+            extractorFormat: options.extractorFormat ?? 'markdown',
             extractionOptions: {
                 instructions: `Provide a concise summary of the content in about ${maxLength} words.
             Focus on the main points and key information.`,
-                temperature: options.temperature || 0.3,
+                temperature: options.temperature ?? 0.3,
                 maxTokens: maxLength * 2, // Approximation for token limit
                 extractionType: 'summarize'
             }

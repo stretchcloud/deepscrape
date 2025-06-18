@@ -789,24 +789,24 @@ export class HtmlToMarkdownTransformer {
       
       // Fix spacing around headings (ensure heading has empty lines around it)
       .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
-      .replace(/(#+\s[^\n]*)\n([^\n])/g, '$1\n\n$2')
+      .replace(/(#+\s[^\n]{0,500}?)\n([^\n])/g, '$1\n\n$2')
       
       // Improve list formatting
-      .replace(/\n(\s*[-*+])\s{2,}/g, '\n$1 ')
+      .replace(/\n(\s{0,20}[-*+])\s{2,}/g, '\n$1 ')
       
       // Improve code block formatting
-      .replace(/\n```([^`\n]*)\n/g, '\n\n```$1\n')
-      .replace(/\n([^`\n]+)```\n/g, '\n$1```\n\n')
+      .replace(/\n```([^`\n]{0,100}?)\n/g, '\n\n```$1\n')
+      .replace(/\n([^`\n]{1,200}?)```\n/g, '\n$1```\n\n')
       
       // Remove trailing whitespace on lines
       .replace(/[ \t]*$/gm, '')
       
       // Make sure links have spaces from surrounding text when needed
-      .replace(/([a-z0-9])(\[[^\]]*\]\([^)]*\))/g, '$1 $2')
-      .replace(/(\[[^\]]*\]\([^)]*\))([a-z0-9])/g, '$1 $2')
+      .replace(/([a-z0-9])(\[[^\]]{0,200}?\]\([^)]{0,500}?\))/g, '$1 $2')
+      .replace(/(\[[^\]]{0,200}?\]\([^)]{0,500}?\))([a-z0-9])/g, '$1 $2')
       
       // Normalize URLs to absolute paths
-      .replace(/\]\(([^)]+)\)/g, (match, url) => {
+      .replace(/\]\(([^)]{1,500}?)\)/g, (match, url) => {
         // Skip URLs that are already absolute or anchors
         if (!url || url.startsWith('http') || url.startsWith('#') || url.startsWith('mailto:')) {
           return match;
@@ -820,15 +820,15 @@ export class HtmlToMarkdownTransformer {
       })
       
       // Fix inconsistent table formatting
-      .replace(/\n\s*\|\s*\n/g, '\n|\n')
+      .replace(/\n\s{0,10}\|\s{0,10}\n/g, '\n|\n')
       
       // Ensure paragraphs are separated by blank lines
       .replace(/([^\n])\n([^\n\s#>*-])/g, '$1\n\n$2')
       
       // Remove "Skip to content" and similar accessibility links
-      .replace(/\[Skip to [cC]ontent\]\([^)]*\)/g, '')
-      .replace(/\[Skip to main content\]\([^)]*\)/g, '')
-      .replace(/\[Skip to navigation\]\([^)]*\)/g, '')
+      .replace(/\[Skip to [cC]ontent\]\([^)]{0,200}?\)/g, '')
+      .replace(/\[Skip to main content\]\([^)]{0,200}?\)/g, '')
+      .replace(/\[Skip to navigation\]\([^)]{0,200}?\)/g, '')
       
       // Remove lines with just whitespace
       .replace(/^\s+$/gm, '')

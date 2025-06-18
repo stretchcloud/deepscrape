@@ -117,6 +117,7 @@ export class PlaywrightScraper {
     
     if (isAmazon) {
       await page.goto('https://www.amazon.com', { timeout, waitUntil: 'domcontentloaded' });
+      // Note: Math.random() is safe here - used only for timing randomization to mimic human behavior
       await page.waitForTimeout(2000 + Math.random() * 1000);
       await page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
     } else {
@@ -395,7 +396,7 @@ export class PlaywrightScraper {
         window.scrollTo(0, pos);
       }, position);
       
-      // Random wait between scrolls
+      // Random wait between scrolls (Math.random() safe here - for timing variation only)
       await page.waitForTimeout(500 + Math.random() * 1000);
     }
     
@@ -404,6 +405,7 @@ export class PlaywrightScraper {
       window.scrollTo(0, 1000);
     });
     
+    // Math.random() safe here - used for human-like timing variation
     await page.waitForTimeout(500 + Math.random() * 1000);
   }
 

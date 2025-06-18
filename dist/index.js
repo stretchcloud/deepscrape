@@ -26,10 +26,15 @@ if (!fs_1.default.existsSync(logsDir)) {
 }
 const accessLogStream = fs_1.default.createWriteStream(path_1.default.join(logsDir, 'access.log'), { flags: 'a' });
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ?? 3000;
 // Middleware
 app.use((0, helmet_1.default)()); // Security headers
-app.use((0, cors_1.default)()); // CORS support
+// CORS support with restricted origins for security
+app.use((0, cors_1.default)({
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : false,
+    credentials: true,
+    optionsSuccessStatus: 200
+}));
 app.use(express_1.default.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
 app.use((0, morgan_1.default)('combined', { stream: accessLogStream })); // HTTP request logging
@@ -80,7 +85,8 @@ async function initializeCrawlQueue() {
 // Start server
 app.listen(PORT, async () => {
     logger_1.logger.info(`Server running on port ${PORT}`);
-    logger_1.logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger_1.logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
+    ;
     // Initialize crawl queue after server starts
     await initializeCrawlQueue();
 });

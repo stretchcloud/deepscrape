@@ -210,6 +210,7 @@ class PlaywrightService extends events_1.EventEmitter {
      */
     async handleRetryDelay(retries, delay, url) {
         if (retries > 0) {
+            // Math.random() safe here - used for retry delay randomization to avoid thundering herd
             const randomizedDelay = delay * (0.8 + Math.random() * 0.4);
             logger_1.logger.info(`Retry ${retries}: Waiting ${Math.round(randomizedDelay)}ms before requesting ${url}`);
             await new Promise(resolve => setTimeout(resolve, randomizedDelay));
@@ -407,7 +408,14 @@ class PlaywrightService extends events_1.EventEmitter {
             const anchors = Array.from(document.querySelectorAll('a[href]'));
             return anchors
                 .map(anchor => anchor.href)
-                .filter(href => href && typeof href === 'string' && !href.startsWith('javascript:'))
+                .filter(href => {
+                // Security: Filter out dangerous protocol schemes that could execute code
+                if (!href || typeof href !== 'string')
+                    return false;
+                const lowerHref = href.toLowerCase();
+                const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
+                return !dangerousProtocols.some(protocol => lowerHref.startsWith(protocol));
+            })
                 .map(href => {
                 try {
                     return new URL(href).toString();
@@ -523,6 +531,7 @@ class PlaywrightService extends events_1.EventEmitter {
             if (viewport) {
                 const { width, height } = viewport;
                 // Move mouse to 2-4 random positions before navigation
+                // Math.random() safe here - used for simulating natural human mouse behavior
                 const movements = 2 + Math.floor(Math.random() * 3);
                 for (let i = 0; i < movements; i++) {
                     const x = Math.floor(Math.random() * width);
@@ -561,6 +570,7 @@ class PlaywrightService extends events_1.EventEmitter {
                     break;
                 }
                 // Scroll a random amount (between 100px and viewport height)
+                // Math.random() safe here - for natural scrolling simulation
                 const scrollAmount = 100 + Math.floor(Math.random() * (clientHeight - 100));
                 // Use a more human-like scroll with variable speed
                 await page.evaluate((scrollAmount) => {
