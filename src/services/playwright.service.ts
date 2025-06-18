@@ -510,6 +510,7 @@ export class PlaywrightService extends EventEmitter {
         .map(anchor => (anchor as HTMLAnchorElement).href)
         .filter(href => {
           // Security: Filter out dangerous protocol schemes that could execute code
+          // This prevents javascript: URLs from being followed, which would be unsafe
           if (!href || typeof href !== 'string') return false;
           const lowerHref = href.toLowerCase();
           const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];

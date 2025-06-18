@@ -77,8 +77,8 @@ RUN groupadd --gid 1001 nodejs && \
     npm ci --only=production --ignore-scripts && \
     npx playwright install-deps chromium
 
-# Copy built application from builder stage with secure permissions
-COPY --from=builder --chown=deepscrape:nodejs --chmod=755 /app/dist ./dist
+# Copy built application from builder stage with secure permissions (no write access)
+COPY --from=builder --chown=deepscrape:nodejs --chmod=555 /app/dist ./dist
 
 # Create directories and set proper permissions
 RUN mkdir -p /app/cache /app/logs /home/deepscrape/.cache && \

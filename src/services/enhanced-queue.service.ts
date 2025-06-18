@@ -421,16 +421,45 @@ export class EnhancedQueueService {
   }
 
   /**
-   * Get system load metrics (placeholder implementation)
+   * Get system load metrics using Node.js built-in modules
    */
   private async getSystemLoad(): Promise<SystemLoad> {
-    // TODO: In a production implementation, replace with actual system metrics
-    // Math.random() is safe here - used only for mock system load simulation
+    const os = require('os');
+    
+    // Get CPU usage (average load over 1 minute as percentage)
+    const loadAvg = os.loadavg()[0]; // 1-minute load average
+    const cpuCount = os.cpus().length;
+    const cpuUsage = Math.min((loadAvg / cpuCount) * 100, 100);
+    
+    // Get memory usage percentage
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsage = (usedMemory / totalMemory) * 100;
+    
+    // Get active connections (approximation based on current queue state)
+    const activeConnections = this.worker ? await this.getActiveJobCount() : 0;
+    
     return {
-      cpu: Math.random() * 100,
-      memory: Math.random() * 100,
-      activeConnections: Math.floor(Math.random() * 50)
+      cpu: Math.round(cpuUsage * 100) / 100, // Round to 2 decimal places
+      memory: Math.round(memoryUsage * 100) / 100,
+      activeConnections
     };
+  }
+  
+  /**
+   * Helper method to get current active job count
+   */
+  private async getActiveJobCount(): Promise<number> {
+    try {
+      const activeJobs = await this.queue.getActive();
+      return activeJobs.length;
+    } catch (error) {
+      logger.warn('Failed to get active job count for system load calculation', {
+        error: (error as Error).message
+      });
+      return 0;
+    }
   }
 
   /**
