@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import scraperManager from '../../scraper/scraper-manager';
-import { ScraperResponse } from '../../types';
 import { logger } from '../../utils/logger';
 import { apiKeyAuth as auth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
