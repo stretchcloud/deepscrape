@@ -1,1 +1,27 @@
 node_modules
+
+# Environment files
+.env
+
+# Compiled output
+dist/
+
+# Logs
+*.log
+logs/*.log
+logs/combined.log
+logs/error.log
+
+
+# Cache
+cache/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# External repositories/analysis
+firecrawl/
+
+crawl-output/
+
