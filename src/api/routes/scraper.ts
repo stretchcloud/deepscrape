@@ -1,12 +1,9 @@
-import express from 'express';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import scraperManager from '../../scraper/scraper-manager';
-import { ScraperOptions, ScraperResponse, BrowserAction } from '../../types';
 import { logger } from '../../utils/logger';
 import { apiKeyAuth as auth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
-import { Schema } from '../../types/schema';
 import { ExtractionResult } from '../../types/schema';
 
 // Extended ScraperResponse interface to include extraction results
@@ -147,7 +144,7 @@ router.post(
       // Combine options with extraction options and force markdown format
       const scrapingOptions = {
         ...options,
-        extractorFormat: options.extractorFormat || 'markdown', // Default to markdown
+        extractorFormat: options.extractorFormat ?? 'markdown', // Default to markdown
         extractionOptions: {
           schema,
           instructions: options.instructions,
@@ -377,11 +374,11 @@ router.post(
       // Create summary extraction options
       const scrapingOptions = {
         ...options,
-        extractorFormat: options.extractorFormat || 'markdown',
+        extractorFormat: options.extractorFormat ?? 'markdown',
         extractionOptions: {
           instructions: `Provide a concise summary of the content in about ${maxLength} words.
             Focus on the main points and key information.`,
-          temperature: options.temperature || 0.3,
+          temperature: options.temperature ?? 0.3,
           maxTokens: maxLength * 2, // Approximation for token limit
           extractionType: 'summarize'
         }

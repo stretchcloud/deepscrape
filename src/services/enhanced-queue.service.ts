@@ -46,14 +46,14 @@ export interface SystemLoad {
  * Includes job locking, dynamic concurrency, and sophisticated error handling
  */
 export class EnhancedQueueService {
-  private queue: Queue;
+  private readonly queue: Queue;
   private worker: Worker | null = null;
-  private queueEvents: QueueEvents;
-  private redis: Redis;
-  private config: QueueConfig;
+  private readonly queueEvents: QueueEvents;
+  private readonly redis: Redis;
+  private readonly config: QueueConfig;
   private isShuttingDown = false;
-  private lockExtensionIntervals = new Map<string, NodeJS.Timeout>();
-  private throughputTracker = {
+  private readonly lockExtensionIntervals = new Map<string, NodeJS.Timeout>();
+  private readonly throughputTracker = {
     processedJobs: 0,
     startTime: Date.now(),
     lastResetTime: Date.now()
@@ -61,23 +61,23 @@ export class EnhancedQueueService {
 
   constructor(queueName: string, config: Partial<QueueConfig> = {}) {
     this.config = {
-      concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '5'),
-      maxJobs: parseInt(process.env.QUEUE_MAX_JOBS || '1000'),
-      lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION || '120000'), // 2 minutes
-      lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME || '30000'), // 30 seconds
-      retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS || '3'),
-      retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY || '5000'),
+      concurrency: parseInt(process.env.QUEUE_CONCURRENCY ?? '5'),
+      maxJobs: parseInt(process.env.QUEUE_MAX_JOBS ?? '1000'),
+      lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION ?? '120000'), // 2 minutes
+      lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME ?? '30000'), // 30 seconds
+      retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS ?? '3'),
+      retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY ?? '5000'),
       enableDynamicScaling: process.env.QUEUE_ENABLE_DYNAMIC_SCALING === 'true',
-      maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY || '20'),
-      minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY || '1'),
+      maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY ?? '20'),
+      minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY ?? '1'),
       ...config
     };
 
     const connection: ConnectionOptions = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.REDIS_DB || '0'),
+      host: process.env.REDIS_HOST ?? 'localhost',
+      port: parseInt(process.env.REDIS_PORT ?? '6379'),
+      password: process.env.REDIS_PASSWORD ?? undefined,
+      db: parseInt(process.env.REDIS_DB ?? '0'),
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       maxRetriesPerRequest: 3,
@@ -260,9 +260,9 @@ export class EnhancedQueueService {
       },
       {
         connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-          password: process.env.REDIS_PASSWORD || undefined,
+          host: process.env.REDIS_HOST ?? 'localhost',
+          port: parseInt(process.env.REDIS_PORT ?? '6379'),
+          password: process.env.REDIS_PASSWORD ?? undefined,
         },
         concurrency: this.config.concurrency,
         lockDuration: this.config.lockDuration,
@@ -421,24 +421,54 @@ export class EnhancedQueueService {
   }
 
   /**
-   * Get system load metrics (placeholder implementation)
+   * Get system load metrics using Node.js built-in modules
    */
   private async getSystemLoad(): Promise<SystemLoad> {
-    // In a real implementation, you would measure actual CPU and memory usage
-    // For now, we'll return mock values
+    const os = require('os');
+    
+    // Get CPU usage (average load over 1 minute as percentage)
+    const loadAvg = os.loadavg()[0]; // 1-minute load average
+    const cpuCount = os.cpus().length;
+    const cpuUsage = Math.min((loadAvg / cpuCount) * 100, 100);
+    
+    // Get memory usage percentage
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsage = (usedMemory / totalMemory) * 100;
+    
+    // Get active connections (approximation based on current queue state)
+    const activeConnections = this.worker ? await this.getActiveJobCount() : 0;
+    
     return {
-      cpu: Math.random() * 100,
-      memory: Math.random() * 100,
-      activeConnections: Math.floor(Math.random() * 50)
+      cpu: Math.round(cpuUsage * 100) / 100, // Round to 2 decimal places
+      memory: Math.round(memoryUsage * 100) / 100,
+      activeConnections
     };
+  }
+  
+  /**
+   * Helper method to get current active job count
+   */
+  private async getActiveJobCount(): Promise<number> {
+    try {
+      const activeJobs = await this.queue.getActive();
+      return activeJobs.length;
+    } catch (error) {
+      logger.warn('Failed to get active job count for system load calculation', {
+        error: (error as Error).message
+      });
+      return 0;
+    }
   }
 
   /**
    * Generate deterministic job ID for duplicate prevention
+   * Using SHA-256 instead of MD5 for better collision resistance
    */
   private generateJobId(jobName: string, data: any): string {
     const crypto = require('crypto');
-    const hash = crypto.createHash('md5');
+    const hash = crypto.createHash('sha256');
     hash.update(jobName);
     hash.update(JSON.stringify(data));
     return hash.digest('hex');

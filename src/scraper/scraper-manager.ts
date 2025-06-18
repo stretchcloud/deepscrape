@@ -8,6 +8,7 @@ import { LLMServiceFactory } from '../services/llm-service-factory';
 import { CacheService } from '../services/cache.service';
 import { ExtractionOptions } from '../types/schema';
 import { logger } from '../utils/logger';
+import * as cheerio from 'cheerio';
 
 export class ScraperManager {
   private readonly playwriteScraper: PlaywrightScraper;
@@ -305,11 +306,27 @@ export class ScraperManager {
         return scraperResponse;
       }
 
-      // Use a simple regex to strip all HTML tags
-      const textContent = scraperResponse.content
-        .replace(/<[^>]*>/g, ' ') // Replace HTML tags with spaces
-        .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
-        .trim();                 // Trim extra spaces
+      // Use a safe approach to strip HTML tags to prevent ReDoS attacks
+      let textContent = '';
+      try {
+        // Use cheerio for safe HTML parsing and text extraction (more secure than regex)
+        const $ = cheerio.load(scraperResponse.content);
+        textContent = $.text();
+      } catch (cheerioError) {
+        // Log the error for debugging and monitoring purposes
+        logger.warn('Cheerio failed to parse HTML content, falling back to regex approach', {
+          error: (cheerioError as Error).message,
+          contentLength: scraperResponse.content?.length || 0
+        });
+        
+        // Fallback to a safer regex approach if cheerio fails
+        // This regex is safer as it limits the length and avoids catastrophic backtracking
+        textContent = scraperResponse.content
+          .replace(/<[^>]{0,1000}>/g, ' ') // Limit tag length to prevent ReDoS
+          .replace(/\s+/g, ' ');           // Replace multiple spaces with single space
+      }
+      
+      textContent = textContent.trim(); // Trim extra spaces
 
       return {
         ...scraperResponse,

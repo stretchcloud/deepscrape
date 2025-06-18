@@ -19,22 +19,22 @@ class EnhancedQueueService {
             lastResetTime: Date.now()
         };
         this.config = {
-            concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '5'),
-            maxJobs: parseInt(process.env.QUEUE_MAX_JOBS || '1000'),
-            lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION || '120000'), // 2 minutes
-            lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME || '30000'), // 30 seconds
-            retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS || '3'),
-            retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY || '5000'),
+            concurrency: parseInt(process.env.QUEUE_CONCURRENCY ?? '5'),
+            maxJobs: parseInt(process.env.QUEUE_MAX_JOBS ?? '1000'),
+            lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION ?? '120000'), // 2 minutes
+            lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME ?? '30000'), // 30 seconds
+            retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS ?? '3'),
+            retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY ?? '5000'),
             enableDynamicScaling: process.env.QUEUE_ENABLE_DYNAMIC_SCALING === 'true',
-            maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY || '20'),
-            minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY || '1'),
+            maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY ?? '20'),
+            minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY ?? '1'),
             ...config
         };
         const connection = {
-            host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6379'),
-            password: process.env.REDIS_PASSWORD || undefined,
-            db: parseInt(process.env.REDIS_DB || '0'),
+            host: process.env.REDIS_HOST ?? 'localhost',
+            port: parseInt(process.env.REDIS_PORT ?? '6379'),
+            password: process.env.REDIS_PASSWORD ?? undefined,
+            db: parseInt(process.env.REDIS_DB ?? '0'),
             retryDelayOnFailover: 100,
             enableReadyCheck: false,
             maxRetriesPerRequest: 3,
@@ -187,9 +187,9 @@ class EnhancedQueueService {
             }
         }, {
             connection: {
-                host: process.env.REDIS_HOST || 'localhost',
-                port: parseInt(process.env.REDIS_PORT || '6379'),
-                password: process.env.REDIS_PASSWORD || undefined,
+                host: process.env.REDIS_HOST ?? 'localhost',
+                port: parseInt(process.env.REDIS_PORT ?? '6379'),
+                password: process.env.REDIS_PASSWORD ?? undefined,
             },
             concurrency: this.config.concurrency,
             lockDuration: this.config.lockDuration,
@@ -331,8 +331,8 @@ class EnhancedQueueService {
      * Get system load metrics (placeholder implementation)
      */
     async getSystemLoad() {
-        // In a real implementation, you would measure actual CPU and memory usage
-        // For now, we'll return mock values
+        // TODO: In a production implementation, replace with actual system metrics
+        // Math.random() is safe here - used only for mock system load simulation
         return {
             cpu: Math.random() * 100,
             memory: Math.random() * 100,
@@ -341,10 +341,11 @@ class EnhancedQueueService {
     }
     /**
      * Generate deterministic job ID for duplicate prevention
+     * Using SHA-256 instead of MD5 for better collision resistance
      */
     generateJobId(jobName, data) {
         const crypto = require('crypto');
-        const hash = crypto.createHash('md5');
+        const hash = crypto.createHash('sha256');
         hash.update(jobName);
         hash.update(JSON.stringify(data));
         return hash.digest('hex');

@@ -15,8 +15,8 @@ class CacheService {
     constructor(options) {
         this.options = {
             enabled: process.env.CACHE_ENABLED === 'true',
-            ttl: Number(process.env.CACHE_TTL || 3600), // Default: 1 hour
-            directory: process.env.CACHE_DIRECTORY || './cache',
+            ttl: Number(process.env.CACHE_TTL ?? 3600), // Default: 1 hour
+            directory: process.env.CACHE_DIRECTORY ?? './cache',
             ...options
         };
         // Create cache directory if it doesn't exist
@@ -69,7 +69,7 @@ class CacheService {
             const cacheFile = path_1.default.join(this.options.directory, `${cacheKey}.json`);
             const metadataFile = path_1.default.join(this.options.directory, `${cacheKey}.meta.json`);
             const now = Date.now();
-            const ttl = metadata.customTtl || this.options.ttl;
+            const ttl = metadata.customTtl ?? this.options.ttl;
             // Create metadata
             const cacheMetadata = {
                 timestamp: now,
@@ -130,9 +130,10 @@ class CacheService {
     }
     /**
      * Generate a deterministic cache key from a string
+     * Using SHA-256 instead of MD5 for better collision resistance
      */
     generateCacheKey(key) {
-        return crypto_1.default.createHash('md5').update(key).digest('hex');
+        return crypto_1.default.createHash('sha256').update(key).digest('hex');
     }
     /**
      * Ensure the cache directory exists
