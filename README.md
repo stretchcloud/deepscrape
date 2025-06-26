@@ -662,7 +662,7 @@ curl -X POST http://localhost:3000/api/crawl \
   - `"markdown"` (recommended): Clean markdown
   - `"text"`: Plain text only
 - **`waitForTimeout`** (number): Time to wait after page loads (ms)
-- **`waitForSelector`** (string): CSS selector to wait for before scraping
+- **`waitForSelector`** (string): CSS selector to wait for before scraping (see detailed guide below)
 - **`skipTlsVerification`** (boolean): Skip TLS verification for HTTPS
 
 **Browser Options:**
@@ -693,10 +693,10 @@ curl -X POST http://localhost:3000/api/crawl \
 - **`rotateUserAgent`** (boolean): Rotate user agents between requests
 
 **Browser Actions** (`actions` array):
-Array of actions to perform on each page:
+Array of actions to perform on each page (see detailed browser actions guide below):
 ```javascript
 {
-  "type": "click|scroll|wait|fill|select",
+  "type": "click|scroll|wait|fill|select|hover|keypress",
   "selector": "CSS selector",
   "value": "value for fill/select",
   "position": 1000,  // pixels for scroll
@@ -708,6 +708,888 @@ Array of actions to perform on each page:
 **Caching Options:**
 - **`skipCache`** (boolean): Skip cache for this request
 - **`cacheTtl`** (number): Custom cache TTL in seconds
+
+### **`waitForSelector` - Detailed Guide**
+
+The `waitForSelector` option is a **browser automation feature** that tells DeepScraper to wait for a specific CSS selector to appear on the page before starting to scrape the content.
+
+#### **What It Does:**
+- **Waits for dynamic content** to load (JavaScript-rendered elements)
+- **Ensures elements exist** before scraping begins
+- **Prevents incomplete scraping** of single-page applications (SPAs)
+- **Handles asynchronous loading** (AJAX, lazy loading, etc.)
+
+#### **When to Use:**
+1. **Single Page Applications (SPAs)** - React, Vue, Angular apps
+2. **Dynamic content loading** - Content loaded via JavaScript
+3. **Lazy loading** - Images, content that loads on scroll
+4. **Cookie banners** - Wait for accept/dismiss buttons
+5. **Authentication flows** - Wait for login forms
+6. **API-driven content** - Wait for data to load from APIs
+
+#### **CSS Selector Examples:**
+
+**By Class:**
+```json
+{"waitForSelector": ".content-loaded"}
+```
+
+**By ID:**
+```json
+{"waitForSelector": "#main-article"}
+```
+
+**By Tag:**
+```json
+{"waitForSelector": "article"}
+```
+
+**By Attribute:**
+```json
+{"waitForSelector": "[data-loaded='true']"}
+```
+
+**Complex Selectors:**
+```json
+{"waitForSelector": ".post-content h1"}
+```
+
+#### **Common Selectors for Different Sites:**
+
+| Site Type | Common Selector | Purpose |
+|-----------|----------------|---------|
+| **WordPress** | `.entry-content`, `.post-content` | Main article content |
+| **Medium** | `.postArticle-content` | Article body |
+| **GitHub** | `.markdown-body` | Documentation content |
+| **Stack Overflow** | `.post-text` | Question/answer content |
+| **Documentation** | `.content`, `.docs-content` | Main documentation |
+| **E-commerce** | `.product-details`, `.product-info` | Product information |
+| **News Sites** | `.article-body`, `.story-content` | Article content |
+
+#### **Practical Examples:**
+
+**WordPress Blog (Dynamic Content):**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://blog.example.com/post/123",
+    "options": {
+      "extractorFormat": "markdown",
+      "waitForSelector": ".post-content",
+      "waitForTimeout": 5000
+    }
+  }'
+```
+
+**E-commerce Product Page:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://shop.example.com/product/123",
+    "options": {
+      "extractorFormat": "markdown",
+      "waitForSelector": ".product-details",
+      "waitForTimeout": 10000
+    }
+  }'
+```
+
+**Documentation Site (React/SPA):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://docs.react-app.com",
+    "limit": 50,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "waitForSelector": ".docs-content",
+      "waitForTimeout": 8000
+    }
+  }'
+```
+
+**News Site with Cookie Banner:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://news.example.com/article/123",
+    "options": {
+      "extractorFormat": "markdown",
+      "waitForSelector": ".article-body",
+      "actions": [
+        {"type": "click", "selector": ".accept-cookies", "optional": true},
+        {"type": "wait", "timeout": 2000}
+      ]
+    }
+  }'
+```
+
+#### **Best Practices:**
+
+**1. Use Specific Selectors:**
+```json
+// Good - specific
+{"waitForSelector": ".main-article-content"}
+
+// Avoid - too generic
+{"waitForSelector": "div"}
+```
+
+**2. Combine with Timeout:**
+```json
+{
+  "waitForSelector": ".content-loaded",
+  "waitForTimeout": 10000  // 10 seconds max wait
+}
+```
+
+**3. Use with Browser Mode:**
+```json
+{
+  "useBrowser": true,
+  "waitForSelector": ".dynamic-content",
+  "javascript": true
+}
+```
+
+#### **Troubleshooting:**
+
+**If Content Still Missing:**
+1. **Increase timeout**: Some content takes longer to load
+2. **Check selector**: Use browser dev tools to verify CSS selector
+3. **Wait for multiple elements**: Use actions to wait for sequential loading
+4. **Add scroll actions**: Some content loads on scroll
+
+**Example with Multiple Waits:**
+```json
+{
+  "waitForSelector": ".initial-content",
+  "actions": [
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 1000},
+    {"type": "wait", "timeout": 3000}
+  ]
+}
+```
+
+#### **Performance Notes:**
+- **Default timeout**: Usually 30 seconds if not specified
+- **Faster scraping**: Use specific selectors to avoid long waits
+- **Combine with actions**: For complex loading sequences
+
+### **Browser Actions - Complete Guide**
+
+Browser actions allow you to simulate user interactions on web pages before scraping. This is essential for modern web applications that require user interaction to load content.
+
+#### **🎯 What Browser Actions Do:**
+- **Interact with dynamic content** - Click buttons, fill forms, scroll pages
+- **Handle authentication** - Login to protected areas
+- **Navigate single-page applications** - Trigger page transitions  
+- **Load lazy content** - Scroll to trigger content loading
+- **Dismiss popups** - Handle cookie banners, ads, modals
+- **Simulate real user behavior** - Avoid detection by bot protection
+
+#### **🔧 Available Action Types**
+
+**1. Click Actions (`click`)**
+- **Purpose**: Click buttons, links, or any clickable elements
+- **When to use**: Cookie banners, navigation, load more buttons, login forms
+- **Required**: `selector`
+- **Optional**: `optional` (don't fail if element not found)
+
+```json
+{"type": "click", "selector": ".accept-cookies"}
+{"type": "click", "selector": "#load-more-btn", "optional": true}
+{"type": "click", "selector": "button[data-action='submit']"}
+```
+
+**2. Scroll Actions (`scroll`)**
+- **Purpose**: Scroll the page to load lazy content or reach specific sections
+- **When to use**: Infinite scroll pages, lazy loading, long articles
+- **Required**: `position` (pixels from top)
+- **Optional**: `optional`
+
+```json
+{"type": "scroll", "position": 1000}
+{"type": "scroll", "position": 500, "optional": true}
+{"type": "scroll", "position": 0}  // Scroll to top
+```
+
+**3. Wait Actions (`wait`)**
+- **Purpose**: Pause execution to allow content to load
+- **When to use**: After other actions, for slow-loading content, API calls
+- **Required**: `timeout` (milliseconds)
+- **Optional**: None
+
+```json
+{"type": "wait", "timeout": 3000}
+{"type": "wait", "timeout": 5000}
+```
+
+**4. Fill Actions (`fill`)**
+- **Purpose**: Fill input fields with text
+- **When to use**: Login forms, search boxes, contact forms
+- **Required**: `selector`, `value`
+- **Optional**: `optional`
+
+```json
+{"type": "fill", "selector": "#username", "value": "testuser"}
+{"type": "fill", "selector": "input[name='email']", "value": "test@example.com"}
+{"type": "fill", "selector": "#search-box", "value": "search term", "optional": true}
+```
+
+**5. Select Actions (`select`)**
+- **Purpose**: Select options from dropdown menus
+- **When to use**: Form dropdowns, filters, category selectors
+- **Required**: `selector`, `value`
+- **Optional**: `optional`
+
+```json
+{"type": "select", "selector": "#country", "value": "United States"}
+{"type": "select", "selector": "select[name='category']", "value": "technology"}
+{"type": "select", "selector": ".filter-dropdown", "value": "newest", "optional": true}
+```
+
+**6. Hover Actions (`hover`)**
+- **Purpose**: Hover over elements to trigger dropdown menus or tooltips
+- **When to use**: Navigation menus, tooltip content, hover effects
+- **Required**: `selector`
+- **Optional**: `optional`
+
+```json
+{"type": "hover", "selector": ".menu-item"}
+{"type": "hover", "selector": "#info-icon", "optional": true}
+{"type": "hover", "selector": "nav .dropdown-trigger"}
+```
+
+**7. Key Press Actions (`keypress`)**
+- **Purpose**: Send keyboard inputs like Enter, Tab, Escape
+- **When to use**: Form submission, navigation, dismissing modals
+- **Required**: `value` (key name)
+- **Optional**: `optional`
+
+```json
+{"type": "keypress", "value": "Enter"}
+{"type": "keypress", "value": "Escape"}
+{"type": "keypress", "value": "Tab"}
+{"type": "keypress", "value": "ArrowDown", "optional": true}
+```
+
+#### **📝 Action Sequence Examples**
+
+**Login Flow:**
+```json
+{
+  "actions": [
+    {"type": "fill", "selector": "#username", "value": "your-username"},
+    {"type": "fill", "selector": "#password", "value": "your-password"},
+    {"type": "click", "selector": "#login-btn"},
+    {"type": "wait", "timeout": 3000}
+  ]
+}
+```
+
+**Cookie Banner + Content Loading:**
+```json
+{
+  "actions": [
+    {"type": "click", "selector": ".accept-cookies", "optional": true},
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 1000},
+    {"type": "wait", "timeout": 3000}
+  ]
+}
+```
+
+**Search and Load Results:**
+```json
+{
+  "actions": [
+    {"type": "fill", "selector": "#search-input", "value": "my search term"},
+    {"type": "keypress", "value": "Enter"},
+    {"type": "wait", "timeout": 5000},
+    {"type": "click", "selector": ".load-more", "optional": true}
+  ]
+}
+```
+
+**Infinite Scroll Loading:**
+```json
+{
+  "actions": [
+    {"type": "scroll", "position": 1000},
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 2000},
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 3000},
+    {"type": "wait", "timeout": 2000}
+  ]
+}
+```
+
+**Navigation Menu Interaction:**
+```json
+{
+  "actions": [
+    {"type": "hover", "selector": ".main-nav"},
+    {"type": "wait", "timeout": 1000},
+    {"type": "click", "selector": ".dropdown-item"},
+    {"type": "wait", "timeout": 3000}
+  ]
+}
+```
+
+#### **🌐 Real-World Use Cases**
+
+**E-commerce Product Pages:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://shop.example.com/product/123",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "actions": [
+        {"type": "click", "selector": ".cookie-accept", "optional": true},
+        {"type": "wait", "timeout": 2000},
+        {"type": "scroll", "position": 1000},
+        {"type": "click", "selector": ".show-reviews", "optional": true},
+        {"type": "wait", "timeout": 3000}
+      ]
+    }
+  }'
+```
+
+**Social Media Feeds:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://social.example.com/feed",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "actions": [
+        {"type": "scroll", "position": 1000},
+        {"type": "wait", "timeout": 2000},
+        {"type": "scroll", "position": 2000},
+        {"type": "wait", "timeout": 2000},
+        {"type": "click", "selector": ".load-more", "optional": true},
+        {"type": "wait", "timeout": 5000}
+      ]
+    }
+  }'
+```
+
+**News Sites with Paywalls:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://news.example.com/article/123",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "actions": [
+        {"type": "click", "selector": ".cookie-banner .accept", "optional": true},
+        {"type": "wait", "timeout": 2000},
+        {"type": "keypress", "value": "Escape", "optional": true},
+        {"type": "wait", "timeout": 1000},
+        {"type": "scroll", "position": 1000}
+      ]
+    }
+  }'
+```
+
+**Single Page Applications (SPAs):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://spa-app.com",
+    "limit": 50,
+    "useBrowser": true,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "javascript": true,
+      "waitForSelector": ".content-loaded",
+      "actions": [
+        {"type": "wait", "timeout": 3000},
+        {"type": "click", "selector": ".nav-docs", "optional": true},
+        {"type": "wait", "timeout": 2000},
+        {"type": "scroll", "position": 500}
+      ]
+    }
+  }'
+```
+
+**Search Results Pages:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://search.example.com",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "actions": [
+        {"type": "fill", "selector": "#search-box", "value": "my search query"},
+        {"type": "keypress", "value": "Enter"},
+        {"type": "wait", "timeout": 5000},
+        {"type": "click", "selector": ".show-more-results", "optional": true},
+        {"type": "wait", "timeout": 3000}
+      ]
+    }
+  }'
+```
+
+#### **⚙️ Advanced Action Patterns**
+
+**Progressive Loading:**
+```json
+{
+  "actions": [
+    {"type": "scroll", "position": 1000},
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 2000},
+    {"type": "wait", "timeout": 2000},
+    {"type": "scroll", "position": 3000},
+    {"type": "wait", "timeout": 3000}
+  ]
+}
+```
+
+**Modal Handling:**
+```json
+{
+  "actions": [
+    {"type": "wait", "timeout": 2000},
+    {"type": "keypress", "value": "Escape", "optional": true},
+    {"type": "click", "selector": ".modal-close", "optional": true},
+    {"type": "click", "selector": ".overlay", "optional": true},
+    {"type": "wait", "timeout": 1000}
+  ]
+}
+```
+
+**Multi-Step Form:**
+```json
+{
+  "actions": [
+    {"type": "fill", "selector": "#first-name", "value": "John"},
+    {"type": "fill", "selector": "#last-name", "value": "Doe"},
+    {"type": "select", "selector": "#country", "value": "United States"},
+    {"type": "click", "selector": "#next-step"},
+    {"type": "wait", "timeout": 3000},
+    {"type": "fill", "selector": "#email", "value": "john@example.com"},
+    {"type": "click", "selector": "#submit"}
+  ]
+}
+```
+
+#### **🔍 Selector Best Practices**
+
+**Use Specific Selectors:**
+```json
+// Good - specific and reliable
+{"type": "click", "selector": "#accept-cookies-btn"}
+{"type": "click", "selector": "[data-testid='load-more']"}
+{"type": "click", "selector": ".cookie-banner .accept-btn"}
+
+// Avoid - too generic, might match wrong elements
+{"type": "click", "selector": "button"}
+{"type": "click", "selector": "div"}
+```
+
+**CSS Selector Examples:**
+- **By ID**: `#element-id`
+- **By Class**: `.class-name`
+- **By Attribute**: `[data-action='submit']`
+- **By Text**: `button:contains('Load More')`
+- **Descendant**: `.parent .child`
+- **Child**: `.parent > .child`
+- **Pseudo**: `button:first-child`
+
+#### **⚠️ Error Handling & Best Practices**
+
+**Use Optional Actions:**
+```json
+{
+  "actions": [
+    {"type": "click", "selector": ".accept-cookies", "optional": true},
+    {"type": "click", "selector": ".close-modal", "optional": true},
+    {"type": "wait", "timeout": 2000}
+  ]
+}
+```
+
+**Add Sufficient Waits:**
+```json
+{
+  "actions": [
+    {"type": "click", "selector": ".load-content"},
+    {"type": "wait", "timeout": 5000},  // Give time for content to load
+    {"type": "scroll", "position": 1000}
+  ]
+}
+```
+
+**Handle Different Page States:**
+```json
+{
+  "actions": [
+    {"type": "click", "selector": ".cookie-accept", "optional": true},
+    {"type": "click", "selector": ".popup-close", "optional": true},
+    {"type": "keypress", "value": "Escape", "optional": true},
+    {"type": "wait", "timeout": 2000}
+  ]
+}
+```
+
+#### **📊 Performance Tips**
+
+**Optimize Wait Times:**
+- Use specific `waitForSelector` instead of long waits
+- Only wait as long as necessary
+- Use shorter waits for simple actions
+
+**Minimize Actions:**
+- Only include necessary actions
+- Combine related actions
+- Test with minimal action sets first
+
+**Error Recovery:**
+- Mark non-critical actions as optional
+- Add fallback actions for different page states
+- Use escape key to dismiss unknown modals
+
+#### **🚀 Complete Example - E-commerce Crawl with Actions**
+
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://ecommerce-site.com/products",
+    "useMapDiscovery": true,
+    "maxUrls": 200,
+    "includePatterns": ["/product/", "/category/"],
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "waitForSelector": ".product-info",
+      "actions": [
+        {"type": "click", "selector": ".cookie-accept", "optional": true},
+        {"type": "wait", "timeout": 2000},
+        {"type": "keypress", "value": "Escape", "optional": true},
+        {"type": "scroll", "position": 1000},
+        {"type": "wait", "timeout": 3000},
+        {"type": "click", "selector": ".load-reviews", "optional": true},
+        {"type": "wait", "timeout": 2000},
+        {"type": "scroll", "position": 2000}
+      ],
+      "minDelay": 2000,
+      "maxRetries": 3
+    }
+  }'
+```
+
+This will crawl the e-commerce site while:
+1. Accepting cookie banners
+2. Dismissing any popups with Escape key  
+3. Scrolling to load lazy content
+4. Loading product reviews if available
+5. Ensuring proper delays between actions
+
+### **Proxy Usage - Complete Guide**
+
+Proxies act as intermediaries between your scraper and target websites, helping you avoid IP blocking, bypass geo-restrictions, and scale your scraping operations.
+
+#### **🔍 Why Use Proxies?**
+- **Avoid IP blocking** - Rotate different IP addresses
+- **Bypass geo-restrictions** - Access content from different countries  
+- **Scale scraping** - Make more requests without rate limits
+- **Stay anonymous** - Hide your real IP address
+- **Avoid detection** - Distribute requests across multiple IPs
+
+#### **🛒 Where to Get Proxies**
+
+**Residential Proxy Providers (Recommended for Scraping):**
+- **Bright Data** (formerly Luminati) - Industry leader, expensive but reliable
+- **Oxylabs** - High-quality residential proxies
+- **Smartproxy** - Good balance of price/quality ($25-75/month)
+- **Proxy-Cheap** - Budget-friendly option ($2-20/month)
+- **NetNut** - Fast residential proxies
+
+**Datacenter Proxy Providers (Cheaper, Less Reliable):**
+- **ProxyMesh** - Simple HTTP proxies ($10-50/month)
+- **Storm Proxies** - Rotating datacenter proxies ($50-200/month)
+- **MyPrivateProxy** - Dedicated datacenter proxies ($1-5/proxy/month)
+
+**Typical Pricing:**
+- **Residential Proxies**: $5-15 per GB of traffic
+- **Datacenter Proxies**: $1-5 per proxy per month
+- **Rotating Proxies**: $50-200 per month for unlimited
+
+#### **🔧 Basic Proxy Usage**
+
+**Single Proxy:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://example.com",
+    "options": {
+      "extractorFormat": "markdown",
+      "proxy": "http://proxy-server.com:8080"
+    }
+  }'
+```
+
+**Proxy with Authentication:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://example.com",
+    "options": {
+      "extractorFormat": "markdown",
+      "proxy": "http://proxy-server.com:8080",
+      "proxyUsername": "your-username",
+      "proxyPassword": "your-password"
+    }
+  }'
+```
+
+#### **🔄 Proxy Rotation (Multiple Proxies)**
+
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://target-site.com",
+    "limit": 100,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "proxyRotation": true,
+      "proxyList": [
+        "http://proxy1.example.com:8080",
+        "http://proxy2.example.com:8080",
+        "http://proxy3.example.com:8080",
+        "http://proxy4.example.com:8080"
+      ],
+      "proxyUsername": "your-username",
+      "proxyPassword": "your-password"
+    }
+  }'
+```
+
+#### **🌍 Real-World Provider Examples**
+
+**Bright Data (Premium Residential):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://protected-ecommerce-site.com",
+    "useMapDiscovery": true,
+    "maxUrls": 500,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "proxy": "zproxy.lum-superproxy.io:22225",
+      "proxyUsername": "brd-customer-hl_your-id-zone-residential",
+      "proxyPassword": "your-password"
+    }
+  }'
+```
+
+**Oxylabs Residential:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://geo-restricted-site.com",
+    "options": {
+      "extractorFormat": "markdown",
+      "proxy": "pr.oxylabs.io:7777",
+      "proxyUsername": "customer-your-username-cc-US",
+      "proxyPassword": "your-password"
+    }
+  }'
+```
+
+**Smartproxy (Budget-Friendly):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://target-site.com",
+    "limit": 50,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "proxyRotation": true,
+      "proxyList": ["gate.smartproxy.com:7000"],
+      "proxyUsername": "user-session-rand10000000",
+      "proxyPassword": "your-password",
+      "minDelay": 2000
+    }
+  }'
+```
+
+#### **🎯 Specific Use Cases**
+
+**Scraping E-commerce (Amazon, eBay):**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://amazon.com/dp/B08N5WRWNW",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "proxy": "residential-proxy.provider.com:8080",
+      "proxyUsername": "user-session-country-US",
+      "proxyPassword": "your-password",
+      "waitForSelector": ".product-title",
+      "minDelay": 3000,
+      "maxRetries": 3
+    }
+  }'
+```
+
+**High-Volume Scraping with Rotation:**
+```bash
+curl -X POST http://localhost:3000/api/batch/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "urls": ["https://site1.com", "https://site2.com", "https://site3.com"],
+    "concurrency": 5,
+    "options": {
+      "extractorFormat": "markdown",
+      "proxyRotation": true,
+      "proxyList": [
+        "http://datacenter1.proxymesh.com:31280",
+        "http://datacenter2.proxymesh.com:31280",
+        "http://datacenter3.proxymesh.com:31280"
+      ],
+      "proxyUsername": "your-username",
+      "proxyPassword": "your-password",
+      "minDelay": 1000
+    }
+  }'
+```
+
+#### **📋 Proxy Setup Checklist**
+
+**Before You Start:**
+1. **Choose a proxy provider** based on your budget and needs
+2. **Sign up and get credentials** (username, password, endpoints)
+3. **Test proxy connectivity** with a simple request
+4. **Check IP rotation** to ensure proxies are working
+5. **Monitor usage and costs** to avoid overage charges
+
+**Proxy URL Formats:**
+- **HTTP**: `http://proxy-server.com:8080`
+- **HTTPS**: `https://proxy-server.com:8080`
+- **SOCKS5**: `socks5://proxy-server.com:1080`
+- **With Auth**: `http://username:password@proxy-server.com:8080`
+
+**Testing Your Proxy:**
+```bash
+# Test proxy connectivity
+curl -x "http://your-proxy:8080" \
+     -U "username:password" \
+     "http://httpbin.org/ip"
+```
+
+#### **🚀 Recommended Setup for Beginners**
+
+**Step 1: Start with Smartproxy**
+1. Sign up at smartproxy.com
+2. Choose residential endpoints ($25/month plan)
+3. Get your credentials
+
+**Step 2: Test Basic Setup**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://httpbin.org/ip",
+    "options": {
+      "proxy": "gate.smartproxy.com:7000",
+      "proxyUsername": "your-username",
+      "proxyPassword": "your-password"
+    }
+  }'
+```
+
+**Step 3: Scale with Crawling**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://target-site.com",
+    "useMapDiscovery": true,
+    "maxUrls": 100,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "proxy": "gate.smartproxy.com:7000",
+      "proxyUsername": "user-session-rand10000000",
+      "proxyPassword": "your-password",
+      "minDelay": 2000
+    }
+  }'
+```
+
+#### **⚠️ Important Considerations**
+
+**Legal and Ethical:**
+- **Check robots.txt** - Respect website scraping policies
+- **Rate limiting** - Don't overload target servers
+- **Terms of service** - Ensure scraping is allowed
+- **Data privacy** - Handle scraped data responsibly
+
+**Technical Best Practices:**
+- **Use residential proxies** for strict sites (Amazon, Google, etc.)
+- **Rotate proxies frequently** - Avoid detection patterns
+- **Monitor proxy health** - Replace dead proxies
+- **Combine with delays** - Don't scrape too aggressively
+
+**Cost Optimization:**
+- **Start small** - Test with limited proxy pools
+- **Monitor bandwidth** - Residential proxies charge per GB
+- **Use datacenter for simple sites** - Much cheaper
+- **Pool sharing** - Some providers offer shared pools
 
 #### **Sample API Calls**
 
