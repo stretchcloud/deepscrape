@@ -11,6 +11,14 @@ export interface StreamingDiscoveryOptions {
   includePatterns?: string[];
   excludePatterns?: string[];
   batchSize?: number; // How many URLs to process in each batch
+  crawlOptions?: {
+    maxCrawlDepth?: number;
+    maxConcurrentCrawlers?: number;
+    crawlTimeoutPerPage?: number;
+    maxLinksPerPage?: number;
+    enableDeepCrawling?: boolean;
+    browserPoolSize?: number;
+  };
 }
 
 export interface UrlBatch {
@@ -57,6 +65,20 @@ export interface CrawlKickoffOptions {
   scrapeOptions?: any;
   useMapDiscovery?: boolean;
   concurrency?: number;
+  // Map discovery specific options
+  mapDiscoveryOptions?: {
+    timeoutMs?: number;
+    skipSitemaps?: boolean;
+    sitemapsOnly?: boolean;
+    crawlOptions?: {
+      maxCrawlDepth?: number;
+      maxConcurrentCrawlers?: number;
+      crawlTimeoutPerPage?: number;
+      maxLinksPerPage?: number;
+      enableDeepCrawling?: boolean;
+      browserPoolSize?: number;
+    };
+  };
 }
 
 export interface CrawlKickoffResult {

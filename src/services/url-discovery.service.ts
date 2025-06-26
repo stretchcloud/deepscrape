@@ -282,7 +282,8 @@ export class URLDiscoveryService {
       timeoutMs = 30000,
       includePatterns,
       excludePatterns,
-      batchSize = 50
+      batchSize = 50,
+      crawlOptions = {}
     } = options;
 
     // Validate input
@@ -370,11 +371,20 @@ export class URLDiscoveryService {
     }
 
     if (!sitemapsOnly) {
-      // DISABLED: Browser discovery for /api/map to prevent resource exhaustion
-      // Browser discovery launches full crawling which is too heavy for fast URL discovery
-      // discoveryPromises.push(
-      //   this.streamBrowserDiscovery(url, timeoutMs, maxUrls, createBatchHandler('browser'))
-      // );
+      // Enable browser discovery when crawlOptions are explicitly provided
+      // This indicates the user wants deeper crawling capabilities
+      if (crawlOptions && Object.keys(crawlOptions).length > 0) {
+        logger.info('Enabling browser discovery due to provided crawlOptions', {
+          url,
+          crawlOptions
+        });
+        
+        discoveryPromises.push(
+          this.streamBrowserDiscovery(url, timeoutMs, maxUrls, createBatchHandler('browser'))
+        );
+      } else {
+        logger.debug('Browser discovery disabled - no crawlOptions provided', { url });
+      }
 
       discoveryPromises.push(
         this.streamCommonPathsDiscovery(url, timeoutMs, createBatchHandler('commonPaths'))

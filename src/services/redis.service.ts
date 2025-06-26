@@ -229,11 +229,50 @@ export async function isCrawlFinished(crawlId: string): Promise<boolean> {
 
     const doneJobCount = Math.max(newDoneJobCount, oldDoneJobCount);
 
-    logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} jobs done`);
+    // Check if streaming discovery is still running
+    const isStreamingDiscoveryActive = await redisClient.exists(`crawl:${crawlId}:streaming:active`);
+
+    logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} jobs done, streaming discovery active: ${isStreamingDiscoveryActive}`);
+
+    // Don't mark as finished if streaming discovery is still active
+    if (isStreamingDiscoveryActive) {
+      logger.debug(`Crawl ${crawlId}: Streaming discovery still active, not marking as finished`);
+      return false;
+    }
 
     return jobCount === doneJobCount && jobCount > 0;
   } catch (error) {
     logger.error('Error checking if crawl is finished', { error, crawlId });
+    throw error;
+  }
+}
+
+// Streaming discovery status management
+export async function markStreamingDiscoveryActive(crawlId: string): Promise<void> {
+  try {
+    await redisClient.set(`crawl:${crawlId}:streaming:active`, 'yes', 'EX', 3600); // 1 hour TTL
+    logger.debug(`Marked streaming discovery as active for crawl ${crawlId}`);
+  } catch (error) {
+    logger.error('Error marking streaming discovery as active', { error, crawlId });
+    throw error;
+  }
+}
+
+export async function markStreamingDiscoveryComplete(crawlId: string): Promise<void> {
+  try {
+    await redisClient.del(`crawl:${crawlId}:streaming:active`);
+    logger.info(`Marked streaming discovery as complete for crawl ${crawlId}`);
+  } catch (error) {
+    logger.error('Error marking streaming discovery as complete', { error, crawlId });
+    throw error;
+  }
+}
+
+export async function isStreamingDiscoveryActive(crawlId: string): Promise<boolean> {
+  try {
+    return await redisClient.exists(`crawl:${crawlId}:streaming:active`) === 1;
+  } catch (error) {
+    logger.error('Error checking streaming discovery status', { error, crawlId });
     throw error;
   }
 }
@@ -245,6 +284,9 @@ export async function cancelCrawl(crawlId: string): Promise<void> {
 
     crawl.cancelled = true;
     await saveCrawl(crawlId, crawl);
+    
+    // Also stop streaming discovery if active
+    await markStreamingDiscoveryComplete(crawlId);
   } catch (error) {
     logger.error('Error canceling crawl', { error, crawlId });
     throw error;

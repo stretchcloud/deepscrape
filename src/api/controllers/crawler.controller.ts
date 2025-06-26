@@ -47,7 +47,15 @@ export async function crawl(
       webhook,
       strategy,
       useBrowser = false,
-      useMapDiscovery = false
+      useMapDiscovery = false,
+      // Map discovery specific parameters
+      maxUrls,
+      timeoutMs,
+      skipSitemaps,
+      sitemapsOnly,
+      includePatterns,
+      excludePatterns,
+      crawlOptions = {}
     } = req.body;
 
     // Validate URL
@@ -113,17 +121,24 @@ export async function crawl(
         const kickoffResult = await kickoffService.startStreamingCrawl({
           crawlId: id,
           url,
-          limit,
+          limit: maxUrls || limit, // Use maxUrls if provided, fallback to limit
           maxDepth,
           allowSubdomains,
-          includePaths,
-          excludePaths,
+          includePaths: includePatterns || includePaths, // Prefer includePatterns for map discovery
+          excludePaths: excludePatterns || excludePaths, // Prefer excludePatterns for map discovery
           scrapeOptions: {
             ...scrapeOptions,
             useBrowser
           },
           useMapDiscovery: true,
-          concurrency: 3
+          concurrency: crawlOptions.maxConcurrentCrawlers || 3,
+          // Pass map discovery specific options
+          mapDiscoveryOptions: {
+            timeoutMs: timeoutMs || 120000, // Default to 2 minutes like successful map calls
+            skipSitemaps: skipSitemaps || false,
+            sitemapsOnly: sitemapsOnly || false,
+            crawlOptions
+          }
         });
 
         if (kickoffResult.success) {
