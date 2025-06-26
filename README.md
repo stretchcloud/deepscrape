@@ -50,6 +50,64 @@ Test: `curl http://localhost:3000/health`
 
 ⚡ **New**: Enhanced crawling with `useMapDiscovery: true` - discover 1000+ URLs in seconds instead of minutes!
 
+## 🚀 **Quick Recommendations**
+
+### **For Maximum Performance:**
+```bash
+# Use /api/crawl with useMapDiscovery for best results
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://docs.example.com",
+    "useMapDiscovery": true,
+    "maxUrls": 1000,
+    "includePatterns": ["/api/", "/docs/"],
+    "scrapeOptions": { "extractorFormat": "markdown" }
+  }'
+```
+
+### **For Bot-Protected Sites:**
+```bash
+# Use browser-based scraping with stealth mode
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://protected-site.com",
+    "useMapDiscovery": true,
+    "maxUrls": 100,
+    "skipSitemaps": true,
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true
+    }
+  }'
+```
+
+### **For Rate-Limited Sites:**
+```bash
+# Conservative crawling with delays
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://api-limited-site.com",
+    "useMapDiscovery": true,
+    "maxUrls": 500,
+    "crawlOptions": {
+      "maxConcurrentCrawlers": 1,
+      "crawlTimeoutPerPage": 8000
+    },
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "minDelay": 2000,
+      "maxRetries": 3
+    }
+  }'
+```
+
 ## API Usage
 
 ### Basic Scraping
@@ -557,11 +615,11 @@ curl -X POST http://localhost:3000/api/crawl \
 **Required Parameters:**
 - **`url`** (string): The starting URL to crawl
 
-**Crawl Control Options:**
+**Core Crawl Control Options:**
 - **`limit`** (integer, default: 100): Maximum number of URLs to crawl
 - **`maxDepth`** (integer, default: 5): Maximum depth to crawl from starting URL
-- **`includePaths`** (string[]): Array of regex patterns for URLs to include
-- **`excludePaths`** (string[]): Array of regex patterns for URLs to exclude
+- **`includePaths`** (string[]): Array of regex patterns for URLs to include (legacy)
+- **`excludePaths`** (string[]): Array of regex patterns for URLs to exclude (legacy)
 - **`allowBackwardCrawling`** (boolean, default: false): Allow crawling URLs that aren't descendants of initial URL
 - **`allowExternalContentLinks`** (boolean, default: false): Allow crawling external domain links
 - **`allowSubdomains`** (boolean, default: false): Allow crawling subdomains
@@ -574,7 +632,23 @@ curl -X POST http://localhost:3000/api/crawl \
   - `"dfs"`: Depth-First Search  
   - `"best_first"`: Best-First Search (prioritized)
 - **`useBrowser`** (boolean, default: false): Use browser-based crawling with Playwright
-- **`useMapDiscovery`** (boolean, default: false): Use high-performance URL discovery (finds 5,000+ URLs in seconds)
+- **`useMapDiscovery`** (boolean, default: false): 🚀 **Enable high-performance URL discovery** (finds 5,000+ URLs in seconds)
+
+**Enhanced Map Discovery Options** (when `useMapDiscovery: true`):
+- **`maxUrls`** (integer, default: 5000, max: 30000): Maximum URLs to discover (overrides `limit`)
+- **`timeoutMs`** (integer, default: 120000, max: 300000): Discovery timeout in milliseconds
+- **`skipSitemaps`** (boolean, default: false): Skip sitemap-based discovery (faster for browser-only discovery)
+- **`sitemapsOnly`** (boolean, default: false): Use only sitemap-based discovery (fastest but limited)
+- **`includePatterns`** (string[]): Include only URLs matching these path patterns (overrides `includePaths`)
+- **`excludePatterns`** (string[]): Exclude URLs matching these patterns (overrides `excludePaths`)
+
+**Advanced Crawl Options** (`crawlOptions` object when `useMapDiscovery: true`):
+- **`maxCrawlDepth`** (number, default: 3, max: 5): Browser crawling depth for URL discovery
+- **`maxConcurrentCrawlers`** (number, default: 8, max: 20): Concurrent browser crawlers for discovery
+- **`crawlTimeoutPerPage`** (number, default: 3000, max: 10000): Timeout per page during discovery (ms)
+- **`maxLinksPerPage`** (number, default: 100, max: 500): Maximum links to extract per page during discovery
+- **`enableDeepCrawling`** (boolean, default: true): Enable multi-level crawling during discovery
+- **`browserPoolSize`** (number, default: 5, max: 15): Browser pool size for discovery crawling
 
 **Notification Options:**
 - **`webhook`** (string): URL to call when crawl completes
@@ -649,22 +723,81 @@ curl -X POST http://localhost:3000/api/crawl \
   }'
 ```
 
-**High-Performance Discovery Crawl:**
+**High-Performance Discovery Crawl with Enhanced Options:**
 ```bash
 curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
     "url": "https://docs.oracle.com/en-us/iaas/Content/home.htm",
-    "limit": 5000,
-    "maxDepth": 5,
-    "allowSubdomains": true,
     "useMapDiscovery": true,
-    "includePaths": ["/en-us/iaas/"],
+    "maxUrls": 5000,
+    "timeoutMs": 300000,
+    "allowSubdomains": true,
+    "includePatterns": ["/en-us/iaas/"],
+    "excludePatterns": ["/archive/", "/old/"],
+    "crawlOptions": {
+      "maxCrawlDepth": 3,
+      "maxConcurrentCrawlers": 10,
+      "crawlTimeoutPerPage": 5000,
+      "enableDeepCrawling": true,
+      "browserPoolSize": 8
+    },
     "scrapeOptions": {
       "extractorFormat": "markdown",
+      "useBrowser": true,
       "waitForTimeout": 3000,
       "blockAds": true
+    }
+  }'
+```
+
+**Fast Discovery Crawl (Browser-Only, 10x Faster):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "url": "https://firecrawl.dev",
+    "useMapDiscovery": true,
+    "maxUrls": 100,
+    "timeoutMs": 30000,
+    "skipSitemaps": true,
+    "includePatterns": ["/blog/", "/docs/"],
+    "crawlOptions": {
+      "maxCrawlDepth": 2,
+      "maxConcurrentCrawlers": 5,
+      "enableDeepCrawling": true
+    },
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true
+    }
+  }'
+```
+
+**Conservative Discovery Crawl (Rate-Limited):**
+```bash
+curl -X POST http://localhost:3000/api/crawl \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "url": "https://docs.github.com",
+    "useMapDiscovery": true,
+    "maxUrls": 500,
+    "timeoutMs": 120000,
+    "includePatterns": ["/api/", "/guides/"],
+    "crawlOptions": {
+      "maxCrawlDepth": 2,
+      "maxConcurrentCrawlers": 2,
+      "crawlTimeoutPerPage": 8000,
+      "enableDeepCrawling": false
+    },
+    "scrapeOptions": {
+      "extractorFormat": "markdown",
+      "minDelay": 2000,
+      "maxRetries": 3
     }
   }'
 ```
@@ -892,7 +1025,7 @@ curl -X POST http://localhost:3000/api/crawl \
 |----------|---------|---------|-------------|----------|
 | **`/api/map`** | URL Discovery Only | **List of URLs** (no content) | 5,000+ URLs in 2-3 seconds | Find URLs before scraping |
 | **`/api/crawl`** | Crawl + Scrape | **Scraped content files** | 100 URLs in 2-5 minutes | Traditional approach |
-| **`/api/crawl` + `useMapDiscovery`** | **Streaming + Pool** | **Scraped content files** | **1,000+ URLs in 10-20 seconds** | **🚀 Recommended approach** |
+| **`/api/crawl` + `useMapDiscovery`** | **Enhanced Discovery + Scraping** | **Scraped content files** | **1,000+ URLs in 30-60 seconds** | **🚀 Recommended approach** |
 | **`/api/batch/scrape`** | Parallel scraping | **Scraped content files** | Any number of URLs | Scrape known URL lists |
 
 ### 4. Expected Outputs
@@ -934,7 +1067,7 @@ curl -X POST http://localhost:3000/api/crawl \
 | Workflow | Discovery + Scraping | Total URLs | Success Rate | Architecture |
 |----------|---------------------|------------|--------------|--------------|
 | **Traditional Crawl** | 2-5 minutes | 100 URLs | 85% (limited by timeouts) | Sequential |
-| **Streaming + Pool Crawl** | **10-20 seconds** | **5,000+ URLs** | **98%+ (comprehensive)** | **🚀 Parallel + Browser Pool** |
+| **Enhanced Discovery Crawl** | **30-60 seconds** | **1,000+ URLs** | **95%+ (comprehensive)** | **🚀 Map Discovery + Scraping** |
 | **Map + Batch** | 2-3 seconds discovery + batch time | 30,000 URLs | 98% (parallel processing) | Hybrid |
 
 ## Advanced Features
