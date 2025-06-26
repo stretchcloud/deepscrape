@@ -3,6 +3,7 @@ import { URLValidationUtils } from '../utils/url-validation.utils';
 import { logger } from '../utils/logger';
 import { redisClient } from './redis.service';
 import { PlaywrightService } from './playwright.service';
+import { randomBytes } from 'crypto';
 import {
   DiscoveryOptions,
   DiscoveryResult,
@@ -53,7 +54,7 @@ export class URLDiscoveryService {
    */
   private calculateBackoffDelay(attempt: number, baseDelay: number = 1000): number {
     const exponentialDelay = baseDelay * Math.pow(2, attempt);
-    const jitter = Math.random() * 0.3 * exponentialDelay; // ±30% jitter
+    const jitter = (randomBytes(2).readUInt16BE(0) / 65535) * 0.3 * exponentialDelay; // ±30% jitter
     return Math.min(exponentialDelay + jitter, 10000); // Cap at 10 seconds
   }
 

@@ -1,6 +1,7 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
+import { randomBytes } from 'crypto';
 
 export interface BrowserPoolOptions {
   maxBrowsers?: number;          // Maximum number of browsers in pool
@@ -310,7 +311,7 @@ export class BrowserPoolService extends EventEmitter {
     };
 
     const browser = await chromium.launch(launchOptions);
-    const browserId = `browser-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const browserId = `browser-${Date.now()}-${randomBytes(6).toString('hex')}`;
 
     const pooledBrowser: PooledBrowser = {
       browser,
@@ -357,7 +358,7 @@ export class BrowserPoolService extends EventEmitter {
 
       const pooledContext: PooledContext = {
         context,
-        id: `ctx-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        id: `ctx-${Date.now()}-${randomBytes(4).toString('hex')}`,
         activePages: 0
       };
 
@@ -448,7 +449,8 @@ export class BrowserPoolService extends EventEmitter {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
+    const randomIndex = randomBytes(1)[0] % userAgents.length;
+    return userAgents[randomIndex];
   }
 
   /**
