@@ -50,7 +50,7 @@ export class BrowserPoolService extends EventEmitter {
   private readonly options: Required<BrowserPoolOptions>;
   private cleanupInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
-  private beingRemoved: Set<string> = new Set(); // Track browsers being removed to prevent race conditions
+  private readonly beingRemoved: Set<string> = new Set(); // Track browsers being removed to prevent race conditions
 
   private constructor(options: BrowserPoolOptions = {}) {
     super();
@@ -141,9 +141,7 @@ export class BrowserPoolService extends EventEmitter {
     }
 
     let browser = await this.getAvailableBrowser();
-    if (!browser) {
-      browser = await this.createBrowser();
-    }
+    browser ??= await this.createBrowser();
 
     const pooledContext = await this.getOrCreateContext(browser);
     const page = await pooledContext.context.newPage();
@@ -312,7 +310,7 @@ export class BrowserPoolService extends EventEmitter {
     };
 
     const browser = await chromium.launch(launchOptions);
-    const browserId = `browser-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const browserId = `browser-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
     const pooledBrowser: PooledBrowser = {
       browser,
