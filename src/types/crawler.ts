@@ -78,6 +78,22 @@ export interface CrawlRequest {
   strategy?: CrawlStrategy; // Added crawl strategy
   useBrowser?: boolean; // Option to use browser-based crawling with Playwright
   useMapDiscovery?: boolean; // Option to use high-performance URL discovery before crawling
+  
+  // Map discovery specific parameters (when useMapDiscovery is true)
+  maxUrls?: number; // Override limit for discovery
+  timeoutMs?: number; // Discovery timeout
+  skipSitemaps?: boolean; // Skip sitemap discovery
+  sitemapsOnly?: boolean; // Only use sitemap discovery
+  includePatterns?: string[]; // Alternative to includePaths for discovery
+  excludePatterns?: string[]; // Alternative to excludePaths for discovery
+  crawlOptions?: {
+    maxCrawlDepth?: number;
+    maxConcurrentCrawlers?: number;
+    crawlTimeoutPerPage?: number;
+    maxLinksPerPage?: number;
+    enableDeepCrawling?: boolean;
+    browserPoolSize?: number;
+  };
 }
 
 export interface CrawlResponse {

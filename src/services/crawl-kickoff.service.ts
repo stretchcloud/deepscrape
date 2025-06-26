@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { URLDiscoveryService } from './url-discovery.service';
-import { addCrawlJob } from './redis.service';
+import { addCrawlJob, markStreamingDiscoveryActive, markStreamingDiscoveryComplete } from './redis.service';
 import { addCrawlJobToQueue } from './queue.service';
 import {
   CrawlKickoffOptions,
@@ -37,7 +37,8 @@ export class CrawlKickoffService {
       excludePaths = [],
       scrapeOptions = {},
       useMapDiscovery = false,
-      concurrency = 3
+      concurrency = 3,
+      mapDiscoveryOptions = {}
     } = options;
 
     logger.info('Starting streaming crawl kickoff', {
@@ -57,18 +58,28 @@ export class CrawlKickoffService {
       // STAGE 1B: Launch streaming discovery (if enabled)
       let discoveryStarted = false;
       if (useMapDiscovery) {
-        // Start streaming discovery in background (non-blocking)
+        // Mark streaming discovery as active to prevent premature crawl completion
+        await markStreamingDiscoveryActive(crawlId);
+        
+        // Start map discovery in background (non-blocking) with proper error handling
         this.startStreamingDiscovery(crawlId, url, {
           limit,
           allowSubdomains,
           includePaths,
           excludePaths,
-          scrapeOptions
+          scrapeOptions,
+          mapDiscoveryOptions
+        }).then(() => {
+          logger.info('Map discovery completed and URLs queued', { crawlId });
         }).catch(error => {
-          logger.error('Streaming discovery failed', {
+          logger.error('Map discovery failed', {
             crawlId,
             error: error.message
           });
+          // Mark as complete even on error to prevent hanging
+          markStreamingDiscoveryComplete(crawlId).catch(err => 
+            logger.error('Failed to mark streaming discovery as complete after error', { crawlId, err })
+          );
         });
 
         discoveryStarted = true;
@@ -104,7 +115,7 @@ export class CrawlKickoffService {
   }
 
   /**
-   * STAGE 2: Streaming Discovery - Real-time URL discovery with immediate queue addition
+   * STAGE 2: Simple Map-Based Discovery - Use working /api/map internally
    */
   private async startStreamingDiscovery(
     crawlId: string,
@@ -115,82 +126,70 @@ export class CrawlKickoffService {
       includePaths: string[];
       excludePaths: string[];
       scrapeOptions: any;
+      mapDiscoveryOptions?: any;
     }
   ): Promise<void> {
-    const { limit, allowSubdomains, includePaths, excludePaths, scrapeOptions } = options;
+    const { limit, allowSubdomains, includePaths, excludePaths, scrapeOptions, mapDiscoveryOptions = {} } = options;
 
-    logger.info('Starting streaming URL discovery', {
+    logger.info('Starting map-based URL discovery (using internal /api/map)', {
       crawlId,
       url,
       limit,
       allowSubdomains
     });
 
-    const streamingOptions: StreamingDiscoveryOptions = {
-      url,
-      maxUrls: limit,
-      includeSubdomains: allowSubdomains,
-      includePatterns: includePaths,
-      excludePatterns: excludePaths,
-      batchSize: 25, // Process URLs in small batches for better streaming
-      timeoutMs: 30000
-    };
-
-    // Create URL stream handler that adds discovered URLs to crawl queue immediately
-    const urlStreamHandler = async (batch: UrlBatch): Promise<void> => {
-      try {
-        logger.debug('Processing URL batch from streaming discovery', {
-          crawlId,
-          method: batch.method,
-          batchNumber: batch.batchNumber,
-          urlCount: batch.urls.length,
-          totalProcessed: batch.totalProcessed
-        });
-
-        // Add each URL to the crawl queue immediately
-        const jobPromises = batch.urls.map(discoveredUrl =>
-          this.addDiscoveredUrlToQueue(crawlId, discoveredUrl, batch.method, scrapeOptions)
-        );
-
-        await Promise.allSettled(jobPromises);
-
-        logger.debug('URL batch queued successfully', {
-          crawlId,
-          method: batch.method,
-          batchNumber: batch.batchNumber,
-          urlsQueued: batch.urls.length
-        });
-
-      } catch (error) {
-        logger.error('Failed to process URL batch', {
-          crawlId,
-          method: batch.method,
-          batchNumber: batch.batchNumber,
-          error: (error as Error).message
-        });
-      }
-    };
-
     try {
-      // Start streaming discovery with real-time URL processing
-      const result = await this.discoveryService.streamDiscoverUrls(
-        streamingOptions,
-        urlStreamHandler
-      );
-
-      logger.info('Streaming discovery completed', {
-        crawlId,
-        totalUrls: result.totalUrls,
-        batchesProcessed: result.batchesProcessed,
-        timeTaken: result.timeTaken,
-        methods: result.discoveryMethods
+      // Call the working map discovery internally
+      const mapResult = await this.discoveryService.discoverUrls({
+        url,
+        maxUrls: limit,
+        includeSubdomains: allowSubdomains,
+        includePatterns: includePaths,
+        excludePatterns: excludePaths,
+        timeoutMs: mapDiscoveryOptions.timeoutMs || 120000,
+        skipSitemaps: mapDiscoveryOptions.skipSitemaps || false,
+        sitemapsOnly: mapDiscoveryOptions.sitemapsOnly || false
       });
 
+      logger.info('Map discovery completed', {
+        crawlId,
+        totalUrls: mapResult.links.length,
+        timeTaken: mapResult.timeTaken,
+        methods: mapResult.discoveryMethods
+      });
+
+      // Add all discovered URLs to the crawl queue
+      let urlsQueued = 0;
+      for (const discoveredUrl of mapResult.links) {
+        try {
+          await this.addDiscoveredUrlToQueue(crawlId, discoveredUrl, 'map-discovery', scrapeOptions);
+          urlsQueued++;
+        } catch (error) {
+          logger.warn('Failed to queue discovered URL', {
+            crawlId,
+            url: discoveredUrl,
+            error: (error as Error).message
+          });
+        }
+      }
+
+      logger.info('Map discovery URLs queued successfully', {
+        crawlId,
+        totalDiscovered: mapResult.links.length,
+        urlsQueued
+      });
+
+      // Mark streaming discovery as complete so the crawl can finish
+      await markStreamingDiscoveryComplete(crawlId);
+
     } catch (error) {
-      logger.error('Streaming discovery failed', {
+      logger.error('Map-based discovery failed', {
         crawlId,
         error: (error as Error).message
       });
+      
+      // Mark as complete even on error to prevent hanging
+      await markStreamingDiscoveryComplete(crawlId);
       throw error;
     }
   }

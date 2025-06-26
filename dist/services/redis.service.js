@@ -47,6 +47,9 @@ exports.getCrawlDoneJobs = getCrawlDoneJobs;
 exports.getCrawlDoneJobsCount = getCrawlDoneJobsCount;
 exports.markCrawlFinished = markCrawlFinished;
 exports.isCrawlFinished = isCrawlFinished;
+exports.markStreamingDiscoveryActive = markStreamingDiscoveryActive;
+exports.markStreamingDiscoveryComplete = markStreamingDiscoveryComplete;
+exports.isStreamingDiscoveryActive = isStreamingDiscoveryActive;
 exports.cancelCrawl = cancelCrawl;
 exports.addExportedFile = addExportedFile;
 exports.getExportedFiles = getExportedFiles;
@@ -238,11 +241,48 @@ async function isCrawlFinished(crawlId) {
         const newDoneJobCount = await redisClient.scard(`crawl:${crawlId}:jobs:done:success`);
         const oldDoneJobCount = await redisClient.scard(`crawl:${crawlId}:jobs_done`);
         const doneJobCount = Math.max(newDoneJobCount, oldDoneJobCount);
-        logger_1.logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} jobs done`);
+        // Check if streaming discovery is still running
+        const isStreamingDiscoveryActive = await redisClient.exists(`crawl:${crawlId}:streaming:active`);
+        logger_1.logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} jobs done, streaming discovery active: ${isStreamingDiscoveryActive}`);
+        // Don't mark as finished if streaming discovery is still active
+        if (isStreamingDiscoveryActive) {
+            logger_1.logger.debug(`Crawl ${crawlId}: Streaming discovery still active, not marking as finished`);
+            return false;
+        }
         return jobCount === doneJobCount && jobCount > 0;
     }
     catch (error) {
         logger_1.logger.error('Error checking if crawl is finished', { error, crawlId });
+        throw error;
+    }
+}
+// Streaming discovery status management
+async function markStreamingDiscoveryActive(crawlId) {
+    try {
+        await redisClient.set(`crawl:${crawlId}:streaming:active`, 'yes', 'EX', 3600); // 1 hour TTL
+        logger_1.logger.debug(`Marked streaming discovery as active for crawl ${crawlId}`);
+    }
+    catch (error) {
+        logger_1.logger.error('Error marking streaming discovery as active', { error, crawlId });
+        throw error;
+    }
+}
+async function markStreamingDiscoveryComplete(crawlId) {
+    try {
+        await redisClient.del(`crawl:${crawlId}:streaming:active`);
+        logger_1.logger.info(`Marked streaming discovery as complete for crawl ${crawlId}`);
+    }
+    catch (error) {
+        logger_1.logger.error('Error marking streaming discovery as complete', { error, crawlId });
+        throw error;
+    }
+}
+async function isStreamingDiscoveryActive(crawlId) {
+    try {
+        return await redisClient.exists(`crawl:${crawlId}:streaming:active`) === 1;
+    }
+    catch (error) {
+        logger_1.logger.error('Error checking streaming discovery status', { error, crawlId });
         throw error;
     }
 }
@@ -253,6 +293,8 @@ async function cancelCrawl(crawlId) {
             throw new Error('Crawl not found');
         crawl.cancelled = true;
         await saveCrawl(crawlId, crawl);
+        // Also stop streaming discovery if active
+        await markStreamingDiscoveryComplete(crawlId);
     }
     catch (error) {
         logger_1.logger.error('Error canceling crawl', { error, crawlId });

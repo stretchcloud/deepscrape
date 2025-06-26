@@ -15,7 +15,9 @@ const file_export_service_1 = require("../../services/file-export.service");
  */
 async function crawl(req, res) {
     try {
-        const { url, includePaths, excludePaths, limit = 100, maxDepth = 5, allowBackwardCrawling = false, allowExternalContentLinks = false, allowSubdomains = false, ignoreRobotsTxt = false, regexOnFullURL = false, scrapeOptions = {}, webhook, strategy, useBrowser = false, useMapDiscovery = false } = req.body;
+        const { url, includePaths, excludePaths, limit = 100, maxDepth = 5, allowBackwardCrawling = false, allowExternalContentLinks = false, allowSubdomains = false, ignoreRobotsTxt = false, regexOnFullURL = false, scrapeOptions = {}, webhook, strategy, useBrowser = false, useMapDiscovery = false, 
+        // Map discovery specific parameters
+        maxUrls, timeoutMs, skipSitemaps, sitemapsOnly, includePatterns, excludePatterns, crawlOptions = {} } = req.body;
         // Validate URL
         if (!url) {
             res.status(400).json({ success: false, error: 'URL is required' });
@@ -73,17 +75,24 @@ async function crawl(req, res) {
                 const kickoffResult = await kickoffService.startStreamingCrawl({
                     crawlId: id,
                     url,
-                    limit,
+                    limit: maxUrls || limit, // Use maxUrls if provided, fallback to limit
                     maxDepth,
                     allowSubdomains,
-                    includePaths,
-                    excludePaths,
+                    includePaths: includePatterns || includePaths, // Prefer includePatterns for map discovery
+                    excludePaths: excludePatterns || excludePaths, // Prefer excludePatterns for map discovery
                     scrapeOptions: {
                         ...scrapeOptions,
                         useBrowser
                     },
                     useMapDiscovery: true,
-                    concurrency: 3
+                    concurrency: crawlOptions.maxConcurrentCrawlers || 3,
+                    // Pass map discovery specific options
+                    mapDiscoveryOptions: {
+                        timeoutMs: timeoutMs || 120000, // Default to 2 minutes like successful map calls
+                        skipSitemaps: skipSitemaps || false,
+                        sitemapsOnly: sitemapsOnly || false,
+                        crawlOptions
+                    }
                 });
                 if (kickoffResult.success) {
                     logger_1.logger.info('Streaming crawl kickoff successful', {
