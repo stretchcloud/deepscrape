@@ -1,13 +1,13 @@
-import axios, { AxiosError } from "axios";
-import { load } from "cheerio";
-import { URL } from "url";
-import robotsParser, { Robot } from "robots-parser";
-import https from "https";
-import { logger } from "../utils/logger";
-import { extractLinks } from "../utils/html-utils";
-import { CrawlStrategy, CrawlerHooks, CrawlerOptions } from "../types/crawler";
-import { PlaywrightService, PlaywrightOptions } from "../services/playwright.service";
-import { UrlNormalizationService } from "../services/url-normalization.service";
+import axios, { AxiosError } from 'axios';
+import { load } from 'cheerio';
+import { URL } from 'url';
+import robotsParser, { Robot } from 'robots-parser';
+import https from 'https';
+import { logger } from '../utils/logger';
+import { extractLinks } from '../utils/html-utils';
+import { CrawlStrategy, CrawlerHooks, CrawlerOptions } from '../types/crawler';
+import { PlaywrightService, PlaywrightOptions } from '../services/playwright.service';
+import { UrlNormalizationService } from '../services/url-normalization.service';
 
 export class WebCrawler {
   private jobId: string;
@@ -69,8 +69,8 @@ export class WebCrawler {
     this.includes = Array.isArray(includes) ? includes : [];
     this.excludes = Array.isArray(excludes) ? excludes : [];
     this.limit = limit;
-    this.robotsTxtUrl = `${this.baseUrl}${this.baseUrl.endsWith("/") ? "" : "/"}robots.txt`;
-    this.robots = robotsParser(this.robotsTxtUrl, "");
+    this.robotsTxtUrl = `${this.baseUrl}${this.baseUrl.endsWith('/') ? '' : '/'}robots.txt`;
+    this.robots = robotsParser(this.robotsTxtUrl, '');
     this.maxCrawledLinks = maxCrawledLinks ?? limit;
     this.maxCrawledDepth = maxCrawledDepth ?? 10;
     this.allowBackwardCrawling = allowBackwardCrawling ?? false;
@@ -102,7 +102,7 @@ export class WebCrawler {
    * Check if link matches exclude patterns
    */
   private isExcludedByPatterns(link: string, path: string): boolean {
-    if (this.excludes.length === 0 || this.excludes[0] === "") {
+    if (this.excludes.length === 0 || this.excludes[0] === '') {
       return false;
     }
 
@@ -116,7 +116,7 @@ export class WebCrawler {
    * Check if link matches include patterns
    */
   private isIncludedByPatterns(link: string, path: string): boolean {
-    if (this.includes.length === 0 || this.includes[0] === "") {
+    if (this.includes.length === 0 || this.includes[0] === '') {
       return true;
     }
 
@@ -151,12 +151,12 @@ export class WebCrawler {
       return true;
     }
 
-    const isAllowed = this.robots.isAllowed(normalizedLink, "DeepScrapeCrawler") ?? true;
-    
+    const isAllowed = this.robots.isAllowed(normalizedLink, 'DeepScrapeCrawler') ?? true;
+
     if (!isAllowed) {
       this.logger.debug(`Link disallowed by robots.txt: ${normalizedLink}`);
     }
-    
+
     return isAllowed;
   }
 
@@ -171,14 +171,14 @@ export class WebCrawler {
       this.logger.debug(`Error processing link: ${link}`, { link, error });
       return false;
     }
-    
+
     const normalizedLink = this.urlNormalizationService.normalizeUrl(url.toString());
-    
+
     // Check if URL already visited
     if (this.isUrlVisited(normalizedLink)) {
       return false;
     }
-    
+
     // Check depth
     const depth = this.getURLDepth(normalizedLink);
     if (depth > maxDepth) {
@@ -210,14 +210,14 @@ export class WebCrawler {
     fromMap: boolean = false,
   ): string[] {
     if (this.currentDiscoveryDepth === this.maxDiscoveryDepth) {
-      this.logger.debug("Max discovery depth hit, filtering off all links", { 
-        currentDiscoveryDepth: this.currentDiscoveryDepth, 
-        maxDiscoveryDepth: this.maxDiscoveryDepth 
+      this.logger.debug('Max discovery depth hit, filtering off all links', {
+        currentDiscoveryDepth: this.currentDiscoveryDepth,
+        maxDiscoveryDepth: this.maxDiscoveryDepth
       });
       return [];
     }
 
-    if (this.initialUrl.endsWith("sitemap.xml") && fromMap) {
+    if (this.initialUrl.endsWith('sitemap.xml') && fromMap) {
       return links.slice(0, limit);
     }
 
@@ -232,7 +232,7 @@ export class WebCrawler {
       '.zip', '.rar', '.tar', '.gz', '.jpg', '.jpeg', '.png', '.gif',
       '.mp3', '.mp4', '.avi', '.mov', '.exe', '.apk', '.dmg', '.iso'
     ];
-    
+
     try {
       const parsedUrl = new URL(url);
       const path = parsedUrl.pathname.toLowerCase();
@@ -245,10 +245,10 @@ export class WebCrawler {
   private getURLDepth(url: string): number {
     try {
       const parsedUrl = new URL(url);
-      const path = parsedUrl.pathname.endsWith('/') 
-        ? parsedUrl.pathname.slice(0, -1) 
+      const path = parsedUrl.pathname.endsWith('/')
+        ? parsedUrl.pathname.slice(0, -1)
         : parsedUrl.pathname;
-        
+
       if (path === '') return 0;
       return path.split('/').filter(Boolean).length;
     } catch (e) {
@@ -261,15 +261,15 @@ export class WebCrawler {
    */
   private lockUrl(url: string): boolean {
     const normalizedUrl = this.urlNormalizationService.normalizeUrl(url);
-    
+
     if (this.lockedUrls.has(normalizedUrl)) {
       return false; // Already locked
     }
-    
+
     // If similar URL deduplication is enabled, check for similar URLs
     if (this.deduplicateSimilarUrls) {
       const similarUrls = this.urlNormalizationService.generateSimilarUrls(normalizedUrl);
-      
+
       // Check if any similar URL is already locked or visited
       for (const similarUrl of similarUrls) {
         if (this.lockedUrls.has(similarUrl) || this.visited.has(similarUrl)) {
@@ -277,7 +277,7 @@ export class WebCrawler {
         }
       }
     }
-    
+
     this.lockedUrls.add(normalizedUrl);
     return true;
   }
@@ -295,23 +295,23 @@ export class WebCrawler {
    */
   private isUrlVisited(url: string): boolean {
     const normalizedUrl = this.urlNormalizationService.normalizeUrl(url);
-    
+
     // Check direct visit
     if (this.visited.has(normalizedUrl)) {
       return true;
     }
-    
+
     // If similar URL deduplication is enabled, check similar URLs
     if (this.deduplicateSimilarUrls) {
       const similarUrls = this.urlNormalizationService.generateSimilarUrls(normalizedUrl);
-      
+
       for (const similarUrl of similarUrls) {
         if (this.visited.has(similarUrl)) {
           return true;
         }
       }
     }
-    
+
     return false;
   }
 
@@ -321,7 +321,7 @@ export class WebCrawler {
   private addRedirectMapping(fromUrl: string, toUrl: string): void {
     const normalizedFrom = this.urlNormalizationService.normalizeUrl(fromUrl);
     const normalizedTo = this.urlNormalizationService.normalizeUrl(toUrl);
-    
+
     if (normalizedFrom !== normalizedTo) {
       this.redirectMapping.set(normalizedFrom, normalizedTo);
     }
@@ -357,7 +357,7 @@ export class WebCrawler {
     try {
       const $ = load(html);
       const links: string[] = [];
-      
+
       $('a').each((_, element) => {
         const href = $(element).attr('href');
         if (href) {
@@ -369,7 +369,7 @@ export class WebCrawler {
           }
         }
       });
-      
+
       return [...new Set(links)]; // Deduplicate links
     } catch (error) {
       this.logger.error('Error extracting links from HTML', { error });
@@ -396,15 +396,15 @@ export class WebCrawler {
    */
   private async applyContentHooks(html: string, normalizedUrl: string): Promise<string> {
     let processedHtml = html;
-    
+
     if (this.hooks.afterPageLoad) {
       processedHtml = await this.hooks.afterPageLoad(processedHtml, normalizedUrl);
     }
-    
+
     if (this.hooks.beforeContentExtraction) {
       processedHtml = await this.hooks.beforeContentExtraction(processedHtml, normalizedUrl);
     }
-    
+
     return processedHtml;
   }
 
@@ -452,9 +452,9 @@ export class WebCrawler {
 
       logger.info(`Crawling page with Playwright: ${normalizedUrl}`);
       const response = await this.playwrightService!.crawlPage(normalizedUrl, playwrightOptions);
-      
+
       const html = await this.applyContentHooks(response.content, normalizedUrl);
-      
+
       logger.info(`Crawled page with Playwright: ${normalizedUrl} - Found ${response.links.length} links`);
       return { html, links: response.links };
     } catch (error) {
@@ -497,12 +497,12 @@ export class WebCrawler {
     try {
       const config = this.buildAxiosConfig(normalizedUrl, skipTlsVerification);
       const response = await axios.get(normalizedUrl, config);
-      
+
       this.handleRedirect(response, normalizedUrl);
-      
+
       const html = await this.applyContentHooks(response.data, normalizedUrl);
       const links = await this.extractLinksFromHtml(html, normalizedUrl);
-      
+
       return { html, links };
     } catch (error) {
       await this.executeErrorHook(error as Error, normalizedUrl);
@@ -518,25 +518,25 @@ export class WebCrawler {
     if (this.isUrlVisited(normalizedUrl)) {
       return false;
     }
-    
+
     if (!this.lockUrl(normalizedUrl)) {
       return false;
     }
-    
+
     return true;
   }
 
   public async crawlPage(url: string, skipTlsVerification = false): Promise<{html: string, links: string[]}> {
     const normalizedUrl = this.urlNormalizationService.normalizeUrl(url);
-    
+
     await this.executeBeforeCrawlHook(normalizedUrl);
-    
+
     if (!this.canCrawlUrl(normalizedUrl)) {
       return { html: '', links: [] };
     }
-    
+
     this.visited.add(normalizedUrl);
-    
+
     try {
       if (this.useBrowser && this.playwrightService) {
         return await this.crawlWithPlaywright(normalizedUrl);
@@ -565,8 +565,8 @@ export class WebCrawler {
         });
 
         this.urlQueue.push(...urls);
-        
-        this.urlQueue.sort((a, b) => 
+
+        this.urlQueue.sort((a, b) =>
           (this.urlScores.get(b) || 0) - (this.urlScores.get(a) || 0)
         );
         break;
@@ -588,13 +588,13 @@ export class WebCrawler {
     try {
       const parsedUrl = new URL(url);
       let score = 0;
-      
+
       const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
       score -= pathSegments.length * 10;
-      
+
       const queryParams = parsedUrl.searchParams.toString().length;
       score -= queryParams;
-      
+
       const contentKeywords = ['about', 'docs', 'documentation', 'guide', 'tutorial', 'help'];
       const pathString = parsedUrl.pathname.toLowerCase();
       for (const keyword of contentKeywords) {
@@ -603,7 +603,7 @@ export class WebCrawler {
           break;
         }
       }
-      
+
       const nonContentKeywords = ['login', 'signup', 'register', 'cart', 'checkout'];
       for (const keyword of nonContentKeywords) {
         if (pathString.includes(keyword)) {
@@ -611,7 +611,7 @@ export class WebCrawler {
           break;
         }
       }
-      
+
       return score;
     } catch (e) {
       return -100;
@@ -634,7 +634,7 @@ export class WebCrawler {
    */
   public async discoverUrlsWithBrowser(maxDepth: number = 3, limit: number = 100): Promise<string[]> {
     if (!this.useBrowser) {
-      logger.warn("Browser-based discovery called but browser mode is not enabled. Switching to browser mode.");
+      logger.warn('Browser-based discovery called but browser mode is not enabled. Switching to browser mode.');
       this.useBrowser = true;
     }
 
@@ -664,12 +664,12 @@ export class WebCrawler {
     };
 
     logger.info(`Starting browser-based URL discovery from ${this.initialUrl} with depth ${maxDepth} and limit ${limit}`);
-    
+
     // Run the discovery phase
     const discoveredUrls = await this.playwrightService.discoveryPhase(this.initialUrl, playwrightOptions);
-    
+
     logger.info(`Discovery completed. Found ${discoveredUrls.length} URLs`);
-    
+
     return discoveredUrls;
   }
 
@@ -682,4 +682,4 @@ export class WebCrawler {
       this.playwrightService = null;
     }
   }
-} 
+}

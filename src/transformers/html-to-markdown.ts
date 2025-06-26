@@ -137,11 +137,11 @@ export class HtmlToMarkdownTransformer {
       },
       replacement: (content, node) => {
         const code = node.textContent || '';
-        const language = node.firstChild && 
+        const language = node.firstChild &&
           (node.firstChild as HTMLElement).className
             ? (node.firstChild as HTMLElement).className.replace('language-', '')
             : '';
-        
+
         return '\n\n```' + language + '\n' + code.trim() + '\n```\n\n';
       }
     });
@@ -152,21 +152,21 @@ export class HtmlToMarkdownTransformer {
       replacement: (content, node) => {
         const href = (node as HTMLElement).getAttribute('href');
         const title = (node as HTMLElement).getAttribute('title');
-        
+
         if (!href) return content;
-        
+
         // Skip empty links or anchors with no content
         if (!content.trim()) return '';
-        
+
         // Format links consistently and ensure proper URL formatting
         let finalHref = href;
         if (href && !href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('#')) {
           finalHref = href.startsWith('/') ? `${this.baseUrl}${href}` : `${this.baseUrl}/${href}`;
         }
-        
+
         // Prevent line breaks inside links by replacing them
-        let linkContent = content.trim().replace(/\n/g, ' ');
-        
+        const linkContent = content.trim().replace(/\n/g, ' ');
+
         return `[${linkContent}](${finalHref}${title ? ` "${title}"` : ''})`;
       }
     });
@@ -195,18 +195,18 @@ export class HtmlToMarkdownTransformer {
       replacement: (content, node, options) => {
         const parent = node.parentNode;
         const isOrdered = parent && parent.nodeName === 'OL';
-        
+
         // Handle index properly for ordered lists
         const index = parent ? Array.from(parent.childNodes || [])
           .filter(n => n.nodeType === 1 && (n as HTMLElement).tagName === 'LI')
           .indexOf(node as HTMLElement) + 1 : 1;
-        
+
         const prefix = isOrdered ? `${index}. ` : `${options.bulletListMarker} `;
-        
+
         // Ensure proper indentation for nested lists
         let nestedContent = content.trim();
         nestedContent = nestedContent.replace(/\n/g, '\n  ');
-        
+
         return `\n${prefix}${nestedContent}`;
       }
     });
@@ -226,20 +226,20 @@ export class HtmlToMarkdownTransformer {
         const alt = (node as HTMLElement).getAttribute('alt') || '';
         const src = (node as HTMLElement).getAttribute('src') || '';
         const title = (node as HTMLElement).getAttribute('title') || '';
-        
+
         if (!src) return '';
-        
+
         // Handle base64 images - either remove or limit them
         if (src.startsWith('data:image')) {
           return '![' + alt + '](Base64-Image-Removed)';
         }
-        
+
         // Format images consistently and ensure proper URL formatting
         let finalSrc = src;
         if (!src.startsWith('http') && !src.startsWith('data:')) {
           finalSrc = src.startsWith('/') ? `${this.baseUrl}${src}` : `${this.baseUrl}/${src}`;
         }
-        
+
         return `![${alt}](${finalSrc}${title ? ` "${title}"` : ''})`;
       }
     });
@@ -247,8 +247,8 @@ export class HtmlToMarkdownTransformer {
     // Remove empty or whitespace-only paragraphs
     this.turndownService.addRule('removeEmptyParagraphs', {
       filter: (node) => {
-        return node.nodeName === 'P' && 
-               (!node.textContent || node.textContent.trim() === '') && 
+        return node.nodeName === 'P' &&
+               (!node.textContent || node.textContent.trim() === '') &&
                !node.childNodes.length;
       },
       replacement: () => ''
@@ -277,30 +277,30 @@ export class HtmlToMarkdownTransformer {
 
     // Remove definitely unwanted elements first
     $('script, style, noscript, meta, link[rel="stylesheet"]').remove();
-    
+
     if (!onlyMainContent) {
       // If not extracting only main content, just do basic cleaning
       this.removeUnwantedElements($);
       return $.html();
     }
-    
+
     // First, set a special attribute on headings to make sure we can find them again
     $('h1, h2, h3, h4, h5, h6').attr('data-preserve-heading', 'true');
-    
+
     // Try advanced content extraction
     const extractedContent = this.extractMainContent(html);
     if (extractedContent && extractedContent.trim().length > 0) {
       // Load the extracted content into a new Cheerio instance for final cleaning
       const $extracted = cheerio.load(extractedContent);
-      
+
       // Check if we have headings in the extracted content
       const extractedHeadings = $extracted('[data-preserve-heading="true"]').length;
       logger.debug(`Extracted content contains ${extractedHeadings} preserved headings`);
-      
+
       if (extractedHeadings === 0) {
         // If no headings, this might not be the right content - try an alternative approach
         logger.debug('No headings in extracted content, attempting heading-based extraction');
-        
+
         // Try a heading-based approach - get all h1, h2 elements and their content
         const headingContent = this.extractHeadingsAndContent($);
         if (headingContent && headingContent.trim().length > 0) {
@@ -308,17 +308,17 @@ export class HtmlToMarkdownTransformer {
           return headingContent;
         }
       }
-      
+
       // Apply final cleaning to the extracted content
       this.removeUnwantedElements($extracted);
-      
+
       // Check heading count after cleaning
       const finalHeadings = $extracted('[data-preserve-heading="true"]').length;
       logger.debug(`After cleaning, extracted content has ${finalHeadings} headings`);
-      
+
       return $extracted.html() || '';
     }
-    
+
     // If extraction failed, fall back to heading-based approach
     logger.debug('Initial extraction failed, trying heading-based approach');
     const headingContent = this.extractHeadingsAndContent($);
@@ -326,10 +326,10 @@ export class HtmlToMarkdownTransformer {
       logger.debug('Successfully extracted content using heading-based approach');
       return headingContent;
     }
-    
+
     // If all else fails, use the previous approach
     this.removeUnwantedElements($);
-    
+
     // If still no main content found, remove non-main elements
     EXCLUDE_NON_MAIN_TAGS.forEach(selector => {
       $(selector).each((_, el) => {
@@ -337,7 +337,7 @@ export class HtmlToMarkdownTransformer {
         if ($(el).is('[data-preserve-heading="true"]') || $(el).find('[data-preserve-heading="true"]').length > 0) {
           return;
         }
-        
+
         // Check if the element contains any forced include elements before removing
         let shouldKeep = false;
         FORCE_INCLUDE_MAIN_TAGS.forEach(includeSelector => {
@@ -345,17 +345,17 @@ export class HtmlToMarkdownTransformer {
             shouldKeep = true;
           }
         });
-        
+
         if (!shouldKeep) {
           $(el).remove();
         }
       });
     });
-    
+
     // Log the final heading count
     const finalHeadings = $('[data-preserve-heading="true"]').length;
     logger.debug(`Final HTML contains ${finalHeadings} headings`);
-    
+
     return $.html();
   }
 
@@ -365,11 +365,11 @@ export class HtmlToMarkdownTransformer {
   private extractHeadingsAndContent($: cheerio.CheerioAPI): string {
     const $container = this.createContentContainer();
     const headings = this.getTopLevelHeadings($);
-    
+
     if (!this.hasValidHeadings(headings)) {
       return '';
     }
-    
+
     this.processHeadings($, headings, $container);
     return this.getContainerHtml($container);
   }
@@ -422,10 +422,10 @@ export class HtmlToMarkdownTransformer {
     $('*').each((_, el) => {
       // Using type assertion to access attribs
       const element = el as any;
-      
+
       // Skip if element doesn't have attributes
       if (!element.attribs) return;
-      
+
       const attrs = element.attribs;
       Object.keys(attrs).forEach(attr => {
         // Keep only essential attributes
@@ -459,7 +459,7 @@ export class HtmlToMarkdownTransformer {
           const content = $(cell).html() || '';
           $(cell).replaceWith(`<th>${content}</th>`);
         });
-        
+
         const thead = $('<thead></thead>');
         thead.append(firstRow);
         $(table).prepend(thead);
@@ -490,7 +490,7 @@ export class HtmlToMarkdownTransformer {
       logger.debug('No h1/h2 headings found for extraction');
       return false;
     }
-    
+
     logger.debug(`Found ${headings.length} h1/h2 headings for extraction`);
     return true;
   }
@@ -502,7 +502,7 @@ export class HtmlToMarkdownTransformer {
     for (let i = 0; i < headings.length; i++) {
       const heading = $(headings[i]);
       const nextHeading = this.getNextHeading(headings, i);
-      
+
       this.extractHeadingSection($, heading, nextHeading, $container);
     }
   }
@@ -518,13 +518,13 @@ export class HtmlToMarkdownTransformer {
    * Extract content for a single heading section
    */
   private extractHeadingSection(
-    $: cheerio.CheerioAPI, 
-    heading: cheerio.Cheerio<any>, 
-    nextHeading: cheerio.Cheerio<any> | null, 
+    $: cheerio.CheerioAPI,
+    heading: cheerio.Cheerio<any>,
+    nextHeading: cheerio.Cheerio<any> | null,
     $container: cheerio.Cheerio<any>
   ): void {
     $container.append(heading.clone());
-    
+
     if (nextHeading) {
       this.extractContentUntilNextHeading(heading, nextHeading, $container);
     } else {
@@ -536,8 +536,8 @@ export class HtmlToMarkdownTransformer {
    * Extract content until next heading
    */
   private extractContentUntilNextHeading(
-    heading: cheerio.Cheerio<any>, 
-    nextHeading: cheerio.Cheerio<any>, 
+    heading: cheerio.Cheerio<any>,
+    nextHeading: cheerio.Cheerio<any>,
     $container: cheerio.Cheerio<any>
   ): void {
     let current = heading[0].nextSibling;
@@ -553,19 +553,19 @@ export class HtmlToMarkdownTransformer {
    * Extract content until end of document or next heading
    */
   private extractContentUntilEnd(
-    $: cheerio.CheerioAPI, 
-    heading: cheerio.Cheerio<any>, 
+    $: cheerio.CheerioAPI,
+    heading: cheerio.Cheerio<any>,
     $container: cheerio.Cheerio<any>
   ): void {
     let current = heading[0].nextSibling;
     let contentAdded = 0;
-    
+
     while (current && contentAdded < 10000) {
       if (this.isElementNode(current)) {
         if (this.shouldStopAtHeading(current)) {
           break;
         }
-        
+
         $container.append($(current).clone());
         contentAdded += $(current).text().length;
       }
@@ -595,13 +595,13 @@ export class HtmlToMarkdownTransformer {
     const $result = $container.parent();
     return $result.html() || '';
   }
-  
+
   /**
    * Extract main content using multiple strategies
    */
   private extractMainContent(html: string): string {
     const $ = cheerio.load(html);
-    
+
     // First attempt: Try known content selectors
     const mainContentSelector = this.findBestContentSelector($);
     if (mainContentSelector) {
@@ -610,7 +610,7 @@ export class HtmlToMarkdownTransformer {
         return $('<div>').append(mainContent.clone()).html() || '';
       }
     }
-    
+
     // Second attempt: Use text density analysis
     return this.extractByTextDensity($);
   }
@@ -622,7 +622,7 @@ export class HtmlToMarkdownTransformer {
     // Try each selector and score based on content metrics
     let bestScore = 0;
     let bestSelector = null;
-    
+
     for (const selector of MAIN_CONTENT_SELECTORS) {
       const element = $(selector);
       if (element.length) {
@@ -633,7 +633,7 @@ export class HtmlToMarkdownTransformer {
         }
       }
     }
-    
+
     return bestSelector;
   }
 
@@ -644,39 +644,39 @@ export class HtmlToMarkdownTransformer {
     // Text length (longer = better)
     const text = element.text().trim();
     const textLength = text.length;
-    
+
     // Text/HTML ratio (higher = better)
     const html = element.html() || '';
     const htmlLength = html.length;
     const textToHtmlRatio = htmlLength > 0 ? textLength / htmlLength : 0;
-    
+
     // Presence of headings, paragraphs, lists (more = better)
     const paragraphs = element.find('p').length;
     const headings = element.find('h1, h2, h3, h4, h5, h6').length;
     const listItems = element.find('li').length;
-    
+
     // Fewer links proportional to content (fewer = better)
     const links = element.find('a').length;
     const linkDensity = textLength > 0 ? links * 100 / textLength : 100;
-    
+
     // Score calculation
-    let score = (textLength * 0.1) + 
-                (paragraphs * 5) + 
-                (headings * 10) + 
-                (listItems * 2) + 
-                (textToHtmlRatio * 20) - 
+    let score = (textLength * 0.1) +
+                (paragraphs * 5) +
+                (headings * 10) +
+                (listItems * 2) +
+                (textToHtmlRatio * 20) -
                 (linkDensity * 2);
-                
+
     // Adjust score based on content fingerprints
     for (const fingerprint of this.contentFingerprints) {
       if (element.is(fingerprint.selector) || element.find(fingerprint.selector).length > 0) {
         score += fingerprint.weight;
       }
     }
-    
+
     return score;
   }
-  
+
   /**
    * Check if an element contains rich content
    */
@@ -684,7 +684,7 @@ export class HtmlToMarkdownTransformer {
     const text = element.text().trim();
     const paragraphs = element.find('p').length;
     const headings = element.find('h1, h2, h3, h4, h5, h6').length;
-    
+
     // Consider content rich if it has significant text and some structure
     return text.length > 250 || (paragraphs >= 3) || (headings >= 1 && paragraphs >= 1);
   }
@@ -695,40 +695,40 @@ export class HtmlToMarkdownTransformer {
   private extractByTextDensity($: cheerio.CheerioAPI): string {
     // Calculate text density for all container elements
     const candidates: {element: any, score: number}[] = [];
-    
+
     $('div, section, article, main').each((_, el) => {
       const $el = $(el);
-      
+
       // Skip if it's likely navigation/sidebar/footer
       if (this.isLikelyNonContent($el)) return;
-      
+
       // Calculate text density (text length / element size)
       const textLength = $el.text().trim().length;
       const numElements = $el.find('*').length;
       const density = numElements > 0 ? textLength / numElements : 0;
-      
+
       // Calculate other quality signals
       const paragraphs = $el.find('p').length;
       const headings = $el.find('h1, h2, h3, h4, h5, h6').length;
       const links = $el.find('a').length;
       const linkDensity = textLength > 0 ? links * 100 / textLength : 100;
-      
+
       // Score based on multiple factors
-      const score = (density * 10) + 
-                   (paragraphs * 5) + 
-                   (headings * 10) - 
+      const score = (density * 10) +
+                   (paragraphs * 5) +
+                   (headings * 10) -
                    (linkDensity * 2);
-                   
+
       candidates.push({ element: $el, score });
     });
-    
+
     // Sort by score and take the highest scoring element
     candidates.sort((a, b) => b.score - a.score);
-    
+
     if (candidates.length && candidates[0].score > CONTENT_THRESHOLD) {
       return $('<div>').append(candidates[0].element.clone()).html() || '';
     }
-    
+
     // Fallback to original approach if no good candidate is found
     return $.html();
   }
@@ -752,24 +752,24 @@ export class HtmlToMarkdownTransformer {
     // Check for signals that indicate non-content
     const classId = (element.attr('class') || '') + ' ' + (element.attr('id') || '');
     const text = element.text().trim();
-    
+
     // Check against common non-content patterns
     const nonContentPatterns = [
       /comment/i, /sidebar/i, /footer/i, /header/i, /nav/i, /menu/i,
       /share/i, /social/i, /widget/i, /banner/i, /ad-/i, /-ad/i
     ];
-    
+
     for (const pattern of nonContentPatterns) {
       if (pattern.test(classId)) return true;
     }
-    
+
     // Check for excessive links
     const linkTextLength = element.find('a').text().length;
     const totalTextLength = text.length;
     if (totalTextLength > 0 && linkTextLength / totalTextLength > 0.5) {
       return true; // More than 50% of text is in links
     }
-    
+
     return false;
   }
 
@@ -780,62 +780,62 @@ export class HtmlToMarkdownTransformer {
     return markdown
       // Normalize newlines first
       .replace(/\r\n/g, '\n')
-      
+
       // Remove leading/trailing whitespace
       .trim()
-      
+
       // Replace repeated blank lines with just two newlines
       .replace(/\n{3,}/g, '\n\n')
-      
+
       // Fix spacing around headings (ensure heading has empty lines around it)
       .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
       .replace(/(#+\s[^\n]{0,500}?)\n([^\n])/g, '$1\n\n$2')
-      
+
       // Improve list formatting
       .replace(/\n(\s{0,20}[-*+])\s{2,}/g, '\n$1 ')
-      
+
       // Improve code block formatting
       .replace(/\n```([^`\n]{0,100}?)\n/g, '\n\n```$1\n')
       .replace(/\n([^`\n]{1,200}?)```\n/g, '\n$1```\n\n')
-      
+
       // Remove trailing whitespace on lines
       .replace(/[ \t]*$/gm, '')
-      
+
       // Make sure links have spaces from surrounding text when needed
       .replace(/([a-z0-9])(\[[^\]]{0,200}?\]\([^)]{0,500}?\))/g, '$1 $2')
       .replace(/(\[[^\]]{0,200}?\]\([^)]{0,500}?\))([a-z0-9])/g, '$1 $2')
-      
+
       // Normalize URLs to absolute paths
       .replace(/\]\(([^)]{1,500}?)\)/g, (match, url) => {
         // Skip URLs that are already absolute or anchors
         if (!url || url.startsWith('http') || url.startsWith('#') || url.startsWith('mailto:')) {
           return match;
         }
-        
+
         if (url.startsWith('/')) {
           return `](${this.baseUrl}${url})`;
         } else {
           return `](${this.baseUrl}/${url})`;
         }
       })
-      
+
       // Fix inconsistent table formatting
       .replace(/\n\s{0,10}\|\s{0,10}\n/g, '\n|\n')
-      
+
       // Ensure paragraphs are separated by blank lines
       .replace(/([^\n])\n([^\n\s#>*-])/g, '$1\n\n$2')
-      
+
       // Remove "Skip to content" and similar accessibility links
       .replace(/\[Skip to [cC]ontent\]\([^)]{0,200}?\)/g, '')
       .replace(/\[Skip to main content\]\([^)]{0,200}?\)/g, '')
       .replace(/\[Skip to navigation\]\([^)]{0,200}?\)/g, '')
-      
+
       // Remove lines with just whitespace
       .replace(/^\s+$/gm, '')
-      
+
       // Process multi-line links by escaping newlines in link text
       .replace(/\[([^\]\n]{0,200})\n([^\]\n]{0,200})\]/g, '[$1 $2]')
-      
+
       // Final normalization to ensure consistent newlines
       .replace(/\n{3,}/g, '\n\n')
       .trim();
@@ -847,7 +847,7 @@ export class HtmlToMarkdownTransformer {
   transform(scraperResponse: ScraperResponse): ScraperResponse {
     try {
       logger.info(`Transforming HTML to Markdown for URL: ${scraperResponse.url}`);
-      
+
       if (!scraperResponse.content) {
         logger.warn('Content is empty, skipping transformation');
         return {
@@ -856,7 +856,7 @@ export class HtmlToMarkdownTransformer {
           content: ''
         };
       }
-      
+
       // Force content type to html if we're trying to transform it
       if (scraperResponse.contentType !== 'html') {
         logger.warn(`Content type is not HTML (${scraperResponse.contentType}), forcing to HTML for transformation`);
@@ -867,7 +867,7 @@ export class HtmlToMarkdownTransformer {
       const $ = cheerio.load(scraperResponse.content);
       const headingCount = $('h1, h2, h3, h4, h5, h6').length;
       logger.info(`Original HTML contains ${headingCount} headings`);
-      
+
       // Log the first 200 chars of the HTML for debugging
       logger.debug(`First 200 chars of HTML: ${scraperResponse.content.substring(0, 200)}...`);
 
@@ -882,7 +882,7 @@ export class HtmlToMarkdownTransformer {
       // Pre-clean the HTML - enable main content extraction by default
       const cleanedHtml = this.cleanHtml(scraperResponse.content, true);
       logger.debug(`HTML cleaned successfully. Size: ${cleanedHtml.length} characters`);
-      
+
       // Check if headings were preserved
       const $cleaned = cheerio.load(cleanedHtml);
       const cleanedHeadingCount = $cleaned('h1, h2, h3, h4, h5, h6').length;
@@ -891,18 +891,18 @@ export class HtmlToMarkdownTransformer {
       // Convert HTML to Markdown
       const markdown = this.turndownService.turndown(cleanedHtml);
       logger.debug(`Raw markdown generated. Size: ${markdown.length} characters`);
-      
+
       // Check for headings in the markdown
       const headingLines = markdown.match(/^#+\s.+$/gm);
       logger.info(`Markdown contains ${headingLines?.length || 0} heading lines`);
-      
+
       // Post-process the markdown
       const cleanedMarkdown = this.cleanMarkdown(markdown);
       logger.debug(`Cleaned markdown. Size: ${cleanedMarkdown.length} characters`);
-      
+
       // Log the first 200 chars of the markdown for debugging
       logger.debug(`First 200 chars of markdown: ${cleanedMarkdown.substring(0, 200)}...`);
-      
+
       // Create a new response with markdown content
       const result: ScraperResponse = {
         ...scraperResponse,
@@ -914,7 +914,7 @@ export class HtmlToMarkdownTransformer {
       return result;
     } catch (error) {
       logger.error(`Error transforming HTML to Markdown: ${error instanceof Error ? error.message : String(error)}`);
-      
+
       // Return original response with error
       return {
         ...scraperResponse,
@@ -925,4 +925,4 @@ export class HtmlToMarkdownTransformer {
 
   // Base URL for fixing relative links
   private baseUrl: string = '';
-} 
+}

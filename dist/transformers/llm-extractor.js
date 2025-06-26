@@ -15,7 +15,7 @@ function limitTextSize(text, maxTokens = 15000) {
     }
     // If text is too long, cut it and add a note
     return text.substring(0, maxCharacters) +
-        "\n\n[Note: Content was truncated due to length limitations.]";
+        '\n\n[Note: Content was truncated due to length limitations.]';
 }
 class LLMExtractor {
     constructor(llmService) {

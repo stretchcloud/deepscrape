@@ -1,8 +1,7 @@
 import { chromium, Browser, Page, Route, Request } from 'playwright';
 import { randomBytes } from 'crypto';
 import { logger } from '../utils/logger';
-import { ScraperOptions, BrowserAction, ScraperResponse } from '../types';
-import { AD_SERVING_DOMAINS } from '../types';
+import { ScraperOptions, BrowserAction, ScraperResponse, AD_SERVING_DOMAINS } from '../types';
 import { PlaywrightService, PlaywrightOptions } from '../services/playwright.service';
 
 /**
@@ -76,12 +75,12 @@ export class PlaywrightScraper {
     const timestamp = Date.now();
     const sessionId = `${timestamp.toString(36)}-${randomBytes(8).toString('hex')}`;
     const ubidValue = `${timestamp.toString(36)}-${randomBytes(12).toString('hex')}`;
-    
+
     await context.addCookies([
       { name: 'session-id', value: sessionId, domain: '.amazon.com', path: '/' },
       { name: 'ubid-main', value: ubidValue, domain: '.amazon.com', path: '/' }
     ]);
-    
+
     await context.setExtraHTTPHeaders({
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
@@ -103,7 +102,7 @@ export class PlaywrightScraper {
     if (blockAds || blockResources) {
       await this.setupResourceBlocking(page, blockAds, blockResources);
     }
-    
+
     if (options.headers) {
       await page.setExtraHTTPHeaders(options.headers);
     }
@@ -114,7 +113,7 @@ export class PlaywrightScraper {
    */
   private async navigateToUrl(page: any, url: string, isAmazon: boolean, timeout: number): Promise<void> {
     logger.info(`Navigating to URL: ${url}`);
-    
+
     if (isAmazon) {
       await page.goto('https://www.amazon.com', { timeout, waitUntil: 'domcontentloaded' });
       // Note: Math.random() is safe here - used only for timing randomization to mimic human behavior
@@ -138,20 +137,20 @@ export class PlaywrightScraper {
         logger.warn(`Timeout waiting for selector: ${options.waitForSelector}`);
       }
     }
-    
+
     // Amazon-specific scrolling
     if (isAmazon) {
       logger.info('Performing random scrolling for Amazon page');
       await this.performRandomScrolling(page);
     }
-    
+
     // Additional wait time
     const waitTime = options.waitForTimeout !== undefined ? options.waitForTimeout : 0;
     if (waitTime > 0) {
       logger.info(`Waiting additional ${waitTime}ms`);
       await page.waitForTimeout(waitTime);
     }
-    
+
     // Execute actions
     if (options.actions && options.actions.length > 0) {
       logger.info(`Executing ${options.actions.length} actions`);
@@ -170,14 +169,14 @@ export class PlaywrightScraper {
     screenshot?: Buffer;
   }> {
     const title = await page.title();
-    
+
     // Get response info
     let status = 0;
-    let headers: Record<string, string> = {};
+    const headers: Record<string, string> = {};
     try {
       const responseInfo = await page.evaluate(() => {
         const perf = window.performance.getEntriesByType('navigation')[0] as any;
-        return { 
+        return {
           status: perf?.responseStatus || 0,
           headers: {}
         };
@@ -186,18 +185,18 @@ export class PlaywrightScraper {
     } catch (error) {
       logger.warn(`Could not get response info: ${error}`);
     }
-    
+
     // Extract content
-    const content = isAmazon ? 
-      await this.extractAmazonProductData(page) : 
+    const content = isAmazon ?
+      await this.extractAmazonProductData(page) :
       await page.content();
-    
+
     // Take screenshot if requested
     let screenshot;
     if (options.fullPage) {
       screenshot = await page.screenshot({ fullPage: true, type: 'png' });
     }
-    
+
     return { title, content, status, headers, screenshot };
   }
 
@@ -224,44 +223,44 @@ export class PlaywrightScraper {
    */
   async scrape(url: string, options: ScraperOptions = {}): Promise<ScraperResponse> {
     const startTime = Date.now();
-    
+
     try {
       if (options.useBrowser) {
         return await this.scrapeWithPlaywrightService(url, options);
       }
-      
+
       const { isEcommerce, isAmazon } = this.isEcommerceSite(url);
       const { timeout, blockAds, blockResources, userAgent } = this.getDefaultOptions(options);
-      
+
       let browser: Browser | null = null;
-      
+
       try {
         if (isEcommerce) {
           logger.info('E-commerce site detected, using enhanced anti-bot measures');
         }
-        
+
         logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions || {})}`);
         const launchOptions = this.buildLaunchOptions(options, isEcommerce);
-        
+
         browser = await chromium.launch(launchOptions);
         const context = await browser.newContext({
           userAgent,
           viewport: { width: 1920, height: 1080 },
           ignoreHTTPSErrors: true
         });
-        
+
         await this.setupEcommerceContext(context, isEcommerce);
-        
+
         const page = await context.newPage();
         await this.setupPage(page, options, blockAds, blockResources);
         await this.navigateToUrl(page, url, isAmazon, timeout);
         await this.handlePostNavigation(page, url, options, isAmazon, timeout);
-        
+
         const { title, content, status, headers, screenshot } = await this.extractPageData(page, url, isAmazon, options);
-        
+
         const loadTime = Date.now() - startTime;
         logger.info(`Page loaded in ${loadTime}ms`);
-        
+
         return {
           url,
           title,
@@ -293,7 +292,7 @@ export class PlaywrightScraper {
   private async scrapeWithPlaywrightService(url: string, options: ScraperOptions): Promise<ScraperResponse> {
     logger.info(`Scraping with enhanced PlaywrightService: ${url}`);
     const startTime = Date.now();
-    
+
     try {
       // Convert ScraperOptions to PlaywrightOptions
       const playwrightOptions: PlaywrightOptions = {
@@ -306,14 +305,14 @@ export class PlaywrightScraper {
         logRequests: false,
         userAgent: options.userAgent,
         viewport: { width: 1920, height: 1080 },
-        
+
         // Rate limiting options
         minDelay: options.minDelay,
         maxDelay: options.maxDelay,
         maxRetries: options.maxRetries,
         backoffFactor: options.backoffFactor,
         rotateUserAgent: options.rotateUserAgent,
-        
+
         // Proxy options
         proxy: options.proxy,
         proxyUsername: options.proxyUsername,
@@ -321,10 +320,10 @@ export class PlaywrightScraper {
         proxyRotation: options.proxyRotation,
         proxyList: options.proxyList
       };
-      
+
       // Crawl the page using our enhanced service
       const response = await this.playwrightService.crawlPage(url, playwrightOptions);
-      
+
       // Convert the response to ScraperResponse format
       return {
         url: response.url,
@@ -342,7 +341,7 @@ export class PlaywrightScraper {
       };
     } catch (error) {
       logger.error(`Error in enhanced scraping: ${error instanceof Error ? error.message : String(error)}`);
-      
+
       return {
         url,
         title: '',
@@ -367,19 +366,19 @@ export class PlaywrightScraper {
       const request = route.request();
       const url = request.url();
       const resourceType = request.resourceType();
-      
+
       // Block ad-serving domains
       if (blockAds && AD_SERVING_DOMAINS.some(domain => url.includes(domain))) {
         logger.debug(`Blocking ad resource: ${url}`);
         return route.abort();
       }
-      
+
       // Block various resource types if blockResources is enabled
       if (blockResources && ['image', 'font', 'stylesheet', 'media'].includes(resourceType)) {
         logger.debug(`Blocking resource: ${resourceType} - ${url}`);
         return route.abort();
       }
-      
+
       // Allow other requests
       return route.continue();
     });
@@ -390,21 +389,21 @@ export class PlaywrightScraper {
    */
   private async performRandomScrolling(page: Page): Promise<void> {
     const scrollPositions = [300, 600, 1000, 1500, 2000, 2500];
-    
+
     for (const position of scrollPositions) {
       await page.evaluate((pos) => {
         window.scrollTo(0, pos);
       }, position);
-      
+
       // Random wait between scrolls (Math.random() safe here - for timing variation only)
       await page.waitForTimeout(500 + Math.random() * 1000);
     }
-    
+
     // Scroll back up randomly
     await page.evaluate(() => {
       window.scrollTo(0, 1000);
     });
-    
+
     // Math.random() safe here - used for human-like timing variation
     await page.waitForTimeout(500 + Math.random() * 1000);
   }
@@ -509,26 +508,26 @@ export class PlaywrightScraper {
   private async extractAmazonProductData(page: Page): Promise<string> {
     // Get the original HTML first as a fallback
     const originalHtml = await page.content();
-    
+
     try {
       // Extract key product information using Amazon's specific selectors
       const productInfo = await page.evaluate(() => {
         // Common selectors for Amazon product pages
         const productTitle = document.querySelector('#productTitle')?.textContent?.trim() || '';
         const brand = document.querySelector('#bylineInfo')?.textContent?.trim() || '';
-        const price = document.querySelector('.a-price .a-offscreen')?.textContent?.trim() || 
-                     document.querySelector('#priceblock_ourprice')?.textContent?.trim() || 
+        const price = document.querySelector('.a-price .a-offscreen')?.textContent?.trim() ||
+                     document.querySelector('#priceblock_ourprice')?.textContent?.trim() ||
                      document.querySelector('#corePrice_feature_div .a-price .a-offscreen')?.textContent?.trim() || '';
-        
-        const rating = document.querySelector('#acrPopover')?.getAttribute('title')?.trim() || 
+
+        const rating = document.querySelector('#acrPopover')?.getAttribute('title')?.trim() ||
                       document.querySelector('.a-icon-star')?.textContent?.trim() || '';
-        
+
         // Technical specifications
         const techSpecs: Record<string, string> = {};
-        const techSpecsTable = document.querySelector('.a-section.a-spacing-medium.a-spacing-top-small .a-section.a-spacing-small table') || 
+        const techSpecsTable = document.querySelector('.a-section.a-spacing-medium.a-spacing-top-small .a-section.a-spacing-small table') ||
                                document.querySelector('#productDetails_techSpec_section_1') ||
                                document.querySelector('#productDetails_detailBullets_sections1');
-        
+
         if (techSpecsTable) {
           const rows = techSpecsTable.querySelectorAll('tr');
           rows.forEach(row => {
@@ -539,7 +538,7 @@ export class PlaywrightScraper {
             }
           });
         }
-        
+
         // Get bullet points for features
         const features: string[] = [];
         const featuresList = document.querySelector('#feature-bullets ul');
@@ -550,14 +549,14 @@ export class PlaywrightScraper {
             if (text) features.push(text);
           });
         }
-        
+
         // Enhanced content for product description
         const productDescription = document.querySelector('#productDescription')?.innerHTML || '';
-        
+
         // Product details
         const detailBullets = document.querySelector('#detailBullets_feature_div');
         const detailBulletsContent = detailBullets ? detailBullets.innerHTML : '';
-        
+
         // Compile all the data with HTML structure
         const enhancedHTML = `
           <div id="enhanced-product-data">
@@ -595,10 +594,10 @@ export class PlaywrightScraper {
             </div>
           </div>
         `;
-        
+
         return enhancedHTML;
       });
-      
+
       // Combine the enhanced product info with the original HTML
       return `
         ${originalHtml}
@@ -611,4 +610,4 @@ export class PlaywrightScraper {
       return originalHtml;
     }
   }
-} 
+}

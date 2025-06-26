@@ -18,26 +18,26 @@ export class UrlNormalizationService {
   static normalizeUrl(url: string): string {
     try {
       const parsedUrl = new URL(url);
-      
+
       // Remove common tracking parameters
       this.TRACKING_PARAMS.forEach(param => {
         parsedUrl.searchParams.delete(param);
       });
-      
+
       // Remove fragment (hash)
       parsedUrl.hash = '';
-      
+
       // Normalize trailing slash for paths (but not for root)
       if (parsedUrl.pathname.endsWith('/') && parsedUrl.pathname.length > 1) {
         parsedUrl.pathname = parsedUrl.pathname.slice(0, -1);
       }
-      
+
       // Sort search parameters for consistency
       parsedUrl.searchParams.sort();
-      
+
       // Convert to lowercase hostname
       parsedUrl.hostname = parsedUrl.hostname.toLowerCase();
-      
+
       return parsedUrl.href;
     } catch (error) {
       logger.warn(`Failed to normalize URL: ${url}`, { error: (error as Error).message });
@@ -52,15 +52,15 @@ export class UrlNormalizationService {
   static generateSimilarUrls(url: string): string[] {
     const normalized = this.normalizeUrl(url);
     const variations: string[] = [normalized];
-    
+
     try {
       const parsedUrl = new URL(normalized);
-      
+
       this.addSlashVariations(normalized, variations);
       this.addWwwVariations(parsedUrl, normalized, variations);
       this.addProtocolVariations(parsedUrl, normalized, variations);
       this.addIndexHtmlVariations(parsedUrl, normalized, variations);
-      
+
       return [...new Set(variations)];
     } catch (error) {
       logger.warn(`Failed to generate similar URLs for: ${url}`, { error: (error as Error).message });
@@ -74,7 +74,7 @@ export class UrlNormalizationService {
   static areUrlsSimilar(url1: string, url2: string): boolean {
     const variations1 = this.generateSimilarUrls(url1);
     const normalized2 = this.normalizeUrl(url2);
-    
+
     return variations1.includes(normalized2);
   }
 
@@ -103,7 +103,7 @@ export class UrlNormalizationService {
       '.exe', '.dmg', '.pkg', '.deb', '.rpm',
       '.iso', '.img'
     ];
-    
+
     try {
       const parsedUrl = new URL(url);
       const path = parsedUrl.pathname.toLowerCase();
@@ -119,22 +119,22 @@ export class UrlNormalizationService {
   static isValidUrl(url: string): boolean {
     try {
       const parsedUrl = new URL(url);
-      
+
       // Check protocol
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
         return false;
       }
-      
+
       // Check if hostname exists
       if (!parsedUrl.hostname || parsedUrl.hostname.length === 0) {
         return false;
       }
-      
+
       // Check for localhost or internal IPs in production
       if (process.env.NODE_ENV === 'production') {
         const hostname = parsedUrl.hostname.toLowerCase();
-        if (hostname === 'localhost' || 
-            hostname.startsWith('127.') || 
+        if (hostname === 'localhost' ||
+            hostname.startsWith('127.') ||
             hostname.startsWith('192.168.') ||
             hostname.startsWith('10.') ||
             hostname.startsWith('172.16.') ||
@@ -142,7 +142,7 @@ export class UrlNormalizationService {
           return false;
         }
       }
-      
+
       return true;
     } catch (error) {
       return false;
@@ -155,10 +155,10 @@ export class UrlNormalizationService {
   static getUrlDepth(url: string): number {
     try {
       const parsedUrl = new URL(url);
-      const path = parsedUrl.pathname.endsWith('/') 
-        ? parsedUrl.pathname.slice(0, -1) 
+      const path = parsedUrl.pathname.endsWith('/')
+        ? parsedUrl.pathname.slice(0, -1)
         : parsedUrl.pathname;
-        
+
       if (path === '' || path === '/') return 0;
       return path.split('/').filter(Boolean).length;
     } catch (error) {
@@ -175,7 +175,7 @@ export class UrlNormalizationService {
       withSlash.pathname += '/';
       variations.push(withSlash.href);
     }
-    
+
     const withoutSlash = new URL(normalized);
     if (withoutSlash.pathname.endsWith('/') && withoutSlash.pathname.length > 1) {
       withoutSlash.pathname = withoutSlash.pathname.slice(0, -1);
@@ -201,7 +201,7 @@ export class UrlNormalizationService {
     const withoutWww = new URL(normalized);
     withoutWww.hostname = withoutWww.hostname.replace('www.', '');
     variations.push(withoutWww.href);
-    
+
     const withoutWwwWithSlash = new URL(withoutWww.href);
     if (!withoutWwwWithSlash.pathname.endsWith('/')) {
       withoutWwwWithSlash.pathname += '/';
@@ -216,7 +216,7 @@ export class UrlNormalizationService {
     const withWww = new URL(normalized);
     withWww.hostname = 'www.' + withWww.hostname;
     variations.push(withWww.href);
-    
+
     const withWwwWithSlash = new URL(withWww.href);
     if (!withWwwWithSlash.pathname.endsWith('/')) {
       withWwwWithSlash.pathname += '/';
@@ -245,12 +245,12 @@ export class UrlNormalizationService {
   private static addIndexHtmlVariations(parsedUrl: URL, normalized: string, variations: string[]): void {
     if (!parsedUrl.pathname.includes('.')) {
       const withIndex = new URL(normalized);
-      withIndex.pathname = withIndex.pathname.endsWith('/') 
+      withIndex.pathname = withIndex.pathname.endsWith('/')
         ? withIndex.pathname + 'index.html'
         : withIndex.pathname + '/index.html';
       variations.push(withIndex.href);
     }
-    
+
     if (parsedUrl.pathname.endsWith('/index.html')) {
       const withoutIndex = new URL(normalized);
       withoutIndex.pathname = withoutIndex.pathname.replace('/index.html', '/');

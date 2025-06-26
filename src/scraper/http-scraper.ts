@@ -11,13 +11,13 @@ export class HttpScraper {
    */
   async scrape(url: string, options: ScraperOptions = {}): Promise<ScraperResponse> {
     const startTime = Date.now();
-    
+
     try {
       logger.info(`HTTP scraping URL: ${url}`);
-      
+
       const timeout = options.timeout ?? 30000;
       const userAgent = options.userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-      
+
       const response = await axios.get(url, {
         timeout,
         headers: {
@@ -32,15 +32,15 @@ export class HttpScraper {
         maxRedirects: 5,
         validateStatus: (status) => status < 400
       });
-      
+
       const loadTime = Date.now() - startTime;
-      
+
       // Extract title from HTML
       const titleMatch = response.data.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1].trim() : '';
-      
+
       logger.info(`HTTP scraping completed for ${url} in ${loadTime}ms`);
-      
+
       return {
         url,
         title,
@@ -55,7 +55,7 @@ export class HttpScraper {
       };
     } catch (error) {
       logger.error(`HTTP scraping error for ${url}: ${error instanceof Error ? error.message : String(error)}`);
-      
+
       return {
         url,
         title: '',
@@ -70,4 +70,4 @@ export class HttpScraper {
       };
     }
   }
-} 
+}

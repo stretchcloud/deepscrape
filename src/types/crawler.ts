@@ -77,6 +77,7 @@ export interface CrawlRequest {
   webhook?: string;
   strategy?: CrawlStrategy; // Added crawl strategy
   useBrowser?: boolean; // Option to use browser-based crawling with Playwright
+  useMapDiscovery?: boolean; // Option to use high-performance URL discovery before crawling
 }
 
 export interface CrawlResponse {
@@ -85,6 +86,8 @@ export interface CrawlResponse {
   url?: string;
   message?: string;
   outputDirectory?: string;
+  crawlType?: string;
+  streamingEnabled?: boolean;
   error?: string;
 }
 
@@ -138,4 +141,4 @@ export interface CrawlStatusResponse {
 export interface CrawlCancelResponse {
   success: boolean;
   error?: string;
-} 
+}

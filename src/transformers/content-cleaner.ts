@@ -15,7 +15,7 @@ export class ContentCleaner {
   clean(scraperResponse: ScraperResponse): ScraperResponse {
     try {
       logger.info(`Cleaning HTML content for URL: ${scraperResponse.url}`);
-      
+
       if (!this.isValidHtmlContent(scraperResponse)) {
         logger.warn('Content is not HTML or is empty, skipping cleaning');
         return scraperResponse;
@@ -23,46 +23,46 @@ export class ContentCleaner {
 
       const $ = cheerio.load(scraperResponse.content);
       this.logHeadingInfo($);
-      
+
       const mainContent = this.findMainContent($);
       this.cleanDocument($);
       const cleanedHtml = this.extractCleanedHtml($, mainContent);
-      
+
       return this.createCleanedResponse(scraperResponse, cleanedHtml);
     } catch (error) {
       return this.createErrorResponse(scraperResponse, error);
     }
   }
-  
+
   /**
    * Remove common ads, tracking scripts, and unwanted elements
    */
   private removeAdsAndTracking($: cheerio.CheerioAPI): void {
     // Remove scripts
     $('script').remove();
-    
+
     // Remove style tags
     $('style').remove();
-    
+
     // Remove common ad containers
     $('[id*="google_ad"], [id*="banner"], [id*="advertisement"], [class*="ad-"], [class*="ads-"], [class*="banner"]').remove();
-    
+
     // Remove tracking pixels and iframes
     $('iframe[src*="doubleclick"], iframe[src*="googlead"], iframe[src*="facebook"], img[src*="pixel"]').remove();
-    
+
     // Remove social sharing buttons
     $('[class*="share"], [class*="social"], [class*="twitter"], [class*="facebook"]').remove();
-    
+
     // Remove comments sections (common patterns)
     $('#comments, .comments, .comment-section, .disqus, #disqus_thread').remove();
-    
+
     // Remove newsletter signups, popups
     $('[class*="newsletter"], [class*="popup"], [class*="modal"], [id*="modal"], [id*="popup"]').remove();
-    
+
     // Remove navigation elements (optional, may want to keep these)
     // $('nav, .nav, .navigation, .menu, header, footer').remove();
   }
-  
+
   /**
    * Remove unnecessary attributes to clean up the HTML
    */
@@ -74,7 +74,7 @@ export class ContentCleaner {
       'style', 'class', 'id', // Sometimes you may want to keep these for structure
       'tabindex', 'role', 'aria-*', // Accessibility attributes
     ];
-    
+
     // For now, only remove event handlers and tracking attributes
     $('*').each((_i, el) => {
       for (const attr of Object.keys((el as any).attribs || {})) {
@@ -84,14 +84,14 @@ export class ContentCleaner {
       }
     });
   }
-  
+
   /**
    * Remove hidden elements that are not visible to the user
    */
   private removeHiddenElements($: cheerio.CheerioAPI): void {
     // Remove elements with inline styles hiding them
     $('[style*="display: none"], [style*="display:none"], [style*="visibility: hidden"], [style*="visibility:hidden"]').remove();
-    
+
     // Remove common hidden element classes
     $('.hidden, .hide, .invisible, .visually-hidden, .sr-only').remove();
   }
@@ -116,15 +116,15 @@ export class ContentCleaner {
    */
   private findMainContent($: cheerio.CheerioAPI): cheerio.Cheerio<any> | null {
     let mainContent = this.findMainContentBySelectors($);
-    
+
     if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
       mainContent = this.findMainContentByTextDensity($);
     }
-    
+
     if (!mainContent || mainContent.find('h1, h2, h3, h4, h5, h6').length === 0) {
       mainContent = this.constructContentFromHeadings($);
     }
-    
+
     return mainContent;
   }
 
@@ -140,13 +140,13 @@ export class ContentCleaner {
     ];
 
     let mainContent = null;
-    
+
     for (const selector of mainContentSelectors) {
       const element = $(selector);
-      
+
       if (this.isValidContentElement(element)) {
         const foundHeadings = element.find('h1, h2, h3, h4, h5, h6').length;
-        
+
         if (foundHeadings > 0) {
           mainContent = element;
           logger.info(`Found main content using selector: ${selector} with ${foundHeadings} headings`);
@@ -157,7 +157,7 @@ export class ContentCleaner {
         }
       }
     }
-    
+
     return mainContent;
   }
 
@@ -173,16 +173,16 @@ export class ContentCleaner {
    */
   private findMainContentByTextDensity($: cheerio.CheerioAPI): cheerio.Cheerio<any> | null {
     logger.info('No main content with headings found, using text density analysis');
-    
+
     const textBlocks = this.analyzeTextBlocks($);
-    
+
     if (textBlocks.length > 0) {
       const mainContent = $(textBlocks[0].element);
       const headingCount = mainContent.find('h1, h2, h3, h4, h5, h6').length;
       logger.info(`Using largest text block with score ${textBlocks[0].textLength} and ${headingCount} headings`);
       return mainContent;
     }
-    
+
     return null;
   }
 
@@ -191,17 +191,17 @@ export class ContentCleaner {
    */
   private analyzeTextBlocks($: cheerio.CheerioAPI): TextBlock[] {
     const textBlocks: TextBlock[] = [];
-    
+
     $('div, section, article').each((_, element) => {
       const text = $(element).text().trim();
       const headingCount = $(element).find('h1, h2, h3, h4, h5, h6').length;
       const score = text.length + (headingCount * 1000);
-      
+
       if (text.length > 300 || headingCount > 0) {
         textBlocks.push({ element, textLength: score });
       }
     });
-    
+
     return textBlocks.sort((a, b) => b.textLength - a.textLength);
   }
 
@@ -210,16 +210,16 @@ export class ContentCleaner {
    */
   private constructContentFromHeadings($: cheerio.CheerioAPI): cheerio.Cheerio<any> | null {
     logger.info('Creating artificial main content container with all heading sections');
-    
+
     const contentContainer = $('<div class="constructed-content"></div>');
     const topHeadings = $('h1, h2').toArray();
-    
+
     if (topHeadings.length > 0) {
       logger.info(`Found ${topHeadings.length} top-level headings to extract content from`);
       this.extractHeadingSections($, topHeadings, contentContainer);
       return contentContainer;
     }
-    
+
     return null;
   }
 
@@ -230,7 +230,7 @@ export class ContentCleaner {
     for (let i = 0; i < topHeadings.length; i++) {
       const heading = $(topHeadings[i]);
       const nextHeading = i < topHeadings.length - 1 ? $(topHeadings[i + 1]) : null;
-      
+
       contentContainer.append(heading.clone());
       this.extractContentBetweenHeadings(heading, nextHeading, contentContainer);
     }
@@ -240,8 +240,8 @@ export class ContentCleaner {
    * Extract content between two headings
    */
   private extractContentBetweenHeadings(
-    heading: cheerio.Cheerio<any>, 
-    nextHeading: cheerio.Cheerio<any> | null, 
+    heading: cheerio.Cheerio<any>,
+    nextHeading: cheerio.Cheerio<any> | null,
     contentContainer: cheerio.Cheerio<any>
   ): void {
     if (nextHeading) {
@@ -309,11 +309,11 @@ export class ContentCleaner {
     const $mainContentWrapper = cheerio.load('')('<div class="main-content-wrapper"></div>');
     $mainContentWrapper.append(mainContent.clone());
     const mainContentHtml = $mainContentWrapper.html() || '';
-    
+
     const $finalCheck = cheerio.load(mainContentHtml);
     const finalHeadings = $finalCheck('h1, h2, h3, h4, h5, h6').length;
     logger.info(`Final cleaned HTML contains ${finalHeadings} headings`);
-    
+
     return mainContentHtml;
   }
 
@@ -333,10 +333,10 @@ export class ContentCleaner {
    */
   private createErrorResponse(scraperResponse: ScraperResponse, error: any): ScraperResponse {
     logger.error(`Error cleaning HTML content: ${error instanceof Error ? error.message : String(error)}`);
-    
+
     return {
       ...scraperResponse,
       error: `Content cleaning error: ${error instanceof Error ? error.message : String(error)}`
     };
   }
-} 
+}

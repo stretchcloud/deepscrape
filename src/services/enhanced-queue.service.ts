@@ -100,7 +100,7 @@ export class EnhancedQueueService {
 
     this.queueEvents = new QueueEvents(queueName, { connection });
     this.setupEventListeners();
-    
+
     // Start dynamic scaling if enabled
     if (this.config.enableDynamicScaling) {
       this.startDynamicScaling();
@@ -116,8 +116,8 @@ export class EnhancedQueueService {
    * Add job with enhanced options and duplicate prevention
    */
   async addJob(
-    jobName: string, 
-    data: any, 
+    jobName: string,
+    data: any,
     options: JobOptions = {}
   ): Promise<Job> {
     if (this.isShuttingDown) {
@@ -149,7 +149,7 @@ export class EnhancedQueueService {
       });
       return job;
     } catch (error) {
-      logger.error(`Failed to add job to queue: ${jobName}`, { 
+      logger.error(`Failed to add job to queue: ${jobName}`, {
         error: (error as Error).message,
         data,
         options: jobOptions
@@ -194,7 +194,7 @@ export class EnhancedQueueService {
       });
       return addedJobs;
     } catch (error) {
-      logger.error(`Failed to add bulk jobs to queue`, { 
+      logger.error(`Failed to add bulk jobs to queue`, {
         error: (error as Error).message,
         jobCount: jobs.length
       });
@@ -216,7 +216,7 @@ export class EnhancedQueueService {
       async (job: Job) => {
         const startTime = Date.now();
         const jobId = job.id!;
-        
+
         try {
           // Setup lock extension for long-running jobs
           this.setupLockExtension(job);
@@ -232,22 +232,22 @@ export class EnhancedQueueService {
 
           // Execute the job processor
           const result = await processor(job);
-          
+
           // Clean up lock extension
           this.cleanupLockExtension(jobId);
-          
+
           const duration = Date.now() - startTime;
           logger.info(`Job completed: ${job.name}`, {
             jobId,
             duration,
             attempt: job.attemptsMade + 1
           });
-          
+
           return result;
         } catch (error) {
           // Clean up lock extension on error
           this.cleanupLockExtension(jobId);
-          
+
           const duration = Date.now() - startTime;
           logger.error(`Job failed: ${job.name}`, {
             jobId,
@@ -282,7 +282,7 @@ export class EnhancedQueueService {
    */
   private setupLockExtension(job: Job): void {
     const jobId = job.id!;
-    
+
     const interval = setInterval(async () => {
       try {
         await job.extendLock('', this.config.lockRenewTime);
@@ -315,7 +315,7 @@ export class EnhancedQueueService {
    */
   private updateThroughputTracker(): void {
     this.throughputTracker.processedJobs++;
-    
+
     // Reset every hour to keep metrics fresh
     const now = Date.now();
     if (now - this.throughputTracker.lastResetTime > 3600000) { // 1 hour
@@ -365,31 +365,31 @@ export class EnhancedQueueService {
     try {
       const stats = await this.getStats();
       const systemLoad = await this.getSystemLoad();
-      
+
       let newConcurrency = this.config.concurrency;
-      
+
       // Increase concurrency if:
       // - System load is reasonable
       // - Many jobs are waiting
       // - We're below max concurrency
-      if (systemLoad.cpu < 70 && 
-          systemLoad.memory < 80 && 
-          stats.waiting > 10 && 
+      if (systemLoad.cpu < 70 &&
+          systemLoad.memory < 80 &&
+          stats.waiting > 10 &&
           this.config.concurrency < this.config.maxConcurrency) {
         newConcurrency = Math.min(this.config.concurrency + 1, this.config.maxConcurrency);
       }
-      
+
       // Decrease concurrency if:
       // - System load is high
       // - We're above min concurrency
-      else if ((systemLoad.cpu > 85 || systemLoad.memory > 90) && 
+      else if ((systemLoad.cpu > 85 || systemLoad.memory > 90) &&
                this.config.concurrency > this.config.minConcurrency) {
         newConcurrency = Math.max(this.config.concurrency - 1, this.config.minConcurrency);
       }
-      
+
       if (newConcurrency !== this.config.concurrency) {
         this.config.concurrency = newConcurrency;
-        
+
         // Update worker concurrency (BullMQ doesn't support runtime changes,
         // so we'll restart the worker if needed)
         logger.info(`Adjusting queue concurrency to ${newConcurrency}`, {
@@ -397,13 +397,13 @@ export class EnhancedQueueService {
           systemLoad,
           queueStats: stats
         });
-        
+
         // Note: In production, you might want to implement graceful worker restart
         // For now, we'll just log the change
       }
     } catch (error) {
-      logger.error('Failed to adjust concurrency', { 
-        error: (error as Error).message 
+      logger.error('Failed to adjust concurrency', {
+        error: (error as Error).message
       });
     }
   }
@@ -425,28 +425,28 @@ export class EnhancedQueueService {
    */
   private async getSystemLoad(): Promise<SystemLoad> {
     const os = require('os');
-    
+
     // Get CPU usage (average load over 1 minute as percentage)
     const loadAvg = os.loadavg()[0]; // 1-minute load average
     const cpuCount = os.cpus().length;
     const cpuUsage = Math.min((loadAvg / cpuCount) * 100, 100);
-    
+
     // Get memory usage percentage
     const totalMemory = os.totalmem();
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;
     const memoryUsage = (usedMemory / totalMemory) * 100;
-    
+
     // Get active connections (approximation based on current queue state)
     const activeConnections = this.worker ? await this.getActiveJobCount() : 0;
-    
+
     return {
       cpu: Math.round(cpuUsage * 100) / 100, // Round to 2 decimal places
       memory: Math.round(memoryUsage * 100) / 100,
       activeConnections
     };
   }
-  
+
   /**
    * Helper method to get current active job count
    */
@@ -510,9 +510,9 @@ export class EnhancedQueueService {
     });
 
     this.worker.on('failed', (job, err) => {
-      logger.error(`Worker failed job: ${job?.name}`, { 
-        jobId: job?.id, 
-        error: err.message 
+      logger.error(`Worker failed job: ${job?.name}`, {
+        jobId: job?.id,
+        error: err.message
       });
     });
 
@@ -546,7 +546,7 @@ export class EnhancedQueueService {
    */
   async cleanup(maxAge: number = 24 * 60 * 60 * 1000): Promise<void> {
     const cutoff = Date.now() - maxAge;
-    
+
     try {
       await this.queue.clean(cutoff, 0, 'completed');
       await this.queue.clean(cutoff, 0, 'failed');
@@ -561,9 +561,9 @@ export class EnhancedQueueService {
    */
   async close(): Promise<void> {
     this.isShuttingDown = true;
-    
+
     logger.info('Shutting down enhanced queue service...');
-    
+
     // Clear all lock extension intervals
     for (const interval of this.lockExtensionIntervals.values()) {
       clearInterval(interval);

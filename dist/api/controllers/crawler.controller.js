@@ -6,6 +6,7 @@ exports.cancelCrawlJob = cancelCrawlJob;
 const uuid_1 = require("uuid");
 const logger_1 = require("../../utils/logger");
 const crawler_1 = require("../../scraper/crawler");
+const crawl_kickoff_service_1 = require("../../services/crawl-kickoff.service");
 const redis_service_1 = require("../../services/redis.service");
 const queue_service_1 = require("../../services/queue.service");
 const file_export_service_1 = require("../../services/file-export.service");
@@ -14,7 +15,7 @@ const file_export_service_1 = require("../../services/file-export.service");
  */
 async function crawl(req, res) {
     try {
-        const { url, includePaths, excludePaths, limit = 100, maxDepth = 5, allowBackwardCrawling = false, allowExternalContentLinks = false, allowSubdomains = false, ignoreRobotsTxt = false, regexOnFullURL = false, scrapeOptions = {}, webhook, strategy, useBrowser = false } = req.body;
+        const { url, includePaths, excludePaths, limit = 100, maxDepth = 5, allowBackwardCrawling = false, allowExternalContentLinks = false, allowSubdomains = false, ignoreRobotsTxt = false, regexOnFullURL = false, scrapeOptions = {}, webhook, strategy, useBrowser = false, useMapDiscovery = false } = req.body;
         // Validate URL
         if (!url) {
             res.status(400).json({ success: false, error: 'URL is required' });
@@ -59,6 +60,58 @@ async function crawl(req, res) {
         catch (error) {
             logger_1.logger.debug('Failed to get robots.txt (this is probably fine!)', { error });
         }
+        // STREAMING ARCHITECTURE: Use kickoff for enhanced crawling
+        if (useMapDiscovery) {
+            logger_1.logger.info('Using Streaming Map Discovery for enhanced URL discovery', {
+                url,
+                limit,
+                crawlId: id
+            });
+            try {
+                // Use new streaming kickoff service instead of sequential discovery
+                const kickoffService = new crawl_kickoff_service_1.CrawlKickoffService();
+                const kickoffResult = await kickoffService.startStreamingCrawl({
+                    crawlId: id,
+                    url,
+                    limit,
+                    maxDepth,
+                    allowSubdomains,
+                    includePaths,
+                    excludePaths,
+                    scrapeOptions: {
+                        ...scrapeOptions,
+                        useBrowser
+                    },
+                    useMapDiscovery: true,
+                    concurrency: 3
+                });
+                if (kickoffResult.success) {
+                    logger_1.logger.info('Streaming crawl kickoff successful', {
+                        crawlId: id,
+                        url,
+                        discoveryStarted: kickoffResult.discoveryStarted,
+                        initialJobId: kickoffResult.initialJobId,
+                        estimatedUrls: kickoffResult.estimatedUrls
+                    });
+                }
+                else {
+                    logger_1.logger.warn('Streaming kickoff failed, falling back to traditional crawling', {
+                        crawlId: id,
+                        url,
+                        error: kickoffResult.message
+                    });
+                    // Continue with traditional crawling setup below
+                }
+            }
+            catch (error) {
+                logger_1.logger.warn('Streaming kickoff service failed, falling back to traditional crawling', {
+                    crawlId: id,
+                    url,
+                    error: error.message
+                });
+                // Continue with traditional crawling setup below
+            }
+        }
         // Store crawl information in Redis
         await (0, redis_service_1.saveCrawl)(id, {
             url,
@@ -76,24 +129,39 @@ async function crawl(req, res) {
             scrapeOptions,
             robots: robotsTxt
         });
-        // Kickoff initial job to start the crawl
-        await (0, queue_service_1.addCrawlJobToQueue)(id, {
-            url,
-            mode: 'kickoff',
-            scrapeOptions: {
-                ...scrapeOptions,
-                useBrowser // Pass browser option to scrape options
-            },
-            webhook,
-        }, 10);
+        // Kickoff initial job to start the crawl (only for traditional non-streaming crawls)
+        if (!useMapDiscovery) {
+            logger_1.logger.info('Starting traditional crawl with kickoff job', { crawlId: id, url });
+            await (0, queue_service_1.addCrawlJobToQueue)(id, {
+                url,
+                mode: 'kickoff',
+                scrapeOptions: {
+                    ...scrapeOptions,
+                    useBrowser // Pass browser option to scrape options
+                },
+                webhook,
+            }, 10);
+        }
+        else {
+            logger_1.logger.info('Streaming crawl kickoff already handled by CrawlKickoffService', {
+                crawlId: id,
+                url
+            });
+        }
         // Return success response with crawl ID
         const protocol = req.secure ? 'https' : 'http';
+        const crawlType = useMapDiscovery ? 'Streaming crawl' : 'Traditional crawl';
+        const message = useMapDiscovery
+            ? 'Streaming crawl initiated successfully. URLs are being discovered and scraped in real-time. Individual pages will be exported as markdown files.'
+            : 'Traditional crawl initiated successfully. Individual pages will be exported as markdown files.';
         res.status(200).json({
             success: true,
             id,
             url: `${protocol}://${req.get('host')}/api/crawl/${id}`,
-            message: 'Crawl initiated successfully. Individual pages will be exported as markdown files.',
-            outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(id)
+            message,
+            outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(id),
+            crawlType,
+            streamingEnabled: useMapDiscovery
         });
     }
     catch (error) {

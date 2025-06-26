@@ -25,10 +25,10 @@ export function setAddJobsToQueueFn(fn: AddJobsToQueueFn): void {
  */
 export async function processCrawlJob(job: Job): Promise<any> {
   const { url, mode, scrapeOptions, webhook, crawlId } = job.data;
-  
+
   try {
     logger.info(`Processing ${mode} job for crawl ${crawlId}`, { url, crawlId, jobId: job.id });
-    
+
     // Handle different job modes
     if (mode === 'kickoff') {
       // This is the initial job that starts the crawl
@@ -36,17 +36,25 @@ export async function processCrawlJob(job: Job): Promise<any> {
     } else if (mode === 'page') {
       // This is a job to scrape a specific page
       return await handlePageScrape(url, scrapeOptions, crawlId);
+    } else if (mode === 'streaming-initial' || mode === 'streaming-discovered') {
+      // These are streaming jobs that should scrape pages and export files immediately
+      logger.info(`Processing streaming job (${mode}) for crawl ${crawlId}`, { 
+        url, 
+        discoveryMethod: scrapeOptions.discoveryMethod,
+        streamingDiscovery: scrapeOptions.streamingDiscovery 
+      });
+      return await handlePageScrape(url, scrapeOptions, crawlId);
     } else {
       throw new Error(`Unknown job mode: ${mode}`);
     }
   } catch (error: any) {
     logger.error(`Error processing crawl job: ${error.message}`, { error, url, crawlId, jobId: job.id });
-    
+
     // If this was the kickoff job, we need to mark the crawl as finished to prevent it from hanging
     if (mode === 'kickoff') {
       await markCrawlFinished(crawlId);
     }
-    
+
     // Send webhook if configured
     if (webhook) {
       try {
@@ -60,7 +68,7 @@ export async function processCrawlJob(job: Job): Promise<any> {
         logger.error('Failed to send webhook notification', { error: webhookError, webhook });
       }
     }
-    
+
     throw error;
   }
 }
@@ -74,7 +82,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
   if (!crawl) {
     throw new Error(`Crawl ${crawlId} not found`);
   }
-  
+
   // Initialize the crawler with strategy if specified
   const crawler = new WebCrawler({
     jobId: crawlId,
@@ -99,67 +107,67 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     // Enable URL deduplication by default
     deduplicateSimilarUrls: true
   });
-  
+
   // Import robots.txt if it was previously fetched
   if (crawl.robots) {
     crawler.importRobotsTxt(crawl.robots);
   }
-  
-  logger.info(`Starting crawl with strategy: ${crawler.getStrategy()}`, { 
-    crawlId, 
+
+  logger.info(`Starting crawl with strategy: ${crawler.getStrategy()}`, {
+    crawlId,
     url,
     strategy: crawler.getStrategy(),
     useBrowser: crawl.crawlerOptions.useBrowser || false
   });
-  
+
   let filteredLinks: string[] = [];
-  
+
   // If using browser, use browser-based URL discovery
   if (crawl.crawlerOptions.useBrowser) {
     logger.info(`Using browser-based discovery for crawl ${crawlId}`);
-    
+
     // Use browser-based discovery
     try {
       filteredLinks = await crawler.discoverUrlsWithBrowser(
         crawl.crawlerOptions.maxDepth || 5,
         crawl.crawlerOptions.limit || 100
       );
-      
+
       logger.info(`Browser-based discovery completed for ${url}. Found ${filteredLinks.length} URLs`, {
         crawlId,
         discoveredCount: filteredLinks.length
       });
     } catch (error) {
-      logger.error(`Error during browser-based discovery: ${error}`, { 
+      logger.error(`Error during browser-based discovery: ${error}`, {
         error,
-        crawlId, 
-        url 
+        crawlId,
+        url
       });
-      
+
       // Fallback to regular crawling on error
       logger.info(`Falling back to regular crawling for ${url}`);
       const result = await crawler.crawlPage(url, scrapeOptions.skipTlsVerification);
       filteredLinks = crawler.filterLinks(
-        result.links, 
-        crawl.crawlerOptions.limit || 100, 
+        result.links,
+        crawl.crawlerOptions.limit || 100,
         crawl.crawlerOptions.maxDepth || 5
       );
     }
   } else {
     // Use regular crawling
     const { html, links } = await crawler.crawlPage(
-      url, 
+      url,
       scrapeOptions.skipTlsVerification
     );
-    
+
     // Filter links based on crawler options
     filteredLinks = crawler.filterLinks(
-      links, 
-      crawl.crawlerOptions.limit || 100, 
+      links,
+      crawl.crawlerOptions.limit || 100,
       crawl.crawlerOptions.maxDepth || 5
     );
   }
-  
+
   // Create jobs for each discovered URL
   const jobsData = filteredLinks.map(link => ({
     url: link,
@@ -172,21 +180,21 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
       useBrowser: crawl.crawlerOptions.useBrowser || false
     }
   }));
-  
+
   // Add jobs to the queue using injected function
   if (!addJobsToQueueFn) {
     throw new Error('Queue function not initialized. Call setAddJobsToQueueFn first.');
   }
   const jobIds = await addJobsToQueueFn(crawlId, jobsData);
-  
+
   // Track jobs in Redis
   await addCrawlJobs(crawlId, jobIds);
-  
+
   // Ensure to close browser if we used it
   if (crawl.crawlerOptions.useBrowser) {
     await crawler.close();
   }
-  
+
   // Log crawl initiation for summary tracking
   logger.info(`Crawl ${crawlId} initiated - discovered ${filteredLinks.length} URLs to process`, {
     crawlId,
@@ -196,7 +204,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     usedBrowser: crawl.crawlerOptions.useBrowser || false,
     outputDir: fileExportService.getCrawlOutputDir(crawlId)
   });
-  
+
   // Return discovery result
   return {
     url,
@@ -234,8 +242,8 @@ function buildEnhancedScrapeOptions(scrapeOptions: any, useBrowser: boolean): an
  * Extract original HTML from scrape result
  */
 function extractOriginalHtml(result: any): string | null {
-  return result.contentType === 'markdown' && result.metadata?.originalHtml 
-    ? result.metadata.originalHtml 
+  return result.contentType === 'markdown' && result.metadata?.originalHtml
+    ? result.metadata.originalHtml
     : (result.contentType === 'html' ? result.content : null);
 }
 
@@ -243,12 +251,15 @@ function extractOriginalHtml(result: any): string | null {
  * Export page content to file and track it
  */
 async function exportPageContent(
-  url: string, 
-  result: any, 
-  crawlId: string, 
-  useBrowser: boolean
+  url: string,
+  result: any,
+  crawlId: string,
+  useBrowser: boolean,
+  isStreaming: boolean = false,
+  discoveryMethod?: string
 ): Promise<void> {
   if (!result.content || result.contentType !== 'markdown') {
+    logger.debug(`Skipping export for ${url} - no markdown content`, { crawlId, contentType: result.contentType });
     return;
   }
 
@@ -264,21 +275,30 @@ async function exportPageContent(
         loadTime: result.metadata?.loadTime,
         usedBrowser: useBrowser,
         processingTime: result.metadata?.processingTime,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isStreaming,
+        discoveryMethod
       }
     );
-    
+
     await addExportedFile(crawlId, exportedFilePath);
-    
-    logger.info(`Page exported to file: ${exportedFilePath}`, { 
-      url, 
+
+    const logMessage = isStreaming 
+      ? `🚀 STREAMING: Page exported to file in real-time: ${exportedFilePath}`
+      : `Page exported to file: ${exportedFilePath}`;
+
+    logger.info(logMessage, {
+      url,
       crawlId,
-      contentLength: result.content.length 
+      contentLength: result.content.length,
+      isStreaming,
+      discoveryMethod,
+      filePath: exportedFilePath
     });
   } catch (exportError) {
-    logger.error(`Failed to export page to file: ${url}`, { 
-      error: exportError, 
-      crawlId 
+    logger.error(`Failed to export page to file: ${url}`, {
+      error: exportError,
+      crawlId
     });
   }
 }
@@ -313,24 +333,28 @@ function buildPageScrapeResponse(result: any, originalHtml: string | null, useBr
 async function handlePageScrape(url: string, scrapeOptions: any, crawlId: string): Promise<any> {
   const scraperManager = new ScraperManager();
   const useBrowser = scrapeOptions.useBrowser === true;
-  
+
   logger.info(`Crawl ${crawlId}: Scraping page ${url} using ${useBrowser ? 'browser-based' : 'standard'} approach`);
-  
+
   const enhancedOptions = buildEnhancedScrapeOptions(scrapeOptions, useBrowser);
   const result = await scraperManager.scrape(url, enhancedOptions);
-  
+
   logger.info(`Crawl ${crawlId}: Completed scraping page ${url}`, {
     contentLength: result.content?.length || 0,
     contentType: result.contentType,
     status: result.metadata?.status,
     usedBrowser: useBrowser
   });
-  
+
   const originalHtml = extractOriginalHtml(result);
-  
+
   logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
-  
-  await exportPageContent(url, result, crawlId, useBrowser);
-  
+
+  // Determine if this is a streaming job and get discovery method
+  const isStreaming = scrapeOptions.streamingDiscovery === true;
+  const discoveryMethod = scrapeOptions.discoveryMethod;
+
+  await exportPageContent(url, result, crawlId, useBrowser, isStreaming, discoveryMethod);
+
   return buildPageScrapeResponse(result, originalHtml, useBrowser);
-} 
+}

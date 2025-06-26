@@ -1,8 +1,7 @@
 import { Job, Worker } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
-import { redisClient } from './redis.service';
+import { redisClient, markCrawlJobDone, addCrawlJob } from './redis.service';
 import { logger } from '../utils/logger';
-import { markCrawlJobDone, addCrawlJob } from './redis.service';
 import { processCrawlJob, setAddJobsToQueueFn } from '../scraper/crawler-processor';
 import { EnhancedQueueService } from './enhanced-queue.service';
 
@@ -27,10 +26,10 @@ const crawlQueue = enhancedQueue.bullQueue;
 // Initialize the queue
 export async function initQueue(): Promise<void> {
   logger.info('Initializing enhanced crawler queue');
-  
+
   // Inject the queue function to break circular dependency
   setAddJobsToQueueFn(addCrawlJobsToQueue);
-  
+
   // Ensure the queue is empty when starting - access through enhancedQueue
   await crawlQueue.obliterate({ force: true });
   logger.info('Enhanced crawler queue initialized');
@@ -43,21 +42,21 @@ export async function addCrawlJobToQueue(
   priority: number = 10
 ): Promise<string> {
   const jobId = uuidv4();
-  
+
   logger.debug('Adding job to enhanced queue', { crawlId, jobId });
-  
+
   // First add to Redis for tracking
   await addCrawlJob(crawlId, jobId);
-  
+
   // Use enhanced queue service to add job
-  await enhancedQueue.addJob(jobId, { 
-    ...jobData, 
+  await enhancedQueue.addJob(jobId, {
+    ...jobData,
     crawlId,
-    jobId 
+    jobId
   }, {
     priority,
   });
-  
+
   return jobId;
 }
 
@@ -68,9 +67,9 @@ export async function addCrawlJobsToQueue(
   priority: number = 10
 ): Promise<string[]> {
   if (jobsData.length === 0) return [];
-  
+
   const jobIds = jobsData.map(() => uuidv4());
-  
+
   // Use enhanced queue service for bulk operations
   await enhancedQueue.addBulkJobs(
     jobsData.map((data, index) => ({
@@ -79,7 +78,7 @@ export async function addCrawlJobsToQueue(
       opts: { priority }
     }))
   );
-  
+
   return jobIds;
 }
 
@@ -89,50 +88,50 @@ export function initializeWorker(): Worker {
   const worker = enhancedQueue.initializeWorker(async (job: Job) => {
     try {
       logger.info(`Processing job ${job.id}`, { jobType: job.data.mode, url: job.data.url });
-      
+
       // Process the job using the crawler processor
       const result = await processCrawlJob(job);
-      
+
       // Mark job as completed in Redis
       if (job.data.crawlId) {
         await markCrawlJobDone(job.data.crawlId, job.id as string, true, result);
       }
-      
+
       logger.info(`Job ${job.id} completed successfully`);
       return result;
     } catch (error: any) {
       logger.error(`Job ${job.id} failed: ${error.message}`, { error });
-      
+
       // Mark job as failed in Redis
       if (job.data.crawlId) {
         await markCrawlJobDone(job.data.crawlId, job.id as string, false);
       }
-      
+
       throw error;
     }
   });
-  
+
   // Additional event handlers for crawler-specific logic
   worker.on('completed', (job) => {
     logger.debug('Crawler job completed', { jobId: job.id });
-    
+
     // Store the full job result in Redis
     if (job.data.crawlId && job.returnvalue) {
       markCrawlJobDone(job.data.crawlId, job.id as string, true, job.returnvalue)
         .catch(err => logger.error(`Error storing job result in Redis: ${err.message}`, { jobId: job.id }));
     }
   });
-  
+
   worker.on('failed', (job, error) => {
     logger.error('Crawler job failed', { jobId: job?.id, error });
   });
-  
+
   logger.info('Enhanced crawler worker initialized with advanced features', {
     concurrency: enhancedQueue.currentConfig.concurrency,
     dynamicScaling: enhancedQueue.currentConfig.enableDynamicScaling,
     lockDuration: enhancedQueue.currentConfig.lockDuration
   });
-  
+
   return worker;
 }
 
@@ -162,4 +161,4 @@ export async function closeQueue(): Promise<void> {
 export { enhancedQueue };
 
 // Legacy compatibility export
-export { crawlQueue }; 
+export { crawlQueue };

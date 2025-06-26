@@ -8,6 +8,7 @@ const playwright_1 = require("playwright");
 const logger_1 = require("../utils/logger");
 const user_agents_1 = __importDefault(require("user-agents"));
 const events_1 = require("events");
+const browser_pool_service_1 = require("./browser-pool.service");
 // Constants
 const AD_SERVING_DOMAINS = [
     'doubleclick.net',
@@ -410,6 +411,7 @@ class PlaywrightService extends events_1.EventEmitter {
                 .map(anchor => anchor.href)
                 .filter(href => {
                 // Security: Filter out dangerous protocol schemes that could execute code
+                // This prevents javascript: URLs from being followed, which would be unsafe
                 if (!href || typeof href !== 'string')
                     return false;
                 const lowerHref = href.toLowerCase();
@@ -490,14 +492,14 @@ class PlaywrightService extends events_1.EventEmitter {
      * @returns The crawl response
      */
     async _performCrawl(url, options = {}) {
-        await this.ensureBrowserContext(options);
-        logger_1.logger.info(`Crawling page: ${url}`);
-        const page = await this.context.newPage();
+        // 🚀 USE BROWSER POOL instead of creating new browser instances
+        const { page, browserId, contextId } = await browser_pool_service_1.browserPool.getPage();
+        logger_1.logger.info(`Crawling page: ${url}`, { browserId, contextId });
         try {
             await this._addHumanBehavior(page);
             const response = await this.navigateWithRetry(page, url);
             const status = response?.status() || 200;
-            logger_1.logger.info(`Page loaded with status: ${status}`);
+            logger_1.logger.info(`Page loaded with status: ${status}`, { browserId });
             if (status >= 400) {
                 return this.handleErrorStatus(url, status);
             }
@@ -512,12 +514,13 @@ class PlaywrightService extends events_1.EventEmitter {
             };
         }
         catch (error) {
-            logger_1.logger.error(`Error crawling ${url}: ${error.message}`);
+            logger_1.logger.error(`Error crawling ${url}: ${error.message}`, { browserId });
             throw error;
         }
         finally {
-            await page.close();
-            logger_1.logger.debug(`Page closed for URL: ${url}`);
+            // 🚀 RELEASE PAGE back to browser pool instead of closing browser
+            await browser_pool_service_1.browserPool.releasePage(page, browserId, contextId, false);
+            logger_1.logger.debug(`Page released to browser pool for URL: ${url}`, { browserId });
         }
     }
     /**
@@ -638,7 +641,7 @@ class PlaywrightService extends events_1.EventEmitter {
             // Get the current level URLs
             const currentLevelUrls = [...this.urlsToVisit];
             this.urlsToVisit = [];
-            // Process all URLs at the current level in parallel
+            // Process all URLs at the current level in parallel for maximum performance
             await Promise.all(currentLevelUrls.map(async (url) => {
                 if (this.crawledUrls.size >= limit)
                     return;
@@ -711,6 +714,271 @@ class PlaywrightService extends events_1.EventEmitter {
         return Array.from(this.discoveredUrls);
     }
     /**
+     * Enhanced discovery phase with configurable multi-level crawling
+     */
+    async enhancedDiscoveryPhase(startUrl, options = {}) {
+        logger_1.logger.info(`Starting enhanced discovery phase from: ${startUrl}`);
+        this.discoveredUrls = new Set();
+        this.crawledUrls = new Set();
+        this.urlsToVisit = [startUrl];
+        this.urlsInProgress = new Set();
+        this.totalDiscovered = 0;
+        this.totalCrawled = 0;
+        const maxDepth = options.maxDiscoveryDepth || 3;
+        const limit = options.discoveryLimit || 100;
+        const maxConcurrency = options.maxConcurrency || 8;
+        const maxLinksPerPage = options.maxLinksPerPage || 100;
+        const enableDeepCrawling = options.enableDeepCrawling !== false;
+        const includePaths = options.includePaths || [];
+        const excludePaths = options.excludePaths || [];
+        const excludeDomains = options.excludeDomains || [];
+        const baseUrl = options.baseUrl || new URL(startUrl).origin;
+        // Add the start URL to the discovered set
+        this.discoveredUrls.add(startUrl);
+        this.totalDiscovered++;
+        let currentDepth = 0;
+        while (currentDepth < maxDepth && this.crawledUrls.size < limit && this.urlsToVisit.length > 0) {
+            logger_1.logger.info(`Enhanced discovery - Depth: ${currentDepth + 1}/${maxDepth}, Discovered: ${this.totalDiscovered}, Crawled: ${this.totalCrawled}, Queue: ${this.urlsToVisit.length}`);
+            // Get the current level URLs
+            const currentLevelUrls = [...this.urlsToVisit];
+            this.urlsToVisit = [];
+            // Process URLs in controlled concurrency batches for optimal performance
+            const batches = [];
+            for (let i = 0; i < currentLevelUrls.length; i += maxConcurrency) {
+                batches.push(currentLevelUrls.slice(i, i + maxConcurrency));
+            }
+            for (const batch of batches) {
+                if (this.crawledUrls.size >= limit)
+                    break;
+                // Process batch concurrently with controlled parallelism
+                await Promise.allSettled(batch.map(url => this.processUrlInBatch(url, limit, browser_pool_service_1.browserPool, options, maxLinksPerPage, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth)));
+                // Add a small delay between batches to prevent overwhelming the target server
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            currentDepth++;
+            // If deep crawling is disabled, only process the first depth level
+            if (!enableDeepCrawling && currentDepth >= 1) {
+                logger_1.logger.info('Deep crawling disabled, stopping after first level');
+                break;
+            }
+        }
+        logger_1.logger.info(`Enhanced discovery phase completed`, {
+            totalDiscovered: this.totalDiscovered,
+            totalCrawled: this.totalCrawled,
+            maxDepthReached: currentDepth,
+            enableDeepCrawling
+        });
+        return Array.from(this.discoveredUrls);
+    }
+    /**
+     * Enhanced page crawling using browser pool
+     */
+    async crawlPageEnhanced(page, url, options) {
+        const maxLinksPerPage = options.maxLinksPerPage || 100;
+        try {
+            // Set page timeout
+            page.setDefaultTimeout(7000);
+            page.setDefaultNavigationTimeout(7000);
+            // Navigate with timeout
+            await page.goto(url, {
+                waitUntil: 'domcontentloaded',
+                timeout: 7000
+            });
+            // Wait for any dynamic content (reduced from 1000ms)
+            await page.waitForTimeout(500);
+            // Extract content and links with timeout
+            const result = await Promise.race([
+                page.evaluate((maxLinks) => {
+                    const title = document.title;
+                    const content = document.body?.innerText || '';
+                    // Get all links and limit them
+                    const linkElements = Array.from(document.querySelectorAll('a[href]'));
+                    const links = linkElements
+                        .map(el => el.href)
+                        .filter(href => href?.startsWith('http'))
+                        .slice(0, maxLinks); // Limit links per page
+                    return { title, content, links };
+                }, maxLinksPerPage),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Page evaluation timeout')), 5000))
+            ]);
+            return {
+                content: result.content,
+                links: result.links,
+                url,
+                title: result.title,
+                status: 200
+            };
+        }
+        catch (error) {
+            logger_1.logger.warn(`Failed to crawl page: ${url}`, { error: error.message });
+            return {
+                content: '',
+                links: [],
+                url,
+                status: 0
+            };
+        }
+    }
+    /**
+     * Enhanced link filtering with configurable limits
+     */
+    filterDiscoveredLinks(links, baseUrl, includePaths, excludePaths, excludeDomains, maxLinksPerPage) {
+        const filtered = links.filter(link => {
+            if (!link)
+                return false;
+            try {
+                const linkUrl = new URL(link);
+                // Remove fragments (#) from URLs to avoid duplicate crawling
+                linkUrl.hash = '';
+                const cleanLink = linkUrl.toString();
+                // Skip if not same origin
+                if (linkUrl.origin !== new URL(baseUrl).origin)
+                    return false;
+                // Skip if already discovered (check clean URL)
+                if (this.discoveredUrls.has(cleanLink))
+                    return false;
+                // Skip if in excluded domains
+                if (excludeDomains.some(domain => linkUrl.hostname.includes(domain)))
+                    return false;
+                // Check include paths
+                const matchesIncludePath = includePaths.length === 0 ||
+                    includePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
+                // Check exclude paths
+                const matchesExcludePath = excludePaths.length > 0 &&
+                    excludePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
+                return matchesIncludePath && !matchesExcludePath;
+            }
+            catch {
+                return false;
+            }
+        });
+        // Limit the number of links processed per page
+        return filtered.slice(0, maxLinksPerPage);
+    }
+    /**
+     * Process a single URL in a batch during enhanced discovery
+     */
+    async processUrlInBatch(url, limit, browserPool, options, maxLinksPerPage, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth) {
+        if (this.crawledUrls.size >= limit)
+            return;
+        if (this.crawledUrls.has(url) || this.urlsInProgress.has(url))
+            return;
+        if (!this.shouldProcessUrl(url))
+            return;
+        this.urlsInProgress.add(url);
+        try {
+            const { page, browserId } = await this.acquirePageWithTimeout(browserPool);
+            try {
+                const response = await this.crawlPageEnhanced(page, url, {
+                    ...options,
+                    maxLinksPerPage
+                });
+                await this.processDiscoveryResponse(url, response, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth, limit);
+            }
+            finally {
+                await this.releasePageSafely(page, browserId, browserPool, url);
+            }
+        }
+        catch (error) {
+            this.handleDiscoveryError(error, url, currentDepth);
+        }
+        finally {
+            this.urlsInProgress.delete(url);
+        }
+    }
+    /**
+     * Check if URL should be processed based on filtering rules
+     */
+    shouldProcessUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const path = urlObj.pathname.toLowerCase();
+            const search = urlObj.search.toLowerCase();
+            // Skip login, signup, and authentication pages
+            if (path.includes('/signin') || path.includes('/login') ||
+                path.includes('/signup') || path.includes('/register') ||
+                search.includes('signin') || search.includes('continue=')) {
+                return false;
+            }
+            // Skip pages with language parameters that might be duplicates
+            if (search.includes('hl=') && !search.includes('hl=en')) {
+                return false;
+            }
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    /**
+     * Acquire page from browser pool with timeout
+     */
+    async acquirePageWithTimeout(browserPool) {
+        return Promise.race([
+            browserPool.getPage(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser pool timeout')), 10000))
+        ]);
+    }
+    /**
+     * Process discovery response and add new URLs
+     */
+    async processDiscoveryResponse(url, response, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth, limit) {
+        this.crawledUrls.add(url);
+        this.totalCrawled++;
+        const newLinks = this.filterDiscoveredLinks(response.links, baseUrl, includePaths, excludePaths, excludeDomains, 100);
+        for (const link of newLinks) {
+            const cleanUrl = new URL(link);
+            cleanUrl.hash = '';
+            const cleanLink = cleanUrl.toString();
+            if (!this.discoveredUrls.has(cleanLink)) {
+                this.discoveredUrls.add(cleanLink);
+                if (enableDeepCrawling) {
+                    this.urlsToVisit.push(cleanLink);
+                }
+                this.totalDiscovered++;
+                this.emit('url-discovered', {
+                    url: cleanLink,
+                    totalDiscovered: this.totalDiscovered,
+                    depth: currentDepth + 1
+                });
+                if (this.totalDiscovered >= limit)
+                    break;
+            }
+        }
+        this.emit('url-crawled', {
+            url,
+            totalCrawled: this.totalCrawled,
+            newUrls: newLinks.length,
+            depth: currentDepth + 1
+        });
+    }
+    /**
+     * Safely release page back to browser pool
+     */
+    async releasePageSafely(page, browserId, browserPool, url) {
+        try {
+            await browserPool.releasePage(page, browserId);
+        }
+        catch (releaseError) {
+            logger_1.logger.warn(`Failed to release page for ${url}`, {
+                error: releaseError.message
+            });
+        }
+    }
+    /**
+     * Handle discovery errors with appropriate logging
+     */
+    handleDiscoveryError(error, url, currentDepth) {
+        const errorMessage = error.message;
+        if (!errorMessage.includes('Browser pool timeout') &&
+            !errorMessage.includes('Page evaluation timeout')) {
+            logger_1.logger.error(`Enhanced discovery error for ${url}`, {
+                error: errorMessage,
+                depth: currentDepth + 1
+            });
+        }
+    }
+    /**
      * Close the browser and context
      */
     async close() {
@@ -756,7 +1024,7 @@ class PlaywrightService extends events_1.EventEmitter {
             if (navigator.permissions) {
                 navigator.permissions.query = async function (permissionDesc) {
                     return Promise.resolve({
-                        state: "granted",
+                        state: 'granted',
                         onchange: null
                     });
                 };
@@ -836,6 +1104,47 @@ class PlaywrightService extends events_1.EventEmitter {
                 route.continue();
             }
         });
+    }
+    /**
+     * Simplified URL discovery method for the URLDiscoveryService
+     * @param startUrl The starting URL for discovery
+     * @param options Discovery options
+     * @returns Array of discovered URLs
+     */
+    async discoverUrls(startUrl, options = {}) {
+        const { maxDepth = 3, discoveryLimit = 100, timeout = 15000, maxConcurrency = 8, maxLinksPerPage = 100, enableDeepCrawling = true, browserPoolSize = 5 } = options;
+        try {
+            logger_1.logger.info('Starting enhanced URL discovery', {
+                startUrl,
+                maxDepth,
+                discoveryLimit,
+                maxConcurrency,
+                maxLinksPerPage,
+                enableDeepCrawling,
+                browserPoolSize
+            });
+            const playwrightOptions = {
+                maxDiscoveryDepth: maxDepth,
+                discoveryLimit,
+                timeout,
+                maxConcurrency,
+                maxLinksPerPage,
+                enableDeepCrawling,
+                includePaths: [],
+                excludePaths: [],
+                excludeDomains: [],
+                baseUrl: new URL(startUrl).origin
+            };
+            const urls = await this.enhancedDiscoveryPhase(startUrl, playwrightOptions);
+            return urls.slice(0, discoveryLimit);
+        }
+        catch (error) {
+            logger_1.logger.warn('Enhanced browser-based URL discovery failed', {
+                startUrl,
+                error: error.message
+            });
+            return [];
+        }
     }
 }
 exports.PlaywrightService = PlaywrightService;

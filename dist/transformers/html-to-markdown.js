@@ -198,7 +198,7 @@ class HtmlToMarkdownTransformer {
                     finalHref = href.startsWith('/') ? `${this.baseUrl}${href}` : `${this.baseUrl}/${href}`;
                 }
                 // Prevent line breaks inside links by replacing them
-                let linkContent = content.trim().replace(/\n/g, ' ');
+                const linkContent = content.trim().replace(/\n/g, ' ');
                 return `[${linkContent}](${finalHref}${title ? ` "${title}"` : ''})`;
             }
         });

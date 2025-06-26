@@ -18,25 +18,25 @@ export interface ScraperOptions {
   skipCache?: boolean; // Skip cache for this request
   cacheTtl?: number; // Custom TTL for caching this response (in seconds)
   skipTlsVerification?: boolean; // Skip TLS verification for HTTPS connections
-  
+
   // Browser-based crawling options
   useBrowser?: boolean; // Use browser-based crawling with Playwright
   stealthMode?: boolean; // Enable stealth mode to avoid detection
   maxScrolls?: number; // Maximum number of scrolls for extracting dynamic content
-  
+
   // Rate limiting options
   minDelay?: number; // Minimum delay between requests (ms)
   maxDelay?: number; // Maximum delay for exponential backoff (ms)
   maxRetries?: number; // Maximum number of retries for failed requests
   backoffFactor?: number; // Exponential backoff factor
   rotateUserAgent?: boolean; // Rotate user agents between requests
-  
+
   // Proxy options
   proxyUsername?: string; // Username for proxy authentication
   proxyPassword?: string; // Password for proxy authentication
   proxyRotation?: boolean; // Enable proxy rotation
   proxyList?: string[]; // List of proxy URLs to rotate through
-  
+
   // Discovery options for browser crawling
   discoverLinks?: boolean; // Discover links on the page
   maxDiscoveryDepth?: number; // Maximum depth for discovery
@@ -170,4 +170,4 @@ export const AD_SERVING_DOMAINS = [
   'criteo.com',
   'outbrain.com',
   'taboola.com'
-]; 
+];

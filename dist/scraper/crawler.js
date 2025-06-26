@@ -32,8 +32,8 @@ class WebCrawler {
         this.includes = Array.isArray(includes) ? includes : [];
         this.excludes = Array.isArray(excludes) ? excludes : [];
         this.limit = limit;
-        this.robotsTxtUrl = `${this.baseUrl}${this.baseUrl.endsWith("/") ? "" : "/"}robots.txt`;
-        this.robots = (0, robots_parser_1.default)(this.robotsTxtUrl, "");
+        this.robotsTxtUrl = `${this.baseUrl}${this.baseUrl.endsWith('/') ? '' : '/'}robots.txt`;
+        this.robots = (0, robots_parser_1.default)(this.robotsTxtUrl, '');
         this.maxCrawledLinks = maxCrawledLinks ?? limit;
         this.maxCrawledDepth = maxCrawledDepth ?? 10;
         this.allowBackwardCrawling = allowBackwardCrawling ?? false;
@@ -63,7 +63,7 @@ class WebCrawler {
      * Check if link matches exclude patterns
      */
     isExcludedByPatterns(link, path) {
-        if (this.excludes.length === 0 || this.excludes[0] === "") {
+        if (this.excludes.length === 0 || this.excludes[0] === '') {
             return false;
         }
         const testPath = this.regexOnFullURL ? link : path;
@@ -73,7 +73,7 @@ class WebCrawler {
      * Check if link matches include patterns
      */
     isIncludedByPatterns(link, path) {
-        if (this.includes.length === 0 || this.includes[0] === "") {
+        if (this.includes.length === 0 || this.includes[0] === '') {
             return true;
         }
         const testPath = this.regexOnFullURL ? link : path;
@@ -102,7 +102,7 @@ class WebCrawler {
         if (this.ignoreRobotsTxt) {
             return true;
         }
-        const isAllowed = this.robots.isAllowed(normalizedLink, "DeepScrapeCrawler") ?? true;
+        const isAllowed = this.robots.isAllowed(normalizedLink, 'DeepScrapeCrawler') ?? true;
         if (!isAllowed) {
             this.logger.debug(`Link disallowed by robots.txt: ${normalizedLink}`);
         }
@@ -149,13 +149,13 @@ class WebCrawler {
     }
     filterLinks(links, limit, maxDepth, fromMap = false) {
         if (this.currentDiscoveryDepth === this.maxDiscoveryDepth) {
-            this.logger.debug("Max discovery depth hit, filtering off all links", {
+            this.logger.debug('Max discovery depth hit, filtering off all links', {
                 currentDiscoveryDepth: this.currentDiscoveryDepth,
                 maxDiscoveryDepth: this.maxDiscoveryDepth
             });
             return [];
         }
-        if (this.initialUrl.endsWith("sitemap.xml") && fromMap) {
+        if (this.initialUrl.endsWith('sitemap.xml') && fromMap) {
             return links.slice(0, limit);
         }
         return links
@@ -516,7 +516,7 @@ class WebCrawler {
      */
     async discoverUrlsWithBrowser(maxDepth = 3, limit = 100) {
         if (!this.useBrowser) {
-            logger_1.logger.warn("Browser-based discovery called but browser mode is not enabled. Switching to browser mode.");
+            logger_1.logger.warn('Browser-based discovery called but browser mode is not enabled. Switching to browser mode.');
             this.useBrowser = true;
         }
         // Initialize PlaywrightService if not already initialized

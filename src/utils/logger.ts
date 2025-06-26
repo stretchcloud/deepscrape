@@ -26,15 +26,15 @@ const logger = winston.createLogger({
       ),
     }),
     // File transport for errors
-    new winston.transports.File({ 
-      filename: path.join(logDir, 'error.log'), 
-      level: 'error' 
+    new winston.transports.File({
+      filename: path.join(logDir, 'error.log'),
+      level: 'error'
     }),
     // File transport for all logs
-    new winston.transports.File({ 
-      filename: path.join(logDir, 'combined.log') 
+    new winston.transports.File({
+      filename: path.join(logDir, 'combined.log')
     }),
   ],
 });
 
-export { logger }; 
+export { logger };
