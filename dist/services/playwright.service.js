@@ -795,7 +795,7 @@ class PlaywrightService extends events_1.EventEmitter {
                     const linkElements = Array.from(document.querySelectorAll('a[href]'));
                     const links = linkElements
                         .map(el => el.href)
-                        .filter(href => href && href.startsWith('http'))
+                        .filter(href => href?.startsWith('http'))
                         .slice(0, maxLinks); // Limit links per page
                     return { title, content, links };
                 }, maxLinksPerPage),
