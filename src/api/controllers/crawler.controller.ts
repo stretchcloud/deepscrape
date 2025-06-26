@@ -10,6 +10,8 @@ import {
 } from '../../types/crawler';
 import { logger } from '../../utils/logger';
 import { WebCrawler } from '../../scraper/crawler';
+import { URLDiscoveryService } from '../../services/url-discovery.service';
+import { CrawlKickoffService } from '../../services/crawl-kickoff.service';
 import { 
   saveCrawl, 
   getCrawl, 
@@ -45,7 +47,8 @@ export async function crawl(
       scrapeOptions = {},
       webhook,
       strategy,
-      useBrowser = false
+      useBrowser = false,
+      useMapDiscovery = false
     } = req.body;
 
     // Validate URL
@@ -96,6 +99,61 @@ export async function crawl(
       logger.debug('Failed to get robots.txt (this is probably fine!)', { error });
     }
 
+    // STREAMING ARCHITECTURE: Use kickoff for enhanced crawling
+    if (useMapDiscovery) {
+      logger.info('Using Streaming Map Discovery for enhanced URL discovery', { 
+        url, 
+        limit, 
+        crawlId: id 
+      });
+
+      try {
+        // Use new streaming kickoff service instead of sequential discovery
+        const kickoffService = new CrawlKickoffService();
+        
+        const kickoffResult = await kickoffService.startStreamingCrawl({
+          crawlId: id,
+          url,
+          limit,
+          maxDepth,
+          allowSubdomains,
+          includePaths,
+          excludePaths,
+          scrapeOptions: {
+            ...scrapeOptions,
+            useBrowser
+          },
+          useMapDiscovery: true,
+          concurrency: 3
+        });
+
+        if (kickoffResult.success) {
+          logger.info('Streaming crawl kickoff successful', {
+            crawlId: id,
+            url,
+            discoveryStarted: kickoffResult.discoveryStarted,
+            initialJobId: kickoffResult.initialJobId,
+            estimatedUrls: kickoffResult.estimatedUrls
+          });
+        } else {
+          logger.warn('Streaming kickoff failed, falling back to traditional crawling', {
+            crawlId: id,
+            url,
+            error: kickoffResult.message
+          });
+          // Continue with traditional crawling setup below
+        }
+
+      } catch (error) {
+        logger.warn('Streaming kickoff service failed, falling back to traditional crawling', {
+          crawlId: id,
+          url,
+          error: (error as Error).message
+        });
+        // Continue with traditional crawling setup below
+      }
+    }
+
     // Store crawl information in Redis
     await saveCrawl(id, {
       url,
@@ -114,25 +172,41 @@ export async function crawl(
       robots: robotsTxt
     });
 
-    // Kickoff initial job to start the crawl
-    await addCrawlJobToQueue(id, {
-      url,
-      mode: 'kickoff',
-      scrapeOptions: {
-        ...scrapeOptions,
-        useBrowser  // Pass browser option to scrape options
-      },
-      webhook,
-    }, 10);
+    // Kickoff initial job to start the crawl (only for traditional non-streaming crawls)
+    if (!useMapDiscovery) {
+      logger.info('Starting traditional crawl with kickoff job', { crawlId: id, url });
+      
+      await addCrawlJobToQueue(id, {
+        url,
+        mode: 'kickoff',
+        scrapeOptions: {
+          ...scrapeOptions,
+          useBrowser  // Pass browser option to scrape options
+        },
+        webhook,
+      }, 10);
+    } else {
+      logger.info('Streaming crawl kickoff already handled by CrawlKickoffService', { 
+        crawlId: id, 
+        url 
+      });
+    }
 
     // Return success response with crawl ID
     const protocol = req.secure ? 'https' : 'http';
+    const crawlType = useMapDiscovery ? 'Streaming crawl' : 'Traditional crawl';
+    const message = useMapDiscovery 
+      ? 'Streaming crawl initiated successfully. URLs are being discovered and scraped in real-time. Individual pages will be exported as markdown files.'
+      : 'Traditional crawl initiated successfully. Individual pages will be exported as markdown files.';
+
     res.status(200).json({
       success: true,
       id,
       url: `${protocol}://${req.get('host')}/api/crawl/${id}`,
-      message: 'Crawl initiated successfully. Individual pages will be exported as markdown files.',
-      outputDirectory: fileExportService.getCrawlOutputDir(id)
+      message,
+      outputDirectory: fileExportService.getCrawlOutputDir(id),
+      crawlType,
+      streamingEnabled: useMapDiscovery
     });
   } catch (error: any) {
     logger.error('Error initiating crawl', { error });

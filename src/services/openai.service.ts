@@ -25,7 +25,7 @@ export class OpenAIService {
     });
     this._model = config.model;
   }
-  
+
   /**
    * Get the model name
    */
@@ -37,7 +37,7 @@ export class OpenAIService {
    * Get completion from OpenAI
    */
   async getCompletion<T>(
-    messages: Array<{ role: string; content: string }>, 
+    messages: Array<{ role: string; content: string }>,
     options: { temperature?: number; maxTokens?: number } = {},
     responseFormat?: { type: string; schema?: object }
   ): Promise<LLMResponse<T>> {
@@ -45,7 +45,7 @@ export class OpenAIService {
       const { temperature = 0.2, maxTokens = 4000 } = options;
 
       logger.info(`Sending request to OpenAI: ${this._model}`);
-      
+
       // Convert messages to the type expected by OpenAI
       const typedMessages: ChatCompletionMessageParam[] = messages.map(msg => {
         // Only include role and content for simplicity
@@ -68,7 +68,7 @@ export class OpenAIService {
           return { role: 'user', content: msg.content };
         }
       });
-      
+
       const response = await this.client.chat.completions.create({
         model: this._model,
         messages: typedMessages,
@@ -76,16 +76,16 @@ export class OpenAIService {
         max_tokens: maxTokens,
         response_format: responseFormat as any
       });
-      
+
       // Process the response
       const content = response.choices[0].message.content;
-      
+
       try {
         // If response is JSON string, parse it
-        const parsedContent = typeof content === 'string' && content.trim().startsWith('{') 
+        const parsedContent = typeof content === 'string' && content.trim().startsWith('{')
           ? JSON.parse(content)
           : content;
-          
+
         return {
           success: true,
           data: parsedContent as T
@@ -112,16 +112,16 @@ export class OpenAIService {
   async getEmbeddings(text: string | string[]): Promise<LLMResponse<number[][]>> {
     try {
       const inputArray = Array.isArray(text) ? text : [text];
-      
+
       logger.info(`Getting embeddings from OpenAI: ${this._model}`);
-      
+
       const response = await this.client.embeddings.create({
         model: 'text-embedding-3-small', // Use the appropriate embedding model
         input: inputArray
       });
-      
+
       const embeddings = response.data.map(item => item.embedding);
-      
+
       return {
         success: true,
         data: embeddings
@@ -134,4 +134,4 @@ export class OpenAIService {
       };
     }
   }
-} 
+}

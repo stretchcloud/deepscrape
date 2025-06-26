@@ -2,6 +2,7 @@ import { chromium, Browser, BrowserContext, Page, Route, Request } from 'playwri
 import { logger } from '../utils/logger';
 import UserAgent from 'user-agents';
 import { EventEmitter } from 'events';
+import { browserPool } from './browser-pool.service';
 
 // Constants
 const AD_SERVING_DOMAINS = [
@@ -80,7 +81,7 @@ export class PlaywrightService extends EventEmitter {
   private totalDiscovered = 0;
   private totalCrawled = 0;
   private lastRequestTime = 0;
-  
+
   // Rate limiting configuration
   private rateLimit = {
     minDelay: 2000,      // Minimum delay between requests (ms)
@@ -109,13 +110,13 @@ export class PlaywrightService extends EventEmitter {
   private initUserAgentPool(): void {
     // Create a diverse pool of user agents
     const userAgentGenerator = new UserAgent();
-    
+
     // Generate a pool of 10 different user agents
     for (let i = 0; i < 10; i++) {
       const agent = userAgentGenerator.toString();
       this.userAgents.push(agent);
     }
-    
+
     logger.debug(`Initialized pool of ${this.userAgents.length} user agents for rotation`);
   }
 
@@ -134,7 +135,7 @@ export class PlaywrightService extends EventEmitter {
    */
   public addProxies(proxies: string[]): void {
     if (!proxies || proxies.length === 0) return;
-    
+
     // Add proxies to our list
     this.proxyList.push(...proxies.filter(p => p && p.trim() !== ''));
     logger.info(`Added ${proxies.length} proxies to rotation pool. Total: ${this.proxyList.length}`);
@@ -146,7 +147,7 @@ export class PlaywrightService extends EventEmitter {
    */
   private getNextProxy(): string | null {
     if (this.proxyList.length === 0) return null;
-    
+
     const proxy = this.proxyList[this.currentProxyIndex];
     this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxyList.length;
     return proxy;
@@ -194,7 +195,7 @@ export class PlaywrightService extends EventEmitter {
    * Get user agent based on options
    */
   private getUserAgent(options: PlaywrightOptions): string {
-    return options.userAgent || 
+    return options.userAgent ||
       (options.rotateUserAgent ? this.getNextUserAgent() : new UserAgent().toString());
   }
 
@@ -210,7 +211,7 @@ export class PlaywrightService extends EventEmitter {
       javaScriptEnabled: true,
       extraHTTPHeaders: options.referrer ? { referer: options.referrer } : undefined
     };
-    
+
     this.addProxyToContext(contextOptions, options);
     return contextOptions;
   }
@@ -220,24 +221,24 @@ export class PlaywrightService extends EventEmitter {
    */
   private addProxyToContext(contextOptions: any, options: PlaywrightOptions): void {
     let proxyUrl = options.proxy;
-    
+
     if (!proxyUrl && options.proxyRotation && this.proxyList.length > 0) {
       const nextProxy = this.getNextProxy();
       if (nextProxy) {
         proxyUrl = nextProxy;
       }
     }
-    
+
     if (proxyUrl) {
       contextOptions.proxy = {
         server: proxyUrl
       };
-      
+
       if (options.proxyUsername && options.proxyPassword) {
         contextOptions.proxy.username = options.proxyUsername;
         contextOptions.proxy.password = options.proxyPassword;
       }
-      
+
       logger.info(`Using proxy: ${proxyUrl}`);
     }
   }
@@ -263,7 +264,7 @@ export class PlaywrightService extends EventEmitter {
   private async applyRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
-    
+
     if (this.lastRequestTime > 0 && timeSinceLastRequest < this.rateLimit.minDelay) {
       const waitTime = this.rateLimit.minDelay - timeSinceLastRequest;
       if (waitTime > 0) {
@@ -289,7 +290,7 @@ export class PlaywrightService extends EventEmitter {
    * Check if error is rate limiting related
    */
   private isRateLimitError(error: any): boolean {
-    return error.message.includes('429') || 
+    return error.message.includes('429') ||
            error.message.includes('Too Many Requests') ||
            error.message.includes('too many requests');
   }
@@ -298,9 +299,9 @@ export class PlaywrightService extends EventEmitter {
    * Handle rate limit retry logic
    */
   private async handleRateLimitRetry(
-    url: string, 
-    retries: number, 
-    delay: number, 
+    url: string,
+    retries: number,
+    delay: number,
     options: PlaywrightOptions
   ): Promise<{ shouldContinue: boolean; retries: number; delay: number }> {
     retries++;
@@ -308,12 +309,12 @@ export class PlaywrightService extends EventEmitter {
       logger.error(`Rate limit exceeded for ${url} after ${retries} retries`);
       return { shouldContinue: false, retries, delay };
     }
-    
+
     delay = Math.min(this.rateLimit.maxDelay, delay * this.rateLimit.backoffFactor);
     logger.warn(`Rate limited on ${url}, retry ${retries}/${this.rateLimit.maxRetries} after ${delay}ms backoff`);
-    
+
     await this.rotateUserAgentAndProxy(options);
-    
+
     return { shouldContinue: true, retries, delay };
   }
 
@@ -322,14 +323,14 @@ export class PlaywrightService extends EventEmitter {
    */
   private async rotateUserAgentAndProxy(options: PlaywrightOptions): Promise<void> {
     let needContextReinit = false;
-    
+
     if (options.rotateUserAgent) {
       const newUserAgent = this.getNextUserAgent();
       logger.info(`Rotating user agent to: ${newUserAgent}`);
       options.userAgent = newUserAgent;
       needContextReinit = true;
     }
-    
+
     if (options.proxyRotation && this.proxyList.length > 0) {
       const newProxy = this.getNextProxy();
       if (newProxy) {
@@ -338,7 +339,7 @@ export class PlaywrightService extends EventEmitter {
         needContextReinit = true;
       }
     }
-    
+
     if (needContextReinit) {
       await this.reinitializeContext(options);
     }
@@ -349,12 +350,12 @@ export class PlaywrightService extends EventEmitter {
    */
   private async reinitializeContext(options: PlaywrightOptions): Promise<void> {
     if (!this.browser || !this.context) return;
-    
+
     await this.context.close();
-    
+
     const contextOptions = this.buildContextOptionsForRetry(options);
     this.context = await this.browser.newContext(contextOptions);
-    
+
     await this.reapplyContextSettings(options);
   }
 
@@ -370,18 +371,18 @@ export class PlaywrightService extends EventEmitter {
       javaScriptEnabled: true,
       extraHTTPHeaders: options.referrer ? { referer: options.referrer } : undefined
     };
-    
+
     if (options.proxy) {
       contextOptions.proxy = {
         server: options.proxy
       };
-      
+
       if (options.proxyUsername && options.proxyPassword) {
         contextOptions.proxy.username = options.proxyUsername;
         contextOptions.proxy.password = options.proxyPassword;
       }
     }
-    
+
     return contextOptions;
   }
 
@@ -428,11 +429,11 @@ export class PlaywrightService extends EventEmitter {
       } catch (error) {
         if (this.isTimeoutError(error)) {
           timeoutRetries++;
-          
+
           if (timeoutRetries > maxTimeoutRetries) {
             throw error;
           }
-          
+
           logger.warn(`Navigation timeout for ${url}, retrying (${timeoutRetries}/${maxTimeoutRetries})...`);
           response = await this.retryWithDifferentStrategy(page, url);
           if (response) break;
@@ -479,7 +480,7 @@ export class PlaywrightService extends EventEmitter {
     if (status === 429) {
       throw new Error(`Too Many Requests (429) for URL: ${url}`);
     }
-    
+
     logger.warn(`Error status code: ${status} for URL: ${url}`);
     return {
       content: '',
@@ -550,7 +551,7 @@ export class PlaywrightService extends EventEmitter {
 
     const userAgent = this.getUserAgent(options);
     const contextOptions = this.buildContextOptions(options, userAgent);
-    
+
     this.context = await this.browser.newContext(contextOptions);
     logger.info(`Created browser context with user agent: ${userAgent}`);
 
@@ -567,21 +568,21 @@ export class PlaywrightService extends EventEmitter {
    */
   public async crawlPage(url: string, options: PlaywrightOptions = {}): Promise<PlaywrightResponse> {
     await this.applyRateLimit();
-    
+
     let retries = 0;
     let delay = this.rateLimit.minDelay;
     let lastError: Error | null = null;
-    
+
     while (retries <= this.rateLimit.maxRetries) {
       try {
         await this.handleRetryDelay(retries, delay, url);
         this.lastRequestTime = Date.now();
-        
+
         return await this._performCrawl(url, options);
       } catch (error: any) {
         lastError = error as Error;
         logger.error(`Error crawling ${url}: ${(error as Error).message}`);
-        
+
         if (this.isRateLimitError(error)) {
           const retryResult = await this.handleRateLimitRetry(url, retries, delay, options);
           if (!retryResult.shouldContinue) {
@@ -591,11 +592,11 @@ export class PlaywrightService extends EventEmitter {
           delay = retryResult.delay;
           continue;
         }
-        
+
         throw error;
       }
     }
-    
+
     throw lastError || new Error(`Failed to crawl ${url} after ${retries} retries`);
   }
 
@@ -606,18 +607,18 @@ export class PlaywrightService extends EventEmitter {
    * @returns The crawl response
    */
   private async _performCrawl(url: string, options: PlaywrightOptions = {}): Promise<PlaywrightResponse> {
-    await this.ensureBrowserContext(options);
-    
-    logger.info(`Crawling page: ${url}`);
-    const page = await this.context!.newPage();
+    // 🚀 USE BROWSER POOL instead of creating new browser instances
+    const { page, browserId, contextId } = await browserPool.getPage();
+
+    logger.info(`Crawling page: ${url}`, { browserId, contextId });
 
     try {
       await this._addHumanBehavior(page);
       const response = await this.navigateWithRetry(page, url);
       const status = response?.status() || 200;
-      
-      logger.info(`Page loaded with status: ${status}`);
-      
+
+      logger.info(`Page loaded with status: ${status}`, { browserId });
+
       if (status >= 400) {
         return this.handleErrorStatus(url, status);
       }
@@ -633,11 +634,12 @@ export class PlaywrightService extends EventEmitter {
         status
       };
     } catch (error) {
-      logger.error(`Error crawling ${url}: ${(error as Error).message}`);
+      logger.error(`Error crawling ${url}: ${(error as Error).message}`, { browserId });
       throw error;
     } finally {
-      await page.close();
-      logger.debug(`Page closed for URL: ${url}`);
+      // 🚀 RELEASE PAGE back to browser pool instead of closing browser
+      await browserPool.releasePage(page, browserId, contextId, false);
+      logger.debug(`Page released to browser pool for URL: ${url}`, { browserId });
     }
   }
 
@@ -651,7 +653,7 @@ export class PlaywrightService extends EventEmitter {
       const viewport = page.viewportSize();
       if (viewport) {
         const { width, height } = viewport;
-        
+
         // Move mouse to 2-4 random positions before navigation
         // Math.random() safe here - used for simulating natural human mouse behavior
         const movements = 2 + Math.floor(Math.random() * 3);
@@ -659,7 +661,7 @@ export class PlaywrightService extends EventEmitter {
           const x = Math.floor(Math.random() * width);
           const y = Math.floor(Math.random() * (height / 2)); // Focus on upper half
           await page.mouse.move(x, y, { steps: 10 + Math.floor(Math.random() * 20) });
-          
+
           // Add random pause between movements
           await page.waitForTimeout(100 + Math.floor(Math.random() * 200));
         }
@@ -678,7 +680,7 @@ export class PlaywrightService extends EventEmitter {
   private async _simulateHumanScrolling(page: Page, maxScrolls: number): Promise<void> {
     try {
       logger.debug(`Performing human-like scrolling with ${maxScrolls} scrolls`);
-      
+
       for (let i = 0; i < maxScrolls; i++) {
         // Get current scroll position and total height
         const { scrollTop, scrollHeight, clientHeight } = await page.evaluate(() => {
@@ -688,17 +690,17 @@ export class PlaywrightService extends EventEmitter {
             clientHeight: document.documentElement.clientHeight
           };
         });
-        
+
         // Check if we're already at the bottom
         if (scrollTop + clientHeight >= scrollHeight) {
           logger.debug('Reached bottom of page, stopping scroll simulation');
           break;
         }
-        
+
         // Scroll a random amount (between 100px and viewport height)
         // Math.random() safe here - for natural scrolling simulation
         const scrollAmount = 100 + Math.floor(Math.random() * (clientHeight - 100));
-        
+
         // Use a more human-like scroll with variable speed
         await page.evaluate((scrollAmount) => {
           return new Promise<void>((resolve) => {
@@ -706,32 +708,32 @@ export class PlaywrightService extends EventEmitter {
             const totalScroll = scrollAmount;
             const duration = 500 + Math.random() * 500; // Random duration between 500-1000ms
             const startTime = Date.now();
-            
+
             function step() {
               const now = Date.now();
               const elapsed = now - startTime;
-              
+
               if (elapsed >= duration) {
                 window.scrollBy(0, totalScroll - scrolled);
                 resolve();
                 return;
               }
-              
+
               // Easing function for more natural motion
               const progress = elapsed / duration;
               const easedProgress = 0.5 - Math.cos(progress * Math.PI) / 2;
-              
+
               const currentScroll = Math.floor(easedProgress * totalScroll) - scrolled;
               scrolled += currentScroll;
-              
+
               window.scrollBy(0, currentScroll);
               requestAnimationFrame(step);
             }
-            
+
             requestAnimationFrame(step);
           });
         }, scrollAmount);
-        
+
         // Add random pause between scrolls (500-2000ms)
         const pauseTime = 500 + Math.floor(Math.random() * 1500);
         await page.waitForTimeout(pauseTime);
@@ -770,74 +772,74 @@ export class PlaywrightService extends EventEmitter {
     this.totalDiscovered++;
 
     let currentDepth = 0;
-    
+
     while (currentDepth < maxDepth && this.crawledUrls.size < limit && this.urlsToVisit.length > 0) {
       logger.info(`Discovery phase - Depth: ${currentDepth + 1}/${maxDepth}, Discovered: ${this.totalDiscovered}, Crawled: ${this.totalCrawled}`);
-      
+
       // Get the current level URLs
       const currentLevelUrls = [...this.urlsToVisit];
       this.urlsToVisit = [];
 
-      // Process all URLs at the current level in parallel
+      // Process all URLs at the current level in parallel for maximum performance
       await Promise.all(
         currentLevelUrls.map(async (url) => {
           if (this.crawledUrls.size >= limit) return;
           if (this.crawledUrls.has(url) || this.urlsInProgress.has(url)) return;
-          
+
           this.urlsInProgress.add(url);
-          
+
           try {
             const response = await this.crawlPage(url, options);
             this.crawledUrls.add(url);
             this.totalCrawled++;
-            
+
             // Filter and add new links
             const newLinks = response.links.filter(link => {
               if (!link) return false;
-              
+
               try {
                 const linkUrl = new URL(link);
-                
+
                 // Skip if not same origin
                 if (linkUrl.origin !== new URL(baseUrl).origin) return false;
-                
+
                 // Skip if already discovered
                 if (this.discoveredUrls.has(link)) return false;
-                
+
                 // Skip if in excluded domains
                 if (excludeDomains.some(domain => linkUrl.hostname.includes(domain))) return false;
-                
+
                 // Check include paths
-                const matchesIncludePath = includePaths.length === 0 || 
+                const matchesIncludePath = includePaths.length === 0 ||
                   includePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
-                
+
                 // Check exclude paths
-                const matchesExcludePath = excludePaths.length > 0 && 
+                const matchesExcludePath = excludePaths.length > 0 &&
                   excludePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
-                
+
                 return matchesIncludePath && !matchesExcludePath;
               } catch {
                 return false;
               }
             });
-            
+
             // Add new links to discovered set and to visit queue
             for (const link of newLinks) {
               if (!this.discoveredUrls.has(link)) {
                 this.discoveredUrls.add(link);
                 this.urlsToVisit.push(link);
                 this.totalDiscovered++;
-                
+
                 // Emit an event for each new discovered URL
                 this.emit('url-discovered', {
                   url: link,
                   totalDiscovered: this.totalDiscovered
                 });
-                
+
                 if (this.totalDiscovered >= limit) break;
               }
             }
-            
+
             // Emit crawled event
             this.emit('url-crawled', {
               url,
@@ -851,12 +853,310 @@ export class PlaywrightService extends EventEmitter {
           }
         })
       );
-      
+
       currentDepth++;
     }
-    
+
     logger.info(`Discovery phase completed. Total discovered: ${this.totalDiscovered}, Total crawled: ${this.totalCrawled}`);
     return Array.from(this.discoveredUrls);
+  }
+
+  /**
+   * Enhanced discovery phase with configurable multi-level crawling
+   */
+  public async enhancedDiscoveryPhase(startUrl: string, options: PlaywrightOptions & {
+    maxConcurrency?: number;
+    maxLinksPerPage?: number;
+    enableDeepCrawling?: boolean;
+  } = {}): Promise<string[]> {
+    logger.info(`Starting enhanced discovery phase from: ${startUrl}`);
+    this.discoveredUrls = new Set();
+    this.crawledUrls = new Set();
+    this.urlsToVisit = [startUrl];
+    this.urlsInProgress = new Set();
+    this.totalDiscovered = 0;
+    this.totalCrawled = 0;
+
+    const maxDepth = options.maxDiscoveryDepth || 3;
+    const limit = options.discoveryLimit || 100;
+    const maxConcurrency = options.maxConcurrency || 8;
+    const maxLinksPerPage = options.maxLinksPerPage || 100;
+    const enableDeepCrawling = options.enableDeepCrawling !== false;
+    const includePaths = options.includePaths || [];
+    const excludePaths = options.excludePaths || [];
+    const excludeDomains = options.excludeDomains || [];
+    const baseUrl = options.baseUrl || new URL(startUrl).origin;
+
+    // Add the start URL to the discovered set
+    this.discoveredUrls.add(startUrl);
+    this.totalDiscovered++;
+
+    let currentDepth = 0;
+
+    while (currentDepth < maxDepth && this.crawledUrls.size < limit && this.urlsToVisit.length > 0) {
+      logger.info(`Enhanced discovery - Depth: ${currentDepth + 1}/${maxDepth}, Discovered: ${this.totalDiscovered}, Crawled: ${this.totalCrawled}, Queue: ${this.urlsToVisit.length}`);
+
+      // Get the current level URLs
+      const currentLevelUrls = [...this.urlsToVisit];
+      this.urlsToVisit = [];
+
+      // Process URLs in controlled concurrency batches for optimal performance
+      const batches = [];
+      for (let i = 0; i < currentLevelUrls.length; i += maxConcurrency) {
+        batches.push(currentLevelUrls.slice(i, i + maxConcurrency));
+      }
+
+      for (const batch of batches) {
+        if (this.crawledUrls.size >= limit) break;
+
+        // Process batch concurrently with controlled parallelism
+        await Promise.allSettled(
+          batch.map(async (url) => {
+            if (this.crawledUrls.size >= limit) return;
+            if (this.crawledUrls.has(url) || this.urlsInProgress.has(url)) return;
+
+            // Skip URLs that are likely to be slow or unproductive
+            try {
+              const urlObj = new URL(url);
+              const path = urlObj.pathname.toLowerCase();
+              const search = urlObj.search.toLowerCase();
+              
+              // Skip login, signup, and authentication pages
+              if (path.includes('/signin') || path.includes('/login') || 
+                  path.includes('/signup') || path.includes('/register') ||
+                  search.includes('signin') || search.includes('continue=')) {
+                return;
+              }
+              
+              // Skip pages with language parameters that might be duplicates
+              if (search.includes('hl=') && !search.includes('hl=en')) {
+                return;
+              }
+            } catch {
+              // If URL parsing fails, skip this URL
+              return;
+            }
+
+            this.urlsInProgress.add(url);
+
+            try {
+              // Use browser pool for page acquisition with timeout
+              const { page, browserId } = await Promise.race([
+                browserPool.getPage(),
+                new Promise<never>((_, reject) => 
+                  setTimeout(() => reject(new Error('Browser pool timeout')), 10000)
+                )
+              ]);
+              
+              try {
+                const response = await this.crawlPageEnhanced(page, url, {
+                  ...options,
+                  maxLinksPerPage
+                });
+                this.crawledUrls.add(url);
+                this.totalCrawled++;
+
+                // Filter and add new links with enhanced filtering
+                const newLinks = this.filterDiscoveredLinks(
+                  response.links,
+                  baseUrl,
+                  includePaths,
+                  excludePaths,
+                  excludeDomains,
+                  maxLinksPerPage
+                );
+
+                // Add new links to discovered set and to visit queue
+                for (const link of newLinks) {
+                  // Clean the URL (remove fragments)
+                  const cleanUrl = new URL(link);
+                  cleanUrl.hash = '';
+                  const cleanLink = cleanUrl.toString();
+                  
+                  if (!this.discoveredUrls.has(cleanLink)) {
+                    this.discoveredUrls.add(cleanLink);
+                    
+                    // Only add to visit queue if deep crawling is enabled
+                    if (enableDeepCrawling) {
+                      this.urlsToVisit.push(cleanLink);
+                    }
+                    
+                    this.totalDiscovered++;
+
+                    // Emit an event for each new discovered URL
+                    this.emit('url-discovered', {
+                      url: cleanLink,
+                      totalDiscovered: this.totalDiscovered,
+                      depth: currentDepth + 1
+                    });
+
+                    if (this.totalDiscovered >= limit) break;
+                  }
+                }
+
+                // Emit crawled event
+                this.emit('url-crawled', {
+                  url,
+                  totalCrawled: this.totalCrawled,
+                  newUrls: newLinks.length,
+                  depth: currentDepth + 1
+                });
+                
+              } finally {
+                // Always release the page back to the pool
+                try {
+                  await browserPool.releasePage(page, browserId);
+                } catch (releaseError) {
+                  logger.warn(`Failed to release page for ${url}`, { 
+                    error: (releaseError as Error).message 
+                  });
+                }
+              }
+              
+            } catch (error) {
+              const errorMessage = (error as Error).message;
+              if (!errorMessage.includes('Browser pool timeout') && 
+                  !errorMessage.includes('Page evaluation timeout')) {
+                logger.error(`Enhanced discovery error for ${url}`, {
+                  error: errorMessage,
+                  depth: currentDepth + 1
+                });
+              }
+            } finally {
+              this.urlsInProgress.delete(url);
+            }
+          })
+        );
+
+        // Add a small delay between batches to prevent overwhelming the target server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      currentDepth++;
+      
+      // If deep crawling is disabled, only process the first depth level
+      if (!enableDeepCrawling && currentDepth >= 1) {
+        logger.info('Deep crawling disabled, stopping after first level');
+        break;
+      }
+    }
+
+    logger.info(`Enhanced discovery phase completed`, {
+      totalDiscovered: this.totalDiscovered,
+      totalCrawled: this.totalCrawled,
+      maxDepthReached: currentDepth,
+      enableDeepCrawling
+    });
+    
+    return Array.from(this.discoveredUrls);
+  }
+
+  /**
+   * Enhanced page crawling using browser pool
+   */
+  private async crawlPageEnhanced(page: Page, url: string, options: PlaywrightOptions & {
+    maxLinksPerPage?: number;
+  }): Promise<PlaywrightResponse> {
+    const maxLinksPerPage = options.maxLinksPerPage || 100;
+    
+    try {
+      // Set page timeout
+      page.setDefaultTimeout(7000);
+      page.setDefaultNavigationTimeout(7000);
+      
+      // Navigate with timeout
+      await page.goto(url, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 7000
+      });
+
+      // Wait for any dynamic content (reduced from 1000ms)
+      await page.waitForTimeout(500);
+
+      // Extract content and links with timeout
+      const result = await Promise.race([
+        page.evaluate((maxLinks) => {
+          const title = document.title;
+          const content = document.body?.innerText || '';
+          
+          // Get all links and limit them
+          const linkElements = Array.from(document.querySelectorAll('a[href]'));
+          const links = linkElements
+            .map(el => (el as HTMLAnchorElement).href)
+            .filter(href => href && href.startsWith('http'))
+            .slice(0, maxLinks); // Limit links per page
+          
+          return { title, content, links };
+        }, maxLinksPerPage),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Page evaluation timeout')), 5000)
+        )
+      ]);
+
+      return {
+        content: result.content,
+        links: result.links,
+        url,
+        title: result.title,
+        status: 200
+      };
+    } catch (error) {
+      logger.warn(`Failed to crawl page: ${url}`, { error: (error as Error).message });
+      return {
+        content: '',
+        links: [],
+        url,
+        status: 0
+      };
+    }
+  }
+
+  /**
+   * Enhanced link filtering with configurable limits
+   */
+  private filterDiscoveredLinks(
+    links: string[],
+    baseUrl: string,
+    includePaths: string[],
+    excludePaths: string[],
+    excludeDomains: string[],
+    maxLinksPerPage: number
+  ): string[] {
+    const filtered = links.filter(link => {
+      if (!link) return false;
+
+      try {
+        const linkUrl = new URL(link);
+        
+        // Remove fragments (#) from URLs to avoid duplicate crawling
+        linkUrl.hash = '';
+        const cleanLink = linkUrl.toString();
+
+        // Skip if not same origin
+        if (linkUrl.origin !== new URL(baseUrl).origin) return false;
+
+        // Skip if already discovered (check clean URL)
+        if (this.discoveredUrls.has(cleanLink)) return false;
+
+        // Skip if in excluded domains
+        if (excludeDomains.some(domain => linkUrl.hostname.includes(domain))) return false;
+
+        // Check include paths
+        const matchesIncludePath = includePaths.length === 0 ||
+          includePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
+
+        // Check exclude paths
+        const matchesExcludePath = excludePaths.length > 0 &&
+          excludePaths.some(pattern => new RegExp(pattern).test(linkUrl.pathname));
+
+        return matchesIncludePath && !matchesExcludePath;
+      } catch {
+        return false;
+      }
+    });
+
+    // Limit the number of links processed per page
+    return filtered.slice(0, maxLinksPerPage);
   }
 
   /**
@@ -881,7 +1181,7 @@ export class PlaywrightService extends EventEmitter {
       window._originalNavigator = window.navigator;
       window._originalWebGL = window.WebGLRenderingContext.prototype.getParameter;
       window._originalWebGL2 = window.WebGL2RenderingContext?.prototype.getParameter;
-      
+
       // Override WebGL fingerprinting methods
       const getParameterProxyHandler = {
         apply: function(target: any, thisArg: any, args: any[]) {
@@ -896,7 +1196,7 @@ export class PlaywrightService extends EventEmitter {
           return target.apply(thisArg, args);
         }
       };
-      
+
       // Apply the proxy to WebGL methods
       if (window.WebGLRenderingContext) {
         window.WebGLRenderingContext.prototype.getParameter = new Proxy(
@@ -904,35 +1204,35 @@ export class PlaywrightService extends EventEmitter {
           getParameterProxyHandler
         );
       }
-      
+
       if (window.WebGL2RenderingContext) {
         window.WebGL2RenderingContext.prototype.getParameter = new Proxy(
           window.WebGL2RenderingContext.prototype.getParameter,
           getParameterProxyHandler
         );
       }
-      
+
       // Mock permissions API to make it always return granted
       if (navigator.permissions) {
         navigator.permissions.query = async function(permissionDesc: any): Promise<PermissionStatus> {
           return Promise.resolve({
-            state: "granted",
+            state: 'granted',
             onchange: null
           } as unknown as PermissionStatus);
         };
       }
-      
+
       // Modify navigator properties to avoid detection
       const modifyNavigator = function() {
         Object.defineProperty(navigator, 'webdriver', {
           get: () => false
         });
-        
+
         Object.defineProperty(navigator, 'plugins', {
           get: () => {
             // Create a plugins array that satisfies PluginArray interface
             const plugins = [] as unknown as PluginArray;
-            
+
             // Add a fake plugin
             Object.defineProperty(plugins, 'length', { value: 1 });
             Object.defineProperty(plugins, '0', {
@@ -942,12 +1242,12 @@ export class PlaywrightService extends EventEmitter {
                 description: 'Portable Document Format'
               }
             });
-            
+
             return plugins;
           }
         });
       };
-      
+
       modifyNavigator();
     });
   }
@@ -962,22 +1262,22 @@ export class PlaywrightService extends EventEmitter {
     await context.route('**/*', (route: Route, request: Request) => {
       const url = request.url();
       const resourceType = request.resourceType();
-      
+
       // Block ad serving domains
       const isAdDomain = AD_SERVING_DOMAINS.some(domain => url.includes(domain));
-      
+
       // Block unnecessary resource types - expanded list
       const blockResourceTypes = ['image', 'media', 'font', 'other', 'websocket', 'eventsource'];
-      
+
       // Block tracking and analytics scripts
       const trackingKeywords = ['tracking', 'analytics', 'telemetry', 'metrics', 'stats', 'pixel', 'gtm', 'ga', 'facebook', 'twitter', 'linkedin'];
       const isTrackingResource = trackingKeywords.some(keyword => url.toLowerCase().includes(keyword));
-      
+
       // Special handling for Microsoft Docs - we know these aren't essential
       const isMicrosoftDocs = url.includes('learn.microsoft.com');
       const microsoftNonEssential = isMicrosoftDocs && (
-        url.includes('click') || 
-        url.includes('feedback') || 
+        url.includes('click') ||
+        url.includes('feedback') ||
         url.includes('rating') ||
         url.includes('tracking') ||
         url.includes('telemetry') ||
@@ -987,7 +1287,7 @@ export class PlaywrightService extends EventEmitter {
         url.includes('.png') ||
         url.includes('.svg')
       );
-      
+
       // Microsoft Docs specific - allow essential resources
       const isMicrosoftEssential = isMicrosoftDocs && (
         url.includes('main.js') ||
@@ -996,14 +1296,14 @@ export class PlaywrightService extends EventEmitter {
         url.includes('content') ||
         resourceType === 'document'
       );
-      
+
       // Determine if request should be blocked
-      const shouldBlock = 
-        isAdDomain || 
-        isTrackingResource || 
+      const shouldBlock =
+        isAdDomain ||
+        isTrackingResource ||
         microsoftNonEssential ||
         (blockResourceTypes.includes(resourceType) && !isMicrosoftEssential);
-      
+
       if (shouldBlock) {
         if (logRequests) {
           logger.debug(`Blocked request: ${resourceType} - ${url}`);
@@ -1014,8 +1314,68 @@ export class PlaywrightService extends EventEmitter {
       }
     });
   }
+
+  /**
+   * Simplified URL discovery method for the URLDiscoveryService
+   * @param startUrl The starting URL for discovery
+   * @param options Discovery options
+   * @returns Array of discovered URLs
+   */
+  public async discoverUrls(startUrl: string, options: {
+    maxDepth?: number;
+    discoveryLimit?: number;
+    timeout?: number;
+    maxConcurrency?: number;
+    maxLinksPerPage?: number;
+    enableDeepCrawling?: boolean;
+    browserPoolSize?: number;
+  } = {}): Promise<string[]> {
+    const { 
+      maxDepth = 3, 
+      discoveryLimit = 100, 
+      timeout = 15000,
+      maxConcurrency = 8,
+      maxLinksPerPage = 100,
+      enableDeepCrawling = true,
+      browserPoolSize = 5
+    } = options;
+
+    try {
+      logger.info('Starting enhanced URL discovery', {
+        startUrl,
+        maxDepth,
+        discoveryLimit,
+        maxConcurrency,
+        maxLinksPerPage,
+        enableDeepCrawling,
+        browserPoolSize
+      });
+
+      const playwrightOptions = {
+        maxDiscoveryDepth: maxDepth,
+        discoveryLimit,
+        timeout,
+        maxConcurrency,
+        maxLinksPerPage,
+        enableDeepCrawling,
+        includePaths: [],
+        excludePaths: [],
+        excludeDomains: [],
+        baseUrl: new URL(startUrl).origin
+      };
+
+      const urls = await this.enhancedDiscoveryPhase(startUrl, playwrightOptions);
+      return urls.slice(0, discoveryLimit);
+    } catch (error) {
+      logger.warn('Enhanced browser-based URL discovery failed', {
+        startUrl,
+        error: (error as Error).message
+      });
+      return [];
+    }
+  }
 }
 
 // Singleton instance
 const playwrightService = new PlaywrightService();
-export default playwrightService; 
+export default playwrightService;

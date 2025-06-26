@@ -62,6 +62,10 @@
  *                 enum: [bfs, dfs, best_first]
  *                 description: The crawling strategy to use (bfs = breadth-first, dfs = depth-first, best_first = prioritized)
  *                 default: bfs
+ *               useMapDiscovery:
+ *                 type: boolean
+ *                 description: Use high-performance URL discovery (5,000+ URLs in seconds) before crawling
+ *                 default: false
  *               scrapeOptions:
  *                 type: object
  *                 description: Options for the scraper

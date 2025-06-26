@@ -24,7 +24,7 @@ export class LLMServiceFactory {
       const apiKey = process.env.OPENAI_API_KEY;
       const organization = process.env.OPENAI_ORGANIZATION;
       const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Default to gpt-4o
-      
+
       if (!apiKey) {
         logger.warn(
           'OpenAI service not configured correctly. Missing environment variable: OPENAI_API_KEY. ' +
@@ -32,9 +32,9 @@ export class LLMServiceFactory {
         );
         return null;
       }
-      
+
       logger.info(`Creating OpenAI service with model: ${model}`);
-      
+
       return new OpenAIService({
         apiKey,
         organization,
@@ -45,7 +45,7 @@ export class LLMServiceFactory {
       return null;
     }
   }
-  
+
   /**
    * Create an LLM service
    * This is the main method to use for getting an LLM service instance
@@ -53,7 +53,7 @@ export class LLMServiceFactory {
   static createLLMService(taskComplexity?: TaskComplexity): OpenAIService | null {
     return this.createOpenAIService(taskComplexity);
   }
-  
+
   /**
    * Determine the task complexity (kept for API compatibility)
    * This is ignored in model selection but maintained for interface compatibility
@@ -62,4 +62,4 @@ export class LLMServiceFactory {
     // Always return MEDIUM complexity as it doesn't matter anymore
     return TaskComplexity.MEDIUM;
   }
-} 
+}

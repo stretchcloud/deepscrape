@@ -27,7 +27,7 @@ interface CacheMetadata {
  */
 export class CacheService {
   private readonly options: CacheOptions;
-  
+
   constructor(options?: Partial<CacheOptions>) {
     this.options = {
       enabled: process.env.CACHE_ENABLED === 'true',
@@ -35,13 +35,13 @@ export class CacheService {
       directory: process.env.CACHE_DIRECTORY ?? './cache',
       ...options
     };
-    
+
     // Create cache directory if it doesn't exist
     if (this.options.enabled) {
       this.ensureCacheDirectory();
     }
   }
-  
+
   /**
    * Get data from cache
    */
@@ -49,27 +49,27 @@ export class CacheService {
     if (!this.options.enabled) {
       return null;
     }
-    
+
     try {
       const cacheKey = this.generateCacheKey(key);
       const cacheFile = path.join(this.options.directory, `${cacheKey}.json`);
       const metadataFile = path.join(this.options.directory, `${cacheKey}.meta.json`);
-      
+
       // Check if cache files exist
       if (!fs.existsSync(cacheFile) || !fs.existsSync(metadataFile)) {
         return null;
       }
-      
+
       // Read metadata
       const metadata = JSON.parse(fs.readFileSync(metadataFile, 'utf-8')) as CacheMetadata;
-      
+
       // Check if cache is expired
       if (Date.now() > metadata.expiresAt) {
         logger.debug(`Cache expired for key: ${key}`);
         this.invalidate(key);
         return null;
       }
-      
+
       // Read cache data
       const cacheData = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')) as T;
       logger.info(`Cache hit for key: ${key}`);
@@ -79,7 +79,7 @@ export class CacheService {
       return null;
     }
   }
-  
+
   /**
    * Store data in cache
    */
@@ -87,15 +87,15 @@ export class CacheService {
     if (!this.options.enabled) {
       return;
     }
-    
+
     try {
       const cacheKey = this.generateCacheKey(key);
       const cacheFile = path.join(this.options.directory, `${cacheKey}.json`);
       const metadataFile = path.join(this.options.directory, `${cacheKey}.meta.json`);
-      
+
       const now = Date.now();
       const ttl = metadata.customTtl ?? this.options.ttl;
-      
+
       // Create metadata
       const cacheMetadata: CacheMetadata = {
         timestamp: now,
@@ -103,17 +103,17 @@ export class CacheService {
         url: metadata.url,
         contentType: metadata.contentType
       };
-      
+
       // Write cache data and metadata
       fs.writeFileSync(cacheFile, JSON.stringify(data));
       fs.writeFileSync(metadataFile, JSON.stringify(cacheMetadata));
-      
+
       logger.info(`Cache set for key: ${key} (TTL: ${ttl}s)`);
     } catch (error) {
       logger.error(`Error writing to cache: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  
+
   /**
    * Remove item from cache
    */
@@ -121,27 +121,27 @@ export class CacheService {
     if (!this.options.enabled) {
       return;
     }
-    
+
     try {
       const cacheKey = this.generateCacheKey(key);
       const cacheFile = path.join(this.options.directory, `${cacheKey}.json`);
       const metadataFile = path.join(this.options.directory, `${cacheKey}.meta.json`);
-      
+
       // Remove cache files if they exist
       if (fs.existsSync(cacheFile)) {
         fs.unlinkSync(cacheFile);
       }
-      
+
       if (fs.existsSync(metadataFile)) {
         fs.unlinkSync(metadataFile);
       }
-      
+
       logger.info(`Cache invalidated for key: ${key}`);
     } catch (error) {
       logger.error(`Error invalidating cache: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  
+
   /**
    * Clear all cached data
    */
@@ -149,20 +149,20 @@ export class CacheService {
     if (!this.options.enabled) {
       return;
     }
-    
+
     try {
       const files = fs.readdirSync(this.options.directory);
-      
+
       for (const file of files) {
         fs.unlinkSync(path.join(this.options.directory, file));
       }
-      
+
       logger.info('Cache cleared');
     } catch (error) {
       logger.error(`Error clearing cache: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  
+
   /**
    * Generate a deterministic cache key from a string
    * Using SHA-256 instead of MD5 for better collision resistance
@@ -170,7 +170,7 @@ export class CacheService {
   private generateCacheKey(key: string): string {
     return crypto.createHash('sha256').update(key).digest('hex');
   }
-  
+
   /**
    * Ensure the cache directory exists
    */
@@ -185,4 +185,4 @@ export class CacheService {
       this.options.enabled = false;
     }
   }
-} 
+}

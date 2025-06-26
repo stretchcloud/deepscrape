@@ -284,6 +284,11 @@ class ScraperManager {
                 textContent = $.text();
             }
             catch (cheerioError) {
+                // Log the error for debugging and monitoring purposes
+                logger_1.logger.warn('Cheerio failed to parse HTML content, falling back to regex approach', {
+                    error: cheerioError.message,
+                    contentLength: scraperResponse.content?.length || 0
+                });
                 // Fallback to a safer regex approach if cheerio fails
                 // This regex is safer as it limits the length and avoids catastrophic backtracking
                 textContent = scraperResponse.content

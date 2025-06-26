@@ -14,7 +14,7 @@ export interface ExportOptions {
 
 export class FileExportService {
   private outputDir: string;
-  
+
   constructor(outputDir?: string) {
     this.outputDir = outputDir || process.env.CRAWL_OUTPUT_DIR || './crawl-output';
     this.ensureOutputDirectory();
@@ -41,20 +41,20 @@ export class FileExportService {
   private generateFilename(url: string, crawlId: string): string {
     try {
       const parsedUrl = new URL(url);
-      
+
       // Create a safe filename from the URL
       let filename = parsedUrl.hostname;
-      
+
       if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
         // Clean up the pathname to be filesystem-safe (ReDoS-safe)
         const cleanPath = this.sanitizePathForFilename(parsedUrl.pathname)
           .substring(0, 100); // Limit length
-        
+
         if (cleanPath) {
           filename += '_' + cleanPath;
         }
       }
-      
+
       // Add query parameters if present (truncated)
       if (parsedUrl.search) {
         const queryString = this.sanitizeStringForFilename(parsedUrl.search.substring(1))
@@ -63,16 +63,16 @@ export class FileExportService {
           filename += '_' + queryString;
         }
       }
-      
+
       // Ensure the filename is not too long
       if (filename.length > 150) {
         filename = filename.substring(0, 150);
       }
-      
+
       // Add timestamp and crawl ID for uniqueness
       const timestamp = this.formatTimestampForFilename(new Date().toISOString());
       filename = `${timestamp}_${crawlId.substring(0, 8)}_${filename}`;
-      
+
       return filename + '.md';
     } catch (error) {
       // Fallback to a simple filename if URL parsing fails
@@ -86,9 +86,9 @@ export class FileExportService {
    * Export a single page's content to markdown file
    */
   async exportPage(
-    url: string, 
-    content: string, 
-    title: string, 
+    url: string,
+    content: string,
+    title: string,
     crawlId: string,
     metadata?: any
   ): Promise<string> {
@@ -96,26 +96,26 @@ export class FileExportService {
       // Generate filename
       const filename = this.generateFilename(url, crawlId);
       const filepath = path.join(this.outputDir, crawlId, filename);
-      
+
       // Ensure crawl-specific directory exists
       const crawlDir = path.join(this.outputDir, crawlId);
       if (!fs.existsSync(crawlDir)) {
         fs.mkdirSync(crawlDir, { recursive: true });
       }
-      
+
       // Prepare markdown content with metadata
       const markdownContent = this.formatMarkdownContent(url, title, content, metadata);
-      
+
       // Write file
       await fs.promises.writeFile(filepath, markdownContent, 'utf8');
-      
+
       logger.info(`Exported page to file: ${filepath}`, {
         url,
         crawlId,
         filename,
         contentLength: content.length
       });
-      
+
       return filepath;
     } catch (error) {
       logger.error(`Failed to export page to file`, {
@@ -141,7 +141,7 @@ export class FileExportService {
         formatted += char;
       }
     }
-    
+
     // Return just the date part (before 'T')
     const tIndex = formatted.indexOf('T');
     return tIndex > 0 ? formatted.substring(0, tIndex) : formatted;
@@ -154,23 +154,23 @@ export class FileExportService {
     if (!path || path === '/') {
       return '';
     }
-    
+
     let sanitized = '';
     let lastWasUnderscore = false;
-    
+
     // Manual character-by-character processing to avoid regex
     for (let i = 0; i < path.length; i++) {
       const char = path[i];
-      
+
       // Skip leading and trailing slashes
       if (char === '/' && (i === 0 || i === path.length - 1)) {
         continue;
       }
-      
+
       // Allow alphanumeric, dash, dot, underscore
-      if ((char >= 'a' && char <= 'z') || 
-          (char >= 'A' && char <= 'Z') || 
-          (char >= '0' && char <= '9') || 
+      if ((char >= 'a' && char <= 'z') ||
+          (char >= 'A' && char <= 'Z') ||
+          (char >= '0' && char <= '9') ||
           char === '-' || char === '.') {
         sanitized += char;
         lastWasUnderscore = false;
@@ -182,12 +182,12 @@ export class FileExportService {
         }
       }
     }
-    
+
     // Remove trailing underscore if present
     if (sanitized.endsWith('_')) {
       sanitized = sanitized.substring(0, sanitized.length - 1);
     }
-    
+
     return sanitized;
   }
 
@@ -198,18 +198,18 @@ export class FileExportService {
     if (!str) {
       return '';
     }
-    
+
     let sanitized = '';
     let lastWasUnderscore = false;
-    
+
     // Manual character-by-character processing
     for (let i = 0; i < str.length; i++) {
       const char = str[i];
-      
+
       // Allow alphanumeric, dash, dot, underscore, equals, ampersand (for query params)
-      if ((char >= 'a' && char <= 'z') || 
-          (char >= 'A' && char <= 'Z') || 
-          (char >= '0' && char <= '9') || 
+      if ((char >= 'a' && char <= 'z') ||
+          (char >= 'A' && char <= 'Z') ||
+          (char >= '0' && char <= '9') ||
           char === '-' || char === '.' || char === '=' || char === '&') {
         sanitized += char;
         lastWasUnderscore = false;
@@ -221,12 +221,12 @@ export class FileExportService {
         }
       }
     }
-    
+
     // Remove trailing underscore if present
     if (sanitized.endsWith('_')) {
       sanitized = sanitized.substring(0, sanitized.length - 1);
     }
-    
+
     return sanitized;
   }
 
@@ -235,19 +235,19 @@ export class FileExportService {
    */
   private isValidMetadataKey(key: string): boolean {
     if (!key) return false;
-    
+
     // Manual validation to avoid regex
     for (let i = 0; i < key.length; i++) {
       const char = key[i];
-      const isValid = (char >= 'a' && char <= 'z') || 
-                     (char >= 'A' && char <= 'Z') || 
-                     (char >= '0' && char <= '9') || 
+      const isValid = (char >= 'a' && char <= 'z') ||
+                     (char >= 'A' && char <= 'Z') ||
+                     (char >= '0' && char <= '9') ||
                      char === '_';
       if (!isValid) {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -258,54 +258,38 @@ export class FileExportService {
     if (!content.startsWith('---\n')) {
       return content;
     }
-    
+
     // Find the end of frontmatter by looking for the closing ---
     const lines = content.split('\n');
     let endIndex = -1;
-    
+
     for (let i = 1; i < lines.length; i++) {
       if (lines[i] === '---') {
         endIndex = i;
         break;
       }
     }
-    
+
     if (endIndex === -1) {
       // No closing frontmatter found, return original content
       return content;
     }
-    
+
     // Return content after frontmatter (skip the closing --- line and following newline)
     return lines.slice(endIndex + 1).join('\n');
   }
 
   /**
-   * Format content as markdown with metadata header
+   * Format content as markdown without metadata header
    */
   private formatMarkdownContent(
-    url: string, 
-    title: string, 
-    content: string, 
+    url: string,
+    title: string,
+    content: string,
     metadata?: any
   ): string {
-    const timestamp = new Date().toISOString();
-    
-    // Create YAML frontmatter
-    const frontmatter = [
-      '---',
-      `url: "${url}"`,
-      `title: "${title || 'Untitled'}"`,
-      `crawled_at: "${timestamp}"`,
-      metadata?.status ? `status: ${metadata.status}` : '',
-      metadata?.contentType ? `content_type: "${metadata.contentType}"` : '',
-      metadata?.loadTime ? `load_time: ${metadata.loadTime}ms` : '',
-      metadata?.usedBrowser ? `browser_mode: ${metadata.usedBrowser}` : '',
-      '---',
-      ''
-    ].filter(Boolean).join('\n');
-    
-    // Combine frontmatter with content
-    return frontmatter + '\n' + (content || '');
+    // Return content directly without YAML frontmatter
+    return content || '';
   }
 
   /**
@@ -327,7 +311,7 @@ export class FileExportService {
     try {
       const filename = `${crawlId}_summary.md`;
       const filepath = path.join(this.outputDir, crawlId, filename);
-      
+
       const summaryContent = [
         '# Crawl Summary',
         '',
@@ -349,11 +333,11 @@ export class FileExportService {
         ...summary.exportedFiles.map(file => `- ${path.basename(file)}`),
         ''
       ].join('\n');
-      
+
       await fs.promises.writeFile(filepath, summaryContent, 'utf8');
-      
+
       logger.info(`Exported crawl summary: ${filepath}`, { crawlId });
-      
+
       return filepath;
     } catch (error) {
       logger.error(`Failed to export crawl summary`, {
@@ -388,15 +372,15 @@ export class FileExportService {
    */
   private extractTitleFromFrontmatter(content: string, filename: string): string {
     let title = filename.replace('.md', ''); // Default fallback
-    
+
     if (!content.startsWith('---\n')) {
       return title;
     }
-    
+
     const lines = content.split('\n');
     for (let i = 1; i < lines.length; i++) {
       if (lines[i] === '---') break;
-      
+
       if (lines[i].startsWith('title: ')) {
         let titleValue = lines[i].substring(7).trim();
         if (titleValue.startsWith('"') && titleValue.endsWith('"')) {
@@ -408,7 +392,7 @@ export class FileExportService {
         break;
       }
     }
-    
+
     return title;
   }
 
@@ -426,7 +410,7 @@ export class FileExportService {
     const content = await fs.promises.readFile(filePath, 'utf8');
     const title = this.extractTitleFromFrontmatter(content, filename);
     const contentWithoutFrontmatter = this.removeFrontmatter(content);
-    
+
     return `## ${title}\n\n${contentWithoutFrontmatter}\n\n---\n\n`;
   }
 
@@ -435,13 +419,13 @@ export class FileExportService {
    */
   private async exportAsMarkdown(crawlId: string, markdownFiles: string[], crawlDir: string, consolidatedPath: string): Promise<void> {
     let consolidatedContent = this.generateMarkdownHeader(crawlId, markdownFiles.length);
-    
+
     for (const file of markdownFiles) {
       const filePath = path.join(crawlDir, file);
       const fileContent = await this.processMarkdownFile(filePath, file);
       consolidatedContent += fileContent;
     }
-    
+
     await fs.promises.writeFile(consolidatedPath, consolidatedContent, 'utf8');
   }
 
@@ -450,22 +434,22 @@ export class FileExportService {
    */
   private parseFrontmatterMetadata(content: string): Record<string, any> {
     let metadata = {};
-    
+
     if (!content.startsWith('---\n')) {
       return metadata;
     }
-    
+
     try {
       const lines = content.split('\n');
       let endIndex = -1;
-      
+
       for (let i = 1; i < lines.length; i++) {
         if (lines[i] === '---') {
           endIndex = i;
           break;
         }
       }
-      
+
       if (endIndex > 0) {
         const frontmatterLines = lines.slice(1, endIndex);
         metadata = this.parseFrontmatterLines(frontmatterLines);
@@ -473,7 +457,7 @@ export class FileExportService {
     } catch (e) {
       // Ignore parsing errors
     }
-    
+
     return metadata;
   }
 
@@ -482,24 +466,24 @@ export class FileExportService {
    */
   private parseFrontmatterLines(lines: string[]): Record<string, any> {
     const metadata: Record<string, any> = {};
-    
+
     lines.forEach(line => {
       const colonIndex = line.indexOf(':');
       if (colonIndex > 0) {
         const key = line.substring(0, colonIndex).trim();
         let value = line.substring(colonIndex + 1).trim();
-        
+
         // Remove quotes if present
         if (value.startsWith('"') && value.endsWith('"')) {
           value = value.slice(1, -1);
         }
-        
+
         if (key && this.isValidMetadataKey(key)) {
           metadata[key] = value;
         }
       }
     });
-    
+
     return metadata;
   }
 
@@ -510,7 +494,7 @@ export class FileExportService {
     const content = await fs.promises.readFile(filePath, 'utf8');
     const metadata = this.parseFrontmatterMetadata(content);
     const contentWithoutFrontmatter = this.removeFrontmatter(content);
-    
+
     return {
       filename,
       metadata,
@@ -528,13 +512,13 @@ export class FileExportService {
       totalFiles: markdownFiles.length,
       pages: []
     };
-    
+
     for (const file of markdownFiles) {
       const filePath = path.join(crawlDir, file);
       const pageData = await this.processFileForJson(filePath, file);
       (jsonData.pages as any).push(pageData);
     }
-    
+
     await fs.promises.writeFile(consolidatedPath, JSON.stringify(jsonData, null, 2), 'utf8');
   }
 
@@ -548,16 +532,16 @@ export class FileExportService {
     try {
       const crawlDir = path.join(this.outputDir, crawlId);
       const markdownFiles = await this.validateAndGetMarkdownFiles(crawlDir);
-      
+
       const consolidatedFilename = `${crawlId}_consolidated.${format}`;
       const consolidatedPath = path.join(crawlDir, consolidatedFilename);
-      
+
       if (format === 'markdown') {
         await this.exportAsMarkdown(crawlId, markdownFiles, crawlDir, consolidatedPath);
       } else if (format === 'json') {
         await this.exportAsJson(crawlId, markdownFiles, crawlDir, consolidatedPath);
       }
-      
+
       logger.info(`Exported consolidated ${format} file: ${consolidatedPath}`, { crawlId, format });
       return consolidatedPath;
     } catch (error) {
@@ -576,18 +560,18 @@ export class FileExportService {
   async cleanupOldCrawls(daysOld: number = 7): Promise<void> {
     try {
       const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
-      
+
       if (!fs.existsSync(this.outputDir)) {
         return;
       }
-      
+
       const entries = await fs.promises.readdir(this.outputDir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const dirPath = path.join(this.outputDir, entry.name);
           const stats = await fs.promises.stat(dirPath);
-          
+
           if (stats.mtime.getTime() < cutoffTime) {
             await fs.promises.rm(dirPath, { recursive: true, force: true });
             logger.info(`Cleaned up old crawl directory: ${dirPath}`);

@@ -2,12 +2,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { redisClient } from './redis.service';
 import { logger } from '../utils/logger';
 import scraperManager, { ScraperManager } from '../scraper/scraper-manager';
-import { 
-  BatchScrapeRequest, 
-  BatchScrapeJob, 
+import {
+  BatchScrapeRequest,
+  BatchScrapeJob,
   BatchScrapeStatusResponse,
   ScraperOptions,
-  ScraperResponse 
+  ScraperResponse
 } from '../types';
 import axios from 'axios';
 
@@ -36,7 +36,7 @@ export class BatchScrapeService {
     const batchId = uuidv4();
     const concurrency = Math.min(request.concurrency ?? BatchScrapeService.DEFAULT_CONCURRENCY, BatchScrapeService.MAX_CONCURRENCY);
     const timeout = request.timeout ?? BatchScrapeService.DEFAULT_TIMEOUT;
-    
+
     // Estimate processing time based on URL count and concurrency
     const estimatedTime = Math.ceil((request.urls.length / concurrency) * 30000); // ~30s per URL
 
@@ -123,7 +123,7 @@ export class BatchScrapeService {
     const failedJobs = jobs.filter(job => job.status === 'failed');
     const pendingJobs = jobs.filter(job => job.status === 'pending' || job.status === 'processing');
 
-    const progress = metadata.totalUrls > 0 
+    const progress = metadata.totalUrls > 0
       ? Math.round(((completedJobs.length + failedJobs.length) / metadata.totalUrls) * 100)
       : 0;
 
@@ -131,7 +131,7 @@ export class BatchScrapeService {
     let status = metadata.status;
     if (status === 'processing' && pendingJobs.length === 0) {
       status = failedJobs.length === 0 ? 'completed' : 'completed_with_errors';
-      
+
       // Update metadata status
       metadata.status = status;
       metadata.endTime = Date.now();
@@ -241,10 +241,10 @@ export class BatchScrapeService {
           logger.error(`Error processing job ${job.id}`, { error: (error as Error).message });
         } finally {
           activeJobs--;
-          
+
           // Save updated jobs
           await redisClient.set(`${BatchScrapeService.BATCH_JOBS_KEY_PREFIX}${batchId}`, JSON.stringify(jobs), 'EX', 86400);
-          
+
           // Process next job if available
           if (jobIndex < jobs.length && activeJobs < concurrency) {
             processingPromises.push(processNextJob());
@@ -267,7 +267,7 @@ export class BatchScrapeService {
 
     } catch (error) {
       logger.error(`Batch processing failed for ${batchId}`, { error: (error as Error).message });
-      
+
       // Update status to failed
       const metadataStr = await redisClient.get(`${BatchScrapeService.BATCH_KEY_PREFIX}${batchId}`);
       if (metadataStr) {
@@ -312,12 +312,12 @@ export class BatchScrapeService {
 
       } catch (error) {
         job.retryCount = attempt;
-        
+
         if (attempt < maxRetries) {
           logger.warn(`Job ${job.id} failed, retrying (${attempt + 1}/${maxRetries})`, {
             error: (error as Error).message
           });
-          
+
           // Exponential backoff
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         } else {
@@ -325,7 +325,7 @@ export class BatchScrapeService {
           job.error = (error as Error).message;
           job.endTime = Date.now();
           job.processingTime = job.endTime - (job.startTime ?? job.endTime);
-          
+
           logger.error(`Job ${job.id} failed after ${maxRetries + 1} attempts`, {
             error: (error as Error).message
           });
@@ -353,9 +353,9 @@ export class BatchScrapeService {
 
       logger.info(`Webhook sent successfully`, { webhookUrl });
     } catch (error) {
-      logger.error(`Failed to send webhook`, { 
-        webhookUrl, 
-        error: (error as Error).message 
+      logger.error(`Failed to send webhook`, {
+        webhookUrl,
+        error: (error as Error).message
       });
     }
   }
@@ -406,7 +406,7 @@ export class BatchScrapeService {
 
       const jobs: BatchScrapeJob[] = JSON.parse(jobsStr);
       const job = jobs.find(j => j.id === jobId);
-      
+
       if (!job || job.status !== 'completed' || !job.result) {
         return null;
       }
@@ -427,10 +427,10 @@ export class BatchScrapeService {
    */
   async cleanup(olderThanDays: number = 7): Promise<void> {
     const cutoffTime = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
-    
+
     try {
       const keys = await redisClient.keys(`${BatchScrapeService.BATCH_KEY_PREFIX}*`);
-      
+
       for (const key of keys) {
         const metadataStr = await redisClient.get(key);
         if (metadataStr) {

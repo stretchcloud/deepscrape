@@ -235,25 +235,11 @@ class FileExportService {
         return lines.slice(endIndex + 1).join('\n');
     }
     /**
-     * Format content as markdown with metadata header
+     * Format content as markdown without metadata header
      */
     formatMarkdownContent(url, title, content, metadata) {
-        const timestamp = new Date().toISOString();
-        // Create YAML frontmatter
-        const frontmatter = [
-            '---',
-            `url: "${url}"`,
-            `title: "${title || 'Untitled'}"`,
-            `crawled_at: "${timestamp}"`,
-            metadata?.status ? `status: ${metadata.status}` : '',
-            metadata?.contentType ? `content_type: "${metadata.contentType}"` : '',
-            metadata?.loadTime ? `load_time: ${metadata.loadTime}ms` : '',
-            metadata?.usedBrowser ? `browser_mode: ${metadata.usedBrowser}` : '',
-            '---',
-            ''
-        ].filter(Boolean).join('\n');
-        // Combine frontmatter with content
-        return frontmatter + '\n' + (content || '');
+        // Return content directly without YAML frontmatter
+        return content || '';
     }
     /**
      * Export crawl summary with all discovered URLs

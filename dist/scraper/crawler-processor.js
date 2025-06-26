@@ -35,6 +35,15 @@ async function processCrawlJob(job) {
             // This is a job to scrape a specific page
             return await handlePageScrape(url, scrapeOptions, crawlId);
         }
+        else if (mode === 'streaming-initial' || mode === 'streaming-discovered') {
+            // These are streaming jobs that should scrape pages and export files immediately
+            logger_1.logger.info(`Processing streaming job (${mode}) for crawl ${crawlId}`, {
+                url,
+                discoveryMethod: scrapeOptions.discoveryMethod,
+                streamingDiscovery: scrapeOptions.streamingDiscovery
+            });
+            return await handlePageScrape(url, scrapeOptions, crawlId);
+        }
         else {
             throw new Error(`Unknown job mode: ${mode}`);
         }
@@ -209,8 +218,9 @@ function extractOriginalHtml(result) {
 /**
  * Export page content to file and track it
  */
-async function exportPageContent(url, result, crawlId, useBrowser) {
+async function exportPageContent(url, result, crawlId, useBrowser, isStreaming = false, discoveryMethod) {
     if (!result.content || result.contentType !== 'markdown') {
+        logger_1.logger.debug(`Skipping export for ${url} - no markdown content`, { crawlId, contentType: result.contentType });
         return;
     }
     try {
@@ -220,13 +230,21 @@ async function exportPageContent(url, result, crawlId, useBrowser) {
             loadTime: result.metadata?.loadTime,
             usedBrowser: useBrowser,
             processingTime: result.metadata?.processingTime,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            isStreaming,
+            discoveryMethod
         });
         await (0, redis_service_1.addExportedFile)(crawlId, exportedFilePath);
-        logger_1.logger.info(`Page exported to file: ${exportedFilePath}`, {
+        const logMessage = isStreaming
+            ? `🚀 STREAMING: Page exported to file in real-time: ${exportedFilePath}`
+            : `Page exported to file: ${exportedFilePath}`;
+        logger_1.logger.info(logMessage, {
             url,
             crawlId,
-            contentLength: result.content.length
+            contentLength: result.content.length,
+            isStreaming,
+            discoveryMethod,
+            filePath: exportedFilePath
         });
     }
     catch (exportError) {
@@ -275,6 +293,9 @@ async function handlePageScrape(url, scrapeOptions, crawlId) {
     });
     const originalHtml = extractOriginalHtml(result);
     logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
-    await exportPageContent(url, result, crawlId, useBrowser);
+    // Determine if this is a streaming job and get discovery method
+    const isStreaming = scrapeOptions.streamingDiscovery === true;
+    const discoveryMethod = scrapeOptions.discoveryMethod;
+    await exportPageContent(url, result, crawlId, useBrowser, isStreaming, discoveryMethod);
     return buildPageScrapeResponse(result, originalHtml, useBrowser);
 }

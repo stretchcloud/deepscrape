@@ -10,7 +10,7 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   try {
     const $ = load(html);
     const links: string[] = [];
-    
+
     $('a').each((_, element) => {
       const href = $(element).attr('href');
       if (href) {
@@ -22,10 +22,10 @@ export function extractLinks(html: string, baseUrl: string): string[] {
         }
       }
     });
-    
+
     return [...new Set(links)]; // Deduplicate links
   } catch (error) {
     console.error('Error extracting links from HTML', error);
     return [];
   }
-} 
+}

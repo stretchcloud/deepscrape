@@ -8,6 +8,7 @@ import path from 'path';
 import scraperRoutes from './api/routes/scraper';
 import crawlerRoutes from './api/routes/crawler.routes';
 import batchScrapeRoutes from './api/routes/batch-scrape.routes';
+import mapRoutes from './api/routes/map.routes';
 import { logger } from './utils/logger';
 import { initQueue, initializeWorker, closeQueue } from './services/queue.service';
 
@@ -47,6 +48,7 @@ app.use(morgan('combined', { stream: accessLogStream })); // HTTP request loggin
 app.use('/api', scraperRoutes);
 app.use('/api/crawl', crawlerRoutes);
 app.use('/api/batch', batchScrapeRoutes);
+app.use('/api/map', mapRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -83,8 +85,25 @@ async function initializeCrawlQueue() {
     
     // Graceful shutdown
     const shutdown = async () => {
-      logger.info('Shutting down enhanced queue service...');
-      await closeQueue();
+      logger.info('Shutting down services...');
+      
+      try {
+        // Import browser pool service for shutdown
+        const { BrowserPoolService } = await import('./services/browser-pool.service');
+        const browserPool = BrowserPoolService.getInstance();
+        await browserPool.shutdown();
+        logger.info('Browser pool shut down successfully');
+      } catch (error) {
+        logger.error('Error shutting down browser pool:', error);
+      }
+      
+      try {
+        await closeQueue();
+        logger.info('Queue service shut down successfully');
+      } catch (error) {
+        logger.error('Error shutting down queue service:', error);
+      }
+      
       process.exit(0);
     };
     

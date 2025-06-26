@@ -2,9 +2,9 @@
  * Types for schema-based extraction
  */
 
-export type SchemaPropertyType = 
-  | 'string' 
-  | 'number' 
+export type SchemaPropertyType =
+  | 'string'
+  | 'number'
   | 'integer'
   | 'boolean'
   | 'array'
@@ -103,7 +103,7 @@ export const ExampleSchemas = {
     },
     required: ['title', 'content']
   },
-  
+
   product: {
     type: 'object',
     title: 'Product',
@@ -153,7 +153,7 @@ export const ExampleSchemas = {
     },
     required: ['name', 'price']
   },
-  
+
   table: {
     type: 'object',
     title: 'Table',
@@ -190,4 +190,4 @@ export const ExampleSchemas = {
     },
     required: ['rows']
   }
-}; 
+};

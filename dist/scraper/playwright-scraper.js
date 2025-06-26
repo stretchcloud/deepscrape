@@ -145,7 +145,7 @@ class PlaywrightScraper {
         const title = await page.title();
         // Get response info
         let status = 0;
-        let headers = {};
+        const headers = {};
         try {
             const responseInfo = await page.evaluate(() => {
                 const perf = window.performance.getEntriesByType('navigation')[0];
