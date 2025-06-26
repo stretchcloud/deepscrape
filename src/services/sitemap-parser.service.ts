@@ -307,7 +307,7 @@ export class SitemapParserService {
     return new Promise((resolve, reject) => {
       parseString(content, { explicitArray: false }, (err, result) => {
         if (err) {
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
           return;
         }
 

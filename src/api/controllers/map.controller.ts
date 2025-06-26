@@ -20,6 +20,18 @@ export class MapController {
     const startTime = Date.now();
     
     try {
+      const requestData = req.body as MapRequest;
+      
+      // Validate request
+      const validationError = this.validateRequest(requestData);
+      if (validationError) {
+        res.status(400).json({
+          success: false,
+          error: validationError
+        });
+        return;
+      }
+
       const {
         url,
         maxUrls = 5000,
@@ -31,90 +43,9 @@ export class MapController {
         timeoutMs = 30000,
         includePatterns,
         excludePatterns,
-        // Rate limiting options
         rateLimitingOptions = {},
-        // NEW: Crawl options
         crawlOptions = {}
-      } = req.body as MapRequest;
-
-      // Validate required fields
-      if (!url) {
-        res.status(400).json({
-          success: false,
-          error: 'URL is required'
-        });
-        return;
-      }
-
-      // Validate URL format
-      try {
-        new URL(url);
-      } catch {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid URL format'
-        });
-        return;
-      }
-
-      // Validate maxUrls
-      if (maxUrls < 1 || maxUrls > 30000) {
-        res.status(400).json({
-          success: false,
-          error: 'maxUrls must be between 1 and 30,000'
-        });
-        return;
-      }
-
-      // Validate timeoutMs
-      if (timeoutMs < 1000 || timeoutMs > 300000) {
-        res.status(400).json({
-          success: false,
-          error: 'timeoutMs must be between 1,000ms and 300,000ms (5 minutes)'
-        });
-        return;
-      }
-
-      // Validate crawl options
-      if (crawlOptions.maxCrawlDepth !== undefined && (crawlOptions.maxCrawlDepth < 1 || crawlOptions.maxCrawlDepth > 5)) {
-        res.status(400).json({
-          success: false,
-          error: 'maxCrawlDepth must be between 1 and 5'
-        });
-        return;
-      }
-
-      if (crawlOptions.maxConcurrentCrawlers !== undefined && (crawlOptions.maxConcurrentCrawlers < 1 || crawlOptions.maxConcurrentCrawlers > 20)) {
-        res.status(400).json({
-          success: false,
-          error: 'maxConcurrentCrawlers must be between 1 and 20'
-        });
-        return;
-      }
-
-      if (crawlOptions.crawlTimeoutPerPage !== undefined && (crawlOptions.crawlTimeoutPerPage < 1000 || crawlOptions.crawlTimeoutPerPage > 10000)) {
-        res.status(400).json({
-          success: false,
-          error: 'crawlTimeoutPerPage must be between 1,000ms and 10,000ms'
-        });
-        return;
-      }
-
-      if (crawlOptions.maxLinksPerPage !== undefined && (crawlOptions.maxLinksPerPage < 1 || crawlOptions.maxLinksPerPage > 500)) {
-        res.status(400).json({
-          success: false,
-          error: 'maxLinksPerPage must be between 1 and 500'
-        });
-        return;
-      }
-
-      if (crawlOptions.browserPoolSize !== undefined && (crawlOptions.browserPoolSize < 1 || crawlOptions.browserPoolSize > 15)) {
-        res.status(400).json({
-          success: false,
-          error: 'browserPoolSize must be between 1 and 15'
-        });
-        return;
-      }
+      } = requestData;
 
       logger.info('Starting URL discovery', {
         url,
@@ -143,7 +74,7 @@ export class MapController {
       };
 
       // Run URL discovery with timeout wrapper to prevent hanging
-      const discoveryTimeoutMs = timeoutMs || 30000; // Use user-provided timeout or default to 30 seconds
+      const discoveryTimeoutMs = timeoutMs ?? 30000; // Use user-provided timeout or default to 30 seconds
       
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error(`Discovery timeout after ${discoveryTimeoutMs}ms`)), discoveryTimeoutMs)
@@ -205,7 +136,7 @@ export class MapController {
           fromCache: false
         },
         metadata: {
-          url: req.body?.url || '',
+          url: req.body?.url ?? '',
           includeSubdomains: req.body?.includeSubdomains ?? true,
           maxUrls: req.body?.maxUrls ?? 5000,
           timestamp: new Date().toISOString()
@@ -310,5 +241,59 @@ export class MapController {
         error: 'Service dependencies unavailable'
       });
     }
+  }
+
+  /**
+   * Validate request parameters
+   */
+  private validateRequest(data: MapRequest): string | null {
+    const { url, maxUrls = 5000, timeoutMs = 30000, crawlOptions = {} } = data;
+
+    if (!url) {
+      return 'URL is required';
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      return 'Invalid URL format';
+    }
+
+    if (maxUrls < 1 || maxUrls > 30000) {
+      return 'maxUrls must be between 1 and 30,000';
+    }
+
+    if (timeoutMs < 1000 || timeoutMs > 300000) {
+      return 'timeoutMs must be between 1,000ms and 300,000ms (5 minutes)';
+    }
+
+    return this.validateCrawlOptions(crawlOptions);
+  }
+
+  /**
+   * Validate crawl options
+   */
+  private validateCrawlOptions(crawlOptions: any): string | null {
+    if (crawlOptions.maxCrawlDepth !== undefined && (crawlOptions.maxCrawlDepth < 1 || crawlOptions.maxCrawlDepth > 5)) {
+      return 'maxCrawlDepth must be between 1 and 5';
+    }
+
+    if (crawlOptions.maxConcurrentCrawlers !== undefined && (crawlOptions.maxConcurrentCrawlers < 1 || crawlOptions.maxConcurrentCrawlers > 20)) {
+      return 'maxConcurrentCrawlers must be between 1 and 20';
+    }
+
+    if (crawlOptions.crawlTimeoutPerPage !== undefined && (crawlOptions.crawlTimeoutPerPage < 1000 || crawlOptions.crawlTimeoutPerPage > 10000)) {
+      return 'crawlTimeoutPerPage must be between 1,000ms and 10,000ms';
+    }
+
+    if (crawlOptions.maxLinksPerPage !== undefined && (crawlOptions.maxLinksPerPage < 1 || crawlOptions.maxLinksPerPage > 500)) {
+      return 'maxLinksPerPage must be between 1 and 500';
+    }
+
+    if (crawlOptions.browserPoolSize !== undefined && (crawlOptions.browserPoolSize < 1 || crawlOptions.browserPoolSize > 15)) {
+      return 'browserPoolSize must be between 1 and 15';
+    }
+
+    return null;
   }
 }

@@ -45,7 +45,7 @@ export interface PoolStats {
  */
 export class BrowserPoolService extends EventEmitter {
   private static instance: BrowserPoolService;
-  private browsers: Map<string, PooledBrowser> = new Map();
+  private readonly browsers: Map<string, PooledBrowser> = new Map();
   private availableBrowsers: string[] = [];
   private readonly options: Required<BrowserPoolOptions>;
   private cleanupInterval?: NodeJS.Timeout;
@@ -369,7 +369,8 @@ export class BrowserPoolService extends EventEmitter {
 
     // Reuse context with least active pages
     return browser.contexts.reduce((min, ctx) =>
-      ctx.activePages < min.activePages ? ctx : min
+      ctx.activePages < min.activePages ? ctx : min,
+      browser.contexts[0]
     );
   }
 

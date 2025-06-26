@@ -10,7 +10,6 @@ import {
 } from '../../types/crawler';
 import { logger } from '../../utils/logger';
 import { WebCrawler } from '../../scraper/crawler';
-import { URLDiscoveryService } from '../../services/url-discovery.service';
 import { CrawlKickoffService } from '../../services/crawl-kickoff.service';
 import { 
   saveCrawl, 

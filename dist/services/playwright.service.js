@@ -751,104 +751,7 @@ class PlaywrightService extends events_1.EventEmitter {
                 if (this.crawledUrls.size >= limit)
                     break;
                 // Process batch concurrently with controlled parallelism
-                await Promise.allSettled(batch.map(async (url) => {
-                    if (this.crawledUrls.size >= limit)
-                        return;
-                    if (this.crawledUrls.has(url) || this.urlsInProgress.has(url))
-                        return;
-                    // Skip URLs that are likely to be slow or unproductive
-                    try {
-                        const urlObj = new URL(url);
-                        const path = urlObj.pathname.toLowerCase();
-                        const search = urlObj.search.toLowerCase();
-                        // Skip login, signup, and authentication pages
-                        if (path.includes('/signin') || path.includes('/login') ||
-                            path.includes('/signup') || path.includes('/register') ||
-                            search.includes('signin') || search.includes('continue=')) {
-                            return;
-                        }
-                        // Skip pages with language parameters that might be duplicates
-                        if (search.includes('hl=') && !search.includes('hl=en')) {
-                            return;
-                        }
-                    }
-                    catch {
-                        // If URL parsing fails, skip this URL
-                        return;
-                    }
-                    this.urlsInProgress.add(url);
-                    try {
-                        // Use browser pool for page acquisition with timeout
-                        const { page, browserId } = await Promise.race([
-                            browser_pool_service_1.browserPool.getPage(),
-                            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser pool timeout')), 10000))
-                        ]);
-                        try {
-                            const response = await this.crawlPageEnhanced(page, url, {
-                                ...options,
-                                maxLinksPerPage
-                            });
-                            this.crawledUrls.add(url);
-                            this.totalCrawled++;
-                            // Filter and add new links with enhanced filtering
-                            const newLinks = this.filterDiscoveredLinks(response.links, baseUrl, includePaths, excludePaths, excludeDomains, maxLinksPerPage);
-                            // Add new links to discovered set and to visit queue
-                            for (const link of newLinks) {
-                                // Clean the URL (remove fragments)
-                                const cleanUrl = new URL(link);
-                                cleanUrl.hash = '';
-                                const cleanLink = cleanUrl.toString();
-                                if (!this.discoveredUrls.has(cleanLink)) {
-                                    this.discoveredUrls.add(cleanLink);
-                                    // Only add to visit queue if deep crawling is enabled
-                                    if (enableDeepCrawling) {
-                                        this.urlsToVisit.push(cleanLink);
-                                    }
-                                    this.totalDiscovered++;
-                                    // Emit an event for each new discovered URL
-                                    this.emit('url-discovered', {
-                                        url: cleanLink,
-                                        totalDiscovered: this.totalDiscovered,
-                                        depth: currentDepth + 1
-                                    });
-                                    if (this.totalDiscovered >= limit)
-                                        break;
-                                }
-                            }
-                            // Emit crawled event
-                            this.emit('url-crawled', {
-                                url,
-                                totalCrawled: this.totalCrawled,
-                                newUrls: newLinks.length,
-                                depth: currentDepth + 1
-                            });
-                        }
-                        finally {
-                            // Always release the page back to the pool
-                            try {
-                                await browser_pool_service_1.browserPool.releasePage(page, browserId);
-                            }
-                            catch (releaseError) {
-                                logger_1.logger.warn(`Failed to release page for ${url}`, {
-                                    error: releaseError.message
-                                });
-                            }
-                        }
-                    }
-                    catch (error) {
-                        const errorMessage = error.message;
-                        if (!errorMessage.includes('Browser pool timeout') &&
-                            !errorMessage.includes('Page evaluation timeout')) {
-                            logger_1.logger.error(`Enhanced discovery error for ${url}`, {
-                                error: errorMessage,
-                                depth: currentDepth + 1
-                            });
-                        }
-                    }
-                    finally {
-                        this.urlsInProgress.delete(url);
-                    }
-                }));
+                await Promise.allSettled(batch.map(url => this.processUrlInBatch(url, limit, browser_pool_service_1.browserPool, options, maxLinksPerPage, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth)));
                 // Add a small delay between batches to prevent overwhelming the target server
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
@@ -951,6 +854,129 @@ class PlaywrightService extends events_1.EventEmitter {
         });
         // Limit the number of links processed per page
         return filtered.slice(0, maxLinksPerPage);
+    }
+    /**
+     * Process a single URL in a batch during enhanced discovery
+     */
+    async processUrlInBatch(url, limit, browserPool, options, maxLinksPerPage, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth) {
+        if (this.crawledUrls.size >= limit)
+            return;
+        if (this.crawledUrls.has(url) || this.urlsInProgress.has(url))
+            return;
+        if (!this.shouldProcessUrl(url))
+            return;
+        this.urlsInProgress.add(url);
+        try {
+            const { page, browserId } = await this.acquirePageWithTimeout(browserPool);
+            try {
+                const response = await this.crawlPageEnhanced(page, url, {
+                    ...options,
+                    maxLinksPerPage
+                });
+                await this.processDiscoveryResponse(url, response, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth, limit);
+            }
+            finally {
+                await this.releasePageSafely(page, browserId, browserPool, url);
+            }
+        }
+        catch (error) {
+            this.handleDiscoveryError(error, url, currentDepth);
+        }
+        finally {
+            this.urlsInProgress.delete(url);
+        }
+    }
+    /**
+     * Check if URL should be processed based on filtering rules
+     */
+    shouldProcessUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const path = urlObj.pathname.toLowerCase();
+            const search = urlObj.search.toLowerCase();
+            // Skip login, signup, and authentication pages
+            if (path.includes('/signin') || path.includes('/login') ||
+                path.includes('/signup') || path.includes('/register') ||
+                search.includes('signin') || search.includes('continue=')) {
+                return false;
+            }
+            // Skip pages with language parameters that might be duplicates
+            if (search.includes('hl=') && !search.includes('hl=en')) {
+                return false;
+            }
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    /**
+     * Acquire page from browser pool with timeout
+     */
+    async acquirePageWithTimeout(browserPool) {
+        return Promise.race([
+            browserPool.getPage(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser pool timeout')), 10000))
+        ]);
+    }
+    /**
+     * Process discovery response and add new URLs
+     */
+    async processDiscoveryResponse(url, response, baseUrl, includePaths, excludePaths, excludeDomains, enableDeepCrawling, currentDepth, limit) {
+        this.crawledUrls.add(url);
+        this.totalCrawled++;
+        const newLinks = this.filterDiscoveredLinks(response.links, baseUrl, includePaths, excludePaths, excludeDomains, 100);
+        for (const link of newLinks) {
+            const cleanUrl = new URL(link);
+            cleanUrl.hash = '';
+            const cleanLink = cleanUrl.toString();
+            if (!this.discoveredUrls.has(cleanLink)) {
+                this.discoveredUrls.add(cleanLink);
+                if (enableDeepCrawling) {
+                    this.urlsToVisit.push(cleanLink);
+                }
+                this.totalDiscovered++;
+                this.emit('url-discovered', {
+                    url: cleanLink,
+                    totalDiscovered: this.totalDiscovered,
+                    depth: currentDepth + 1
+                });
+                if (this.totalDiscovered >= limit)
+                    break;
+            }
+        }
+        this.emit('url-crawled', {
+            url,
+            totalCrawled: this.totalCrawled,
+            newUrls: newLinks.length,
+            depth: currentDepth + 1
+        });
+    }
+    /**
+     * Safely release page back to browser pool
+     */
+    async releasePageSafely(page, browserId, browserPool, url) {
+        try {
+            await browserPool.releasePage(page, browserId);
+        }
+        catch (releaseError) {
+            logger_1.logger.warn(`Failed to release page for ${url}`, {
+                error: releaseError.message
+            });
+        }
+    }
+    /**
+     * Handle discovery errors with appropriate logging
+     */
+    handleDiscoveryError(error, url, currentDepth) {
+        const errorMessage = error.message;
+        if (!errorMessage.includes('Browser pool timeout') &&
+            !errorMessage.includes('Page evaluation timeout')) {
+            logger_1.logger.error(`Enhanced discovery error for ${url}`, {
+                error: errorMessage,
+                depth: currentDepth + 1
+            });
+        }
     }
     /**
      * Close the browser and context

@@ -714,77 +714,136 @@ export class URLDiscoveryService {
     try {
       logger.debug('Starting streaming robots discovery', { url });
 
-      const baseUrl = new URL(url);
-      const robotsUrl = `${baseUrl.origin}/robots.txt`;
+      const robotsContent = await this.fetchRobotsContent(url, timeout);
+      if (!robotsContent) {
+        return this.createStreamingResult('robots', urlsFound, batchesStreamed, startTime, true);
+      }
 
-      // Fetch and parse robots.txt
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      const sitemapUrls = this.extractSitemapUrls(robotsContent);
+      const results = await this.processSitemaps(sitemapUrls, urlHandler);
+      
+      urlsFound = results.urlsFound;
+      batchesStreamed = results.batchesStreamed;
 
+      return this.createStreamingResult('robots', urlsFound, batchesStreamed, startTime, true);
+    } catch (error) {
+      return this.createStreamingResult('robots', urlsFound, batchesStreamed, startTime, false, (error as Error).message);
+    }
+  }
+
+  /**
+   * Fetch robots.txt content with timeout
+   */
+  private async fetchRobotsContent(url: string, timeout: number): Promise<string | null> {
+    const baseUrl = new URL(url);
+    const robotsUrl = `${baseUrl.origin}/robots.txt`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
       const response = await fetch(robotsUrl, {
         signal: controller.signal,
         headers: { 'User-Agent': 'DeepScraper/1.0 Discovery Bot' }
       });
 
       clearTimeout(timeoutId);
+      return response.ok ? await response.text() : null;
+    } catch {
+      clearTimeout(timeoutId);
+      return null;
+    }
+  }
 
-      if (response.ok) {
-        const robotsContent = await response.text();
-        const sitemapUrls: string[] = [];
-
-        // Extract sitemap URLs from robots.txt
-        const lines = robotsContent.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.toLowerCase().startsWith('sitemap:')) {
-            const sitemapUrl = trimmed.substring(8).trim();
-            if (URLValidationUtils.isValidUrl(sitemapUrl)) {
-              sitemapUrls.push(sitemapUrl);
-            }
-          }
-        }
-
-        // Process each sitemap found in robots.txt
-        for (const sitemapUrl of sitemapUrls) {
-          try {
-            const urls = await this.sitemapParser.parseSitemap(sitemapUrl);
-            if (urls.length > 0) {
-              // Stream in batches
-              const batchSize = 50;
-              for (let i = 0; i < urls.length; i += batchSize) {
-                const batch = urls.slice(i, i + batchSize);
-                await urlHandler(batch);
-                urlsFound += batch.length;
-                batchesStreamed++;
-
-                await new Promise(resolve => setTimeout(resolve, 20));
-              }
-            }
-          } catch (error) {
-            logger.debug(`Failed to parse sitemap from robots.txt: ${sitemapUrl}`, {
-              error: (error as Error).message
-            });
-          }
+  /**
+   * Extract sitemap URLs from robots.txt content
+   */
+  private extractSitemapUrls(robotsContent: string): string[] {
+    const sitemapUrls: string[] = [];
+    const lines = robotsContent.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.toLowerCase().startsWith('sitemap:')) {
+        const sitemapUrl = trimmed.substring(8).trim();
+        if (URLValidationUtils.isValidUrl(sitemapUrl)) {
+          sitemapUrls.push(sitemapUrl);
         }
       }
-
-      return {
-        method: 'robots',
-        urlsFound,
-        batchesStreamed,
-        timeTaken: Date.now() - startTime,
-        completed: true
-      };
-    } catch (error) {
-      return {
-        method: 'robots',
-        urlsFound,
-        batchesStreamed,
-        timeTaken: Date.now() - startTime,
-        completed: false,
-        error: (error as Error).message
-      };
     }
+    
+    return sitemapUrls;
+  }
+
+  /**
+   * Process multiple sitemaps and stream URLs
+   */
+  private async processSitemaps(
+    sitemapUrls: string[], 
+    urlHandler: (urls: string[]) => Promise<void>
+  ): Promise<{urlsFound: number, batchesStreamed: number}> {
+    let urlsFound = 0;
+    let batchesStreamed = 0;
+
+    for (const sitemapUrl of sitemapUrls) {
+      try {
+        const urls = await this.sitemapParser.parseSitemap(sitemapUrl);
+        if (urls.length > 0) {
+          const results = await this.streamUrlsInBatches(urls, urlHandler);
+          urlsFound += results.urlsFound;
+          batchesStreamed += results.batchesStreamed;
+        }
+      } catch (error) {
+        logger.debug(`Failed to parse sitemap from robots.txt: ${sitemapUrl}`, {
+          error: (error as Error).message
+        });
+      }
+    }
+
+    return { urlsFound, batchesStreamed };
+  }
+
+  /**
+   * Stream URLs in batches with delay
+   */
+  private async streamUrlsInBatches(
+    urls: string[], 
+    urlHandler: (urls: string[]) => Promise<void>
+  ): Promise<{urlsFound: number, batchesStreamed: number}> {
+    let urlsFound = 0;
+    let batchesStreamed = 0;
+    const batchSize = 50;
+
+    for (let i = 0; i < urls.length; i += batchSize) {
+      const batch = urls.slice(i, i + batchSize);
+      await urlHandler(batch);
+      urlsFound += batch.length;
+      batchesStreamed++;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+
+    return { urlsFound, batchesStreamed };
+  }
+
+  /**
+   * Create standardized streaming result
+   */
+  private createStreamingResult(
+    method: 'sitemap' | 'browser' | 'commonPaths' | 'robots' | 'search' | 'documents', 
+    urlsFound: number, 
+    batchesStreamed: number, 
+    startTime: number, 
+    completed: boolean, 
+    error?: string
+  ): StreamingMethodResult {
+    return {
+      method,
+      urlsFound,
+      batchesStreamed,
+      timeTaken: Date.now() - startTime,
+      completed,
+      ...(error && { error })
+    };
   }
 
 
