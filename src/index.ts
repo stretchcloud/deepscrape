@@ -34,12 +34,26 @@ const PORT = process.env.PORT ?? 3000;
 
 // Middleware
 app.use(helmet()); // Security headers
-// CORS support with restricted origins for security
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : false,
+
+// CORS configuration
+// TODO: In production, restrict CORS to specific origins for security
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+const corsOptions: cors.CorsOptions = {
+  origin: isDevelopment 
+    ? true // Allow all origins in development
+    : (process.env.ALLOWED_ORIGINS 
+        ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+        : false), // In production, use whitelist or block all
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400, // 24 hours
   optionsSuccessStatus: 200
-}));
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
 app.use(morgan('combined', { stream: accessLogStream })); // HTTP request logging
