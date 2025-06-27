@@ -38,17 +38,31 @@ app.use(helmet()); // Security headers
 // CORS configuration
 // TODO: In production, restrict CORS to specific origins for security
 const isDevelopment = process.env.NODE_ENV !== 'production';
+const corsOpenMode = process.env.CORS_OPEN_MODE === 'true'; // New flag for open CORS
 
 // Function to determine CORS origin based on environment
 function getCorsOrigin() {
+  // If CORS_OPEN_MODE is explicitly set to true, allow all origins
+  if (corsOpenMode) {
+    logger.info('CORS running in OPEN mode - allowing all origins');
+    return true;
+  }
+  
   if (isDevelopment) {
     // Allow all origins in development
+    logger.info('CORS running in development mode - allowing all origins');
     return true;
   } else {
     // In production, use allowed origins from environment or block all
-    return process.env.ALLOWED_ORIGINS 
+    const allowedOrigins = process.env.ALLOWED_ORIGINS 
       ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
       : false;
+    
+    logger.info('CORS running in production mode', { 
+      allowedOrigins: allowedOrigins ?? 'none' 
+    });
+    
+    return allowedOrigins;
   }
 }
 
@@ -76,6 +90,25 @@ app.use('/api/map', mapRoutes);
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'UP', message: 'Service is running' });
+});
+
+// CORS diagnostic endpoint
+app.get('/cors-check', (req, res) => {
+  const origin = req.headers.origin ?? 'no-origin';
+  const corsConfig = {
+    isDevelopment,
+    corsOpenMode,
+    nodeEnv: process.env.NODE_ENV ?? 'not-set',
+    allowedOrigins: process.env.ALLOWED_ORIGINS ?? 'not-set',
+    requestOrigin: origin,
+    corsWillAllow: corsOpenMode || isDevelopment || 
+      (process.env.ALLOWED_ORIGINS?.split(',').includes(origin) ?? false)
+  };
+  
+  res.status(200).json({
+    message: 'CORS configuration check',
+    config: corsConfig
+  });
 });
 
 // Error handling middleware
