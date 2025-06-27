@@ -59,7 +59,7 @@ function getCorsOrigin() {
       : false;
     
     logger.info('CORS running in production mode', { 
-      allowedOrigins: allowedOrigins || 'none' 
+      allowedOrigins: allowedOrigins ?? 'none' 
     });
     
     return allowedOrigins;
@@ -94,15 +94,15 @@ app.get('/health', (req, res) => {
 
 // CORS diagnostic endpoint
 app.get('/cors-check', (req, res) => {
-  const origin = req.headers.origin || 'no-origin';
+  const origin = req.headers.origin ?? 'no-origin';
   const corsConfig = {
     isDevelopment,
     corsOpenMode,
-    nodeEnv: process.env.NODE_ENV || 'not-set',
-    allowedOrigins: process.env.ALLOWED_ORIGINS || 'not-set',
+    nodeEnv: process.env.NODE_ENV ?? 'not-set',
+    allowedOrigins: process.env.ALLOWED_ORIGINS ?? 'not-set',
     requestOrigin: origin,
     corsWillAllow: corsOpenMode || isDevelopment || 
-      (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.split(',').includes(origin))
+      (process.env.ALLOWED_ORIGINS?.split(',').includes(origin) ?? false)
   };
   
   res.status(200).json({
