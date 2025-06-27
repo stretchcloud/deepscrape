@@ -40,11 +40,7 @@ app.use(helmet()); // Security headers
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const corsOptions: cors.CorsOptions = {
-  origin: isDevelopment 
-    ? true // Allow all origins in development
-    : (process.env.ALLOWED_ORIGINS 
-        ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-        : false), // In production, use whitelist or block all
+  origin: getCorsOrigin(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
