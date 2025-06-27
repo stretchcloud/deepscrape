@@ -39,6 +39,19 @@ app.use(helmet()); // Security headers
 // TODO: In production, restrict CORS to specific origins for security
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+// Function to determine CORS origin based on environment
+function getCorsOrigin() {
+  if (isDevelopment) {
+    // Allow all origins in development
+    return true;
+  } else {
+    // In production, use allowed origins from environment or block all
+    return process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+      : false;
+  }
+}
+
 const corsOptions: cors.CorsOptions = {
   origin: getCorsOrigin(),
   credentials: true,
