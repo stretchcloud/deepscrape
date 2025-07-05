@@ -1,10 +1,24 @@
 openapi: 3.0.0
 info:
-  title: Xerox Scraper API
+  title: DeepScraper API
   version: 1.0.0
-  description: API for web scraping and content extraction with support for structured data extraction and summarization
+  description: |
+    DeepScraper is an AI-powered web scraping API with intelligent extraction capabilities.
+    It provides comprehensive web scraping, crawling, batch processing, and URL discovery features.
+    
+    ## Key Features
+    - 🤖 LLM-powered data extraction using OpenAI
+    - 📦 Batch processing with concurrent scraping
+    - 🕷️ Multi-page crawling with configurable strategies
+    - 🗺️ High-performance URL discovery (5000+ URLs in seconds)
+    - 🎭 Browser automation with Playwright
+    - 📝 Multiple output formats (HTML, Markdown, Text)
+    - ⚡ Smart caching with configurable TTL
+    - 🔄 Background job processing with Redis
 
 servers:
+  - url: https://app.extractr.ai
+    description: Production server
   - url: http://localhost:3000
     description: Local development server
 
@@ -14,70 +28,552 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+      description: API key for authentication
 
   schemas:
-    ScraperOptions:
-      type: object
-      properties:
-        waitForSelector:
-          type: string
-          description: CSS selector to wait for before extracting content
-        waitForTimeout:
-          type: integer
-          description: Time in milliseconds to wait before extracting content
-        extractorFormat:
-          type: string
-          enum: [markdown, html]
-          default: markdown
-          description: Format of the extracted content
-        instructions:
-          type: string
-          description: Additional instructions for content extraction
-        temperature:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          default: 0.2
-          description: Temperature for LLM extraction (0.0 to 1.0)
-        maxTokens:
-          type: integer
-          description: Maximum number of tokens for LLM extraction
-        apiKey:
-          type: string
-          description: Azure OpenAI API key
-        endpoint:
-          type: string
-          description: Azure OpenAI endpoint URL
-        apiVersion:
-          type: string
-          description: Azure OpenAI API version
-        deploymentName:
-          type: string
-          description: Azure OpenAI deployment name
-
-    SchemaDefinition:
+    # Common schemas
+    BrowserAction:
       type: object
       properties:
         type:
           type: string
-          enum: [object, array, string, number, boolean]
+          enum: [click, scroll, wait, fill, select]
+          description: Type of browser action to perform
+        selector:
+          type: string
+          description: CSS selector for the target element
+        value:
+          type: string
+          description: Value for fill/select actions
+        position:
+          type: number
+          description: Scroll position in pixels
+        timeout:
+          type: number
+          description: Wait timeout in milliseconds
+        optional:
+          type: boolean
+          description: If true, action failure won't stop scraping
+
+    ScraperOptions:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          description: Request timeout in milliseconds
+          minimum: 1000
+          maximum: 300000
+          default: 30000
+        blockAds:
+          type: boolean
+          description: Block ad domains
+          default: false
+        blockResources:
+          type: boolean
+          description: Block images, fonts, and media
+          default: false
+        userAgent:
+          type: string
+          description: Custom user agent string
+        proxy:
+          type: string
+          description: Proxy URL
+        cookies:
+          type: object
+          additionalProperties:
+            type: string
+          description: Cookies to send with requests
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom headers
+        waitForSelector:
+          type: string
+          description: CSS selector to wait for before extracting
+        waitForTimeout:
+          type: integer
+          description: Time to wait in milliseconds
+          minimum: 0
+          maximum: 60000
+        fullPage:
+          type: boolean
+          description: Capture full page screenshot
+          default: false
+        javascript:
+          type: boolean
+          description: Enable JavaScript execution
+          default: true
+        extractorFormat:
+          type: string
+          enum: [html, markdown, text]
+          default: html
+          description: Output format
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserAction'
+          description: Browser actions to perform
+        skipCache:
+          type: boolean
+          description: Skip cache for this request
+          default: false
+        cacheTtl:
+          type: integer
+          description: Custom cache TTL in seconds
+          minimum: 0
+        skipTlsVerification:
+          type: boolean
+          description: Skip TLS certificate verification
+          default: false
+        useBrowser:
+          type: boolean
+          description: Use browser-based scraping with Playwright
+          default: false
+        stealthMode:
+          type: boolean
+          description: Enable stealth mode to avoid bot detection
+          default: false
+
+    SchemaProperty:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [string, number, integer, boolean, array, object, null]
+        description:
+          type: string
+        required:
+          type: boolean
+        format:
+          type: string
+        items:
+          $ref: '#/components/schemas/SchemaProperty'
         properties:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/SchemaDefinition'
-        items:
-          $ref: '#/components/schemas/SchemaDefinition'
+            $ref: '#/components/schemas/SchemaProperty'
+
+    Schema:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [object]
+          default: object
+        title:
+          type: string
+        description:
+          type: string
+        properties:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SchemaProperty'
         required:
           type: array
           items:
             type: string
 
+    ScraperResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        url:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        contentType:
+          type: string
+          enum: [html, markdown, text]
+        metadata:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            status:
+              type: integer
+            headers:
+              type: object
+            processingTime:
+              type: integer
+              description: Processing time in milliseconds
+            fromCache:
+              type: boolean
+
+    CrawlOptions:
+      type: object
+      properties:
+        includePaths:
+          type: array
+          items:
+            type: string
+          description: Regex patterns for paths to include
+        excludePaths:
+          type: array
+          items:
+            type: string
+          description: Regex patterns for paths to exclude
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 100
+          description: Maximum number of pages to crawl
+        maxDepth:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+          description: Maximum crawl depth
+        allowBackwardCrawling:
+          type: boolean
+          default: false
+        allowExternalContentLinks:
+          type: boolean
+          default: false
+        allowSubdomains:
+          type: boolean
+          default: false
+        ignoreRobotsTxt:
+          type: boolean
+          default: false
+        regexOnFullURL:
+          type: boolean
+          default: false
+        scrapeOptions:
+          $ref: '#/components/schemas/ScraperOptions'
+        webhook:
+          type: string
+          format: uri
+          description: Webhook URL for completion notification
+        strategy:
+          type: string
+          enum: [bfs, dfs, best_first]
+          default: bfs
+          description: Crawl strategy
+        useBrowser:
+          type: boolean
+          default: false
+          description: Use browser-based crawling
+        useMapDiscovery:
+          type: boolean
+          default: false
+          description: Use high-performance URL discovery
+
+    CrawlResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        id:
+          type: string
+          description: Crawl job ID
+        url:
+          type: string
+          description: Status endpoint URL
+        message:
+          type: string
+        outputDirectory:
+          type: string
+          description: Directory where files will be exported
+        crawlType:
+          type: string
+        streamingEnabled:
+          type: boolean
+
+    CrawlStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: string
+          enum: [scraping, completed, cancelled]
+        crawl:
+          type: object
+        jobs:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              status:
+                type: string
+              document:
+                type: object
+              error:
+                type: string
+        count:
+          type: integer
+        exportedFiles:
+          type: object
+          properties:
+            count:
+              type: integer
+            outputDirectory:
+              type: string
+            files:
+              type: array
+              items:
+                type: string
+
+    BatchScrapeRequest:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          minItems: 1
+          maxItems: 100
+          description: URLs to scrape
+        options:
+          $ref: '#/components/schemas/ScraperOptions'
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+          description: Number of concurrent scraping operations
+        webhook:
+          type: string
+          format: uri
+          description: Webhook URL for notifications
+        timeout:
+          type: integer
+          minimum: 10000
+          description: Overall timeout in milliseconds
+        failFast:
+          type: boolean
+          default: false
+          description: Stop on first error
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+          default: 3
+
+    BatchScrapeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        batchId:
+          type: string
+        totalUrls:
+          type: integer
+        message:
+          type: string
+        statusUrl:
+          type: string
+        webhook:
+          type: string
+        estimatedTime:
+          type: integer
+
+    BatchStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+        batchId:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, completed_with_errors, failed, cancelled]
+        totalUrls:
+          type: integer
+        completedUrls:
+          type: integer
+        failedUrls:
+          type: integer
+        pendingUrls:
+          type: integer
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        startTime:
+          type: integer
+        endTime:
+          type: integer
+        processingTime:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScraperResponse'
+
+    MapRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL to discover links from
+        maxUrls:
+          type: integer
+          minimum: 1
+          maximum: 30000
+          default: 5000
+          description: Maximum number of URLs to discover
+        includeSubdomains:
+          type: boolean
+          default: true
+          description: Include subdomain URLs
+        searchQuery:
+          type: string
+          description: Optional search query to filter URLs
+        skipSitemaps:
+          type: boolean
+          default: false
+          description: Skip sitemap discovery
+        sitemapsOnly:
+          type: boolean
+          default: false
+          description: Only use sitemap discovery
+        useUrlIndex:
+          type: boolean
+          default: true
+          description: Use URL index cache
+        timeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 300000
+          default: 30000
+          description: Discovery timeout in milliseconds
+        includePatterns:
+          type: array
+          items:
+            type: string
+          description: Path patterns to include
+        excludePatterns:
+          type: array
+          items:
+            type: string
+          description: Path patterns to exclude
+        rateLimitingOptions:
+          type: object
+          properties:
+            minDelay:
+              type: integer
+              default: 500
+            maxConcurrency:
+              type: integer
+              default: 2
+        crawlOptions:
+          type: object
+          properties:
+            maxCrawlDepth:
+              type: integer
+              minimum: 1
+              maximum: 5
+              default: 3
+            maxConcurrentCrawlers:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 8
+
+    MapResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            links:
+              type: array
+              items:
+                type: string
+            total:
+              type: integer
+            discoveryMethods:
+              type: object
+              properties:
+                sitemap:
+                  type: integer
+                search:
+                  type: integer
+                crawling:
+                  type: integer
+                commonPaths:
+                  type: integer
+                robotsSitemaps:
+                  type: integer
+                documents:
+                  type: integer
+            timeTaken:
+              type: integer
+            fromCache:
+              type: boolean
+        metadata:
+          type: object
+          properties:
+            url:
+              type: string
+            includeSubdomains:
+              type: boolean
+            maxUrls:
+              type: integer
+            timestamp:
+              type: string
+              format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        message:
+          type: string
+
 paths:
+  # Health check
+  /health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  message:
+                    type: string
+                    example: Service is running
+
+  # Scraping endpoints
   /api/scrape:
     post:
-      summary: Scrape content from a URL
-      description: Extracts content from a webpage and returns it in the specified format
+      summary: Scrape a single URL
+      description: |
+        Scrapes content from a single URL with various options for extraction and formatting.
+        Supports browser automation, custom actions, and multiple output formats.
+      tags:
+        - Scraping
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -95,39 +591,62 @@ paths:
                   description: URL to scrape
                 options:
                   $ref: '#/components/schemas/ScraperOptions'
+            examples:
+              basic:
+                summary: Basic scraping
+                value:
+                  url: "https://example.com"
+              markdown:
+                summary: Scrape as markdown
+                value:
+                  url: "https://example.com"
+                  options:
+                    extractorFormat: "markdown"
+              withActions:
+                summary: With browser actions
+                value:
+                  url: "https://example.com"
+                  options:
+                    extractorFormat: "markdown"
+                    actions:
+                      - type: "click"
+                        selector: ".load-more"
+                      - type: "wait"
+                        timeout: 2000
       responses:
         '200':
           description: Successfully scraped content
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  content:
-                    type: string
-                  metadata:
-                    type: object
-                    properties:
-                      title:
-                        type: string
-                      url:
-                        type: string
-                      timestamp:
-                        type: string
-                        format: date-time
+                $ref: '#/components/schemas/ScraperResponse'
         '400':
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/extract-schema:
     post:
-      summary: Extract structured data from a URL
-      description: Extracts structured data from a webpage based on a provided schema
+      summary: Extract structured data using a schema
+      description: |
+        Uses LLM (OpenAI) to extract structured data from a webpage based on a provided schema.
+        Requires OpenAI API key configuration.
+      tags:
+        - Scraping
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -145,9 +664,41 @@ paths:
                   format: uri
                   description: URL to extract data from
                 schema:
-                  $ref: '#/components/schemas/SchemaDefinition'
+                  $ref: '#/components/schemas/Schema'
                 options:
-                  $ref: '#/components/schemas/ScraperOptions'
+                  allOf:
+                    - $ref: '#/components/schemas/ScraperOptions'
+                    - type: object
+                      properties:
+                        temperature:
+                          type: number
+                          minimum: 0
+                          maximum: 2
+                          default: 0.2
+                        maxTokens:
+                          type: integer
+                          minimum: 1
+                        instructions:
+                          type: string
+                          description: Additional extraction instructions
+            examples:
+              product:
+                summary: Extract product data
+                value:
+                  url: "https://shop.example.com/product"
+                  schema:
+                    type: "object"
+                    properties:
+                      name:
+                        type: "string"
+                        description: "Product name"
+                      price:
+                        type: "string"
+                        description: "Product price"
+                      description:
+                        type: "string"
+                        description: "Product description"
+                    required: ["name", "price"]
       responses:
         '200':
           description: Successfully extracted structured data
@@ -158,29 +709,43 @@ paths:
                 properties:
                   success:
                     type: boolean
+                  url:
+                    type: string
+                  title:
+                    type: string
                   extractedData:
                     type: object
+                  contentType:
+                    type: string
                   metadata:
                     type: object
-                    properties:
-                      title:
-                        type: string
-                      url:
-                        type: string
-                      timestamp:
-                        type: string
-                        format: date-time
         '400':
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized - Invalid API key
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/summarize:
     post:
-      summary: Summarize content from a URL
-      description: Generates a summary of the content from a webpage
+      summary: Summarize webpage content
+      description: |
+        Uses LLM to generate a concise summary of webpage content.
+        Requires OpenAI API key configuration.
+      tags:
+        - Scraping
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -198,9 +763,20 @@ paths:
                   description: URL to summarize
                 maxLength:
                   type: integer
-                  description: Maximum length of the summary in words
+                  minimum: 50
+                  maximum: 2000
+                  default: 500
+                  description: Maximum summary length in words
                 options:
-                  $ref: '#/components/schemas/ScraperOptions'
+                  allOf:
+                    - $ref: '#/components/schemas/ScraperOptions'
+                    - type: object
+                      properties:
+                        temperature:
+                          type: number
+                          minimum: 0
+                          maximum: 2
+                          default: 0.3
       responses:
         '200':
           description: Successfully generated summary
@@ -211,21 +787,815 @@ paths:
                 properties:
                   success:
                     type: boolean
+                  url:
+                    type: string
+                  title:
+                    type: string
                   summary:
                     type: string
                   metadata:
                     type: object
-                    properties:
-                      title:
-                        type: string
-                      url:
-                        type: string
-                      timestamp:
-                        type: string
-                        format: date-time
         '400':
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized - Invalid API key
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Server error 
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cache:
+    delete:
+      summary: Clear cache
+      description: Clear the entire cache or invalidate a specific URL
+      tags:
+        - Scraping
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: If provided, only invalidate cache for this URL
+      responses:
+        '200':
+          description: Cache cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Crawling endpoints
+  /api/crawl:
+    post:
+      summary: Start a web crawl
+      description: |
+        Initiates a multi-page crawl starting from the given URL.
+        Supports traditional crawling and high-performance URL discovery mode.
+        Individual pages are exported as markdown files.
+      tags:
+        - Crawling
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Starting URL for the crawl
+                includePaths:
+                  type: array
+                  items:
+                    type: string
+                  description: Regex patterns for paths to include
+                excludePaths:
+                  type: array
+                  items:
+                    type: string
+                  description: Regex patterns for paths to exclude
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                  default: 100
+                maxDepth:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 5
+                allowBackwardCrawling:
+                  type: boolean
+                  default: false
+                allowExternalContentLinks:
+                  type: boolean
+                  default: false
+                allowSubdomains:
+                  type: boolean
+                  default: false
+                ignoreRobotsTxt:
+                  type: boolean
+                  default: false
+                regexOnFullURL:
+                  type: boolean
+                  default: false
+                scrapeOptions:
+                  $ref: '#/components/schemas/ScraperOptions'
+                webhook:
+                  type: string
+                  format: uri
+                strategy:
+                  type: string
+                  enum: [bfs, dfs, best_first]
+                  default: bfs
+                useBrowser:
+                  type: boolean
+                  default: false
+                useMapDiscovery:
+                  type: boolean
+                  default: false
+                  description: Use high-performance URL discovery
+                maxUrls:
+                  type: integer
+                  description: Override limit for discovery mode
+                timeoutMs:
+                  type: integer
+                  description: Discovery timeout
+                crawlOptions:
+                  type: object
+                  properties:
+                    maxConcurrentCrawlers:
+                      type: integer
+                      minimum: 1
+                      maximum: 20
+                      default: 3
+            examples:
+              basic:
+                summary: Basic crawl
+                value:
+                  url: "https://docs.example.com"
+                  limit: 50
+              withDiscovery:
+                summary: High-performance crawl
+                value:
+                  url: "https://docs.example.com"
+                  useMapDiscovery: true
+                  maxUrls: 1000
+                  includePatterns: ["/api/", "/docs/"]
+                  scrapeOptions:
+                    extractorFormat: "markdown"
+      responses:
+        '200':
+          description: Crawl initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/crawl/{jobId}:
+    get:
+      summary: Get crawl status
+      description: Get the current status and results of a crawl job
+      tags:
+        - Crawling
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Crawl job ID
+          schema:
+            type: string
+        - name: skip
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            minimum: 0
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Crawl status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrawlStatus'
+        '404':
+          description: Crawl not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Cancel a crawl
+      description: Cancel a running crawl job
+      tags:
+        - Crawling
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Crawl job ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Crawl cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Crawl not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Batch scraping endpoints
+  /api/batch/scrape:
+    post:
+      summary: Start batch scraping
+      description: |
+        Initiate batch scraping for multiple URLs with concurrent processing.
+        Progress and results can be monitored via the status endpoint.
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchScrapeRequest'
+            examples:
+              basic:
+                summary: Basic batch scrape
+                value:
+                  urls:
+                    - "https://example1.com"
+                    - "https://example2.com"
+                    - "https://example3.com"
+                  concurrency: 3
+                  options:
+                    extractorFormat: "markdown"
+      responses:
+        '202':
+          description: Batch scraping initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchScrapeResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/batch/scrape/{batchId}/status:
+    get:
+      summary: Get batch status
+      description: Get the current status and results of a batch scraping operation
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          description: Batch operation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchStatus'
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/batch/scrape/{batchId}:
+    delete:
+      summary: Cancel batch operation
+      description: Cancel a running batch scraping operation
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          description: Batch operation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/batch/scrape/{batchId}/download/zip:
+    get:
+      summary: Download results as ZIP
+      description: Download all batch results as a ZIP archive
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          description: Batch operation ID
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Content format for files in ZIP
+          schema:
+            type: string
+            enum: [json, markdown, html, text]
+            default: markdown
+      responses:
+        '200':
+          description: ZIP file generated successfully
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Batch not found or no results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/batch/scrape/{batchId}/download/json:
+    get:
+      summary: Download results as JSON
+      description: Download all batch results in a single JSON file
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          description: Batch operation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON file generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batchId:
+                    type: string
+                  generatedAt:
+                    type: string
+                    format: date-time
+                  summary:
+                    type: object
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScraperResponse'
+        '404':
+          description: Batch not found or no results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/batch/scrape/{batchId}/result/{jobId}:
+    get:
+      summary: Download individual result
+      description: Download a single result from a batch operation
+      tags:
+        - Batch Operations
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          description: Batch operation ID
+          schema:
+            type: string
+        - name: jobId
+          in: path
+          required: true
+          description: Individual job ID within the batch
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Download format
+          schema:
+            type: string
+            enum: [json, markdown, html, text]
+            default: json
+      responses:
+        '200':
+          description: Result retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScraperResponse'
+            text/markdown:
+              schema:
+                type: string
+            text/html:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # URL Discovery endpoints
+  /api/map:
+    post:
+      summary: Discover URLs from a website
+      description: |
+        High-performance URL discovery using multiple parallel methods:
+        - XML sitemap parsing (including sitemap indexes)
+        - Search engine discovery (site: queries)
+        - Browser-based crawling
+        - Common path discovery (/api, /docs, etc.)
+        - Robots.txt sitemap references
+        
+        Can discover 5000+ URLs in seconds with intelligent caching.
+      tags:
+        - URL Discovery
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapRequest'
+            examples:
+              basic:
+                summary: Basic discovery
+                value:
+                  url: "https://example.com"
+                  maxUrls: 5000
+              filtered:
+                summary: Filtered discovery
+                value:
+                  url: "https://docs.example.com"
+                  maxUrls: 1000
+                  includePatterns: ["/api/", "/guides/"]
+                  excludePatterns: ["/archive/", "/old/"]
+              search:
+                summary: Search-based discovery
+                value:
+                  url: "https://docs.example.com"
+                  searchQuery: "authentication api"
+                  maxUrls: 100
+      responses:
+        '200':
+          description: URLs discovered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/map/cache/stats:
+    get:
+      summary: Get discovery cache statistics
+      description: Get statistics about the URL discovery cache
+      tags:
+        - URL Discovery
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Cache statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/map/cache/clear:
+    post:
+      summary: Clear discovery cache
+      description: Clear the discovery cache for a specific URL
+      tags:
+        - URL Discovery
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to clear from cache
+      responses:
+        '200':
+          description: Cache cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/map/health:
+    get:
+      summary: Map service health check
+      description: Check the health of the URL discovery service
+      tags:
+        - URL Discovery
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+                  services:
+                    type: object
+                  cacheStats:
+                    type: object
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: System
+    description: System health and diagnostics
+  - name: Scraping
+    description: Single-page web scraping operations
+  - name: Crawling
+    description: Multi-page crawling operations
+  - name: Batch Operations
+    description: Batch scraping for multiple URLs
+  - name: URL Discovery
+    description: High-performance URL discovery and mapping
+
+externalDocs:
+  description: DeepScraper Documentation
+  url: https://docs.extractr.ai

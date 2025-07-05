@@ -122,6 +122,112 @@ curl -X POST http://localhost:3000/api/scrape \
   }' | jq -r '.content' > content.md
 ```
 
+### Complete `/api/scrape` Options
+
+#### **Main Request Body Parameters**
+
+**Required Parameters:**
+- **`url`** (string): The URL to scrape
+
+**Optional Parameters:**
+- **`options`** (object): Scraper options configuration (see below)
+
+#### **Scraper Options (`options` object)**
+
+**Output Format Options:**
+- **`extractorFormat`** (enum, default: "markdown"): Output format for scraped content
+  - `"html"`: Raw HTML content
+  - `"markdown"`: Clean markdown format (recommended)
+  - `"text"`: Plain text only
+
+**Browser Configuration:**
+- **`useBrowser`** (boolean, default: false): Use Playwright browser for JavaScript-heavy sites
+- **`javascript`** (boolean, default: true): Enable JavaScript execution
+- **`fullPage`** (boolean, default: false): Capture full page screenshot/content
+- **`stealthMode`** (boolean, default: false): Enable stealth mode to avoid bot detection
+- **`blockAds`** (boolean, default: false): Block advertisements and tracking scripts
+- **`blockResources`** (boolean, default: false): Block images, fonts, media for faster loading
+
+**Wait & Loading Options:**
+- **`waitForSelector`** (string): CSS selector to wait for before scraping
+- **`waitForTimeout`** (number, default: 0): Additional wait time in milliseconds after page load
+- **`timeout`** (number, default: 30000): Total request timeout in milliseconds
+- **`maxScrolls`** (number, default: 0): Maximum number of scrolls for infinite scroll pages
+
+**Authentication & Headers:**
+- **`userAgent`** (string): Custom user agent string
+- **`cookies`** (object): Cookie key-value pairs (e.g., `{"sessionId": "abc123"}`)
+- **`headers`** (object): Custom HTTP headers (e.g., `{"Authorization": "Bearer token"}`)
+
+**Proxy Configuration:**
+- **`proxy`** (string): Proxy server URL (e.g., "http://proxy.example.com:8080")
+- **`proxyUsername`** (string): Proxy authentication username
+- **`proxyPassword`** (string): Proxy authentication password
+- **`proxyRotation`** (boolean, default: false): Enable proxy rotation
+- **`proxyList`** (string[]): List of proxy URLs for rotation
+
+**Rate Limiting:**
+- **`minDelay`** (number, default: 0): Minimum delay between requests in milliseconds
+- **`maxDelay`** (number, default: 0): Maximum delay for exponential backoff
+- **`maxRetries`** (number, default: 3): Maximum retry attempts for failed requests
+- **`backoffFactor`** (number, default: 2): Exponential backoff multiplier
+- **`rotateUserAgent`** (boolean, default: false): Rotate user agents between requests
+
+**Browser Actions:**
+- **`actions`** (array): Array of browser actions to perform before scraping (see Browser Actions guide for details)
+
+**Cache Options:**
+- **`skipCache`** (boolean, default: false): Skip cache for this request
+- **`cacheTtl`** (number): Custom cache TTL in seconds
+- **`skipTlsVerification`** (boolean, default: false): Skip TLS certificate verification
+
+#### **Sample API Calls**
+
+**JavaScript-Heavy Site with Actions:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://spa-website.com",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "javascript": true,
+      "waitForSelector": ".content-loaded",
+      "actions": [
+        {"type": "click", "selector": ".cookie-accept", "optional": true},
+        {"type": "wait", "timeout": 3000},
+        {"type": "scroll", "position": 1000}
+      ]
+    }
+  }'
+```
+
+**Protected Site with Proxy and Authentication:**
+```bash
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://protected-site.com/data",
+    "options": {
+      "extractorFormat": "markdown",
+      "useBrowser": true,
+      "stealthMode": true,
+      "proxy": "http://residential-proxy.com:8080",
+      "proxyUsername": "user123",
+      "proxyPassword": "pass456",
+      "cookies": {
+        "auth_token": "abc123xyz"
+      },
+      "headers": {
+        "Authorization": "Bearer token123"
+      }
+    }
+  }'
+```
+
 ### URL Discovery (High-Performance)
 
 Discover thousands of URLs from a website in seconds using our endpoint:
@@ -339,6 +445,75 @@ curl -X POST http://localhost:3000/api/summarize \
   }' | jq -r '.summary' > summary-output.md
   ```
 
+### Complete `/api/summarize` Options
+
+#### **Main Request Body Parameters**
+
+**Required Parameters:**
+- **`url`** (string): The URL to summarize
+
+**Optional Parameters:**
+- **`maxLength`** (number, default: 300): Maximum length of summary in characters
+- **`options`** (object): Scraper options (same as `/api/scrape`)
+- **`temperature`** (number, default: 0.3): LLM temperature for summarization
+- **`summaryType`** (enum, default: "concise"): Type of summary
+  - `"concise"`: Brief overview
+  - `"detailed"`: Comprehensive summary
+  - `"bullets"`: Bullet point format
+  - `"technical"`: Technical focus
+- **`language`** (string, default: "en"): Output language code
+- **`focus`** (string): Specific aspect to focus on in summary
+
+#### **Sample API Calls**
+
+**Technical Summary with Focus:**
+```bash
+curl -X POST http://localhost:3000/api/summarize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://arxiv.org/abs/2301.00234",
+    "maxLength": 1000,
+    "summaryType": "technical",
+    "focus": "methodology and results",
+    "temperature": 0.2,
+    "options": {
+      "extractorFormat": "markdown",
+      "waitForSelector": ".ltx-article"
+    }
+  }'
+```
+
+**Bullet Point Summary:**
+```bash
+curl -X POST http://localhost:3000/api/summarize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://blog.example.com/long-article",
+    "summaryType": "bullets",
+    "maxLength": 800,
+    "options": {
+      "useBrowser": true,
+      "javascript": true
+    }
+  }'
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "url": "https://example.com",
+  "summary": "This article discusses artificial intelligence...",
+  "summaryType": "concise",
+  "wordCount": 85,
+  "characterCount": 487,
+  "loadTime": 3456,
+  "fromCache": false
+}
+```
+
 ### Technical Documentation Analysis
 
 Extract key information from technical documentation:
@@ -427,6 +602,115 @@ Extract complex data structure from any medium articles
       "extractorFormat": "markdown"
     }
   }' | jq -r '.extractedData' > output.md
+```
+
+### Complete `/api/extract-schema` Options
+
+#### **Main Request Body Parameters**
+
+**Required Parameters:**
+- **`url`** (string): The URL to extract data from
+- **`schema`** (object): JSON Schema defining the structure to extract
+
+**Optional Parameters:**
+- **`options`** (object): Scraper options (same as `/api/scrape`)
+- **`temperature`** (number, default: 0.2): LLM temperature for extraction (0.0-1.0)
+- **`maxTokens`** (number, default: 4096): Maximum tokens for LLM response
+- **`model`** (string, default: "gpt-4o"): OpenAI model to use
+
+#### **Schema Definition**
+
+The schema follows JSON Schema specification with additional extraction hints:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "fieldName": {
+      "type": "string|number|boolean|array|object",
+      "description": "Extraction hint for the LLM",
+      "items": {},  // For arrays
+      "properties": {}  // For nested objects
+    }
+  },
+  "required": ["fieldName"]
+}
+```
+
+#### **Sample API Calls**
+
+**Extract E-commerce Product Data:**
+```bash
+curl -X POST http://localhost:3000/api/extract-schema \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "url": "https://shop.example.com/product/123",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "productName": {
+          "type": "string",
+          "description": "Product title"
+        },
+        "price": {
+          "type": "number",
+          "description": "Current price in USD"
+        },
+        "originalPrice": {
+          "type": "number",
+          "description": "Original price before discount"
+        },
+        "inStock": {
+          "type": "boolean",
+          "description": "Whether product is in stock"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Average customer rating (0-5)"
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "author": {"type": "string"},
+              "rating": {"type": "number"},
+              "comment": {"type": "string"}
+            }
+          },
+          "description": "Top 3 customer reviews"
+        }
+      }
+    },
+    "temperature": 0.1,
+    "options": {
+      "useBrowser": true,
+      "actions": [
+        {"type": "click", "selector": ".show-reviews", "optional": true},
+        {"type": "wait", "timeout": 2000}
+      ]
+    }
+  }'
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "url": "https://example.com",
+  "extractedData": {
+    "productName": "Sample Product",
+    "price": 29.99,
+    "originalPrice": 39.99,
+    "inStock": true,
+    "rating": 4.5,
+    "reviews": [...]
+  },
+  "loadTime": 2345,
+  "fromCache": false,
+  "llmTokensUsed": 1234
+}
 ```
 
 ## 📦 Batch Processing
@@ -558,6 +842,113 @@ curl -X POST http://localhost:3000/api/batch/scrape \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/batch/scrape/{batchId} \
+  -H "X-API-Key: your-secret-key"
+```
+
+### Complete `/api/batch/scrape` Options
+
+#### **Main Request Body Parameters**
+
+**Required Parameters:**
+- **`urls`** (string[]): Array of URLs to scrape
+
+**Optional Parameters:**
+- **`concurrency`** (number, default: 5, max: 20): Number of concurrent scraping jobs
+- **`timeout`** (number, default: 300000): Total batch timeout in milliseconds
+- **`maxRetries`** (number, default: 3): Maximum retries per URL
+- **`failFast`** (boolean, default: false): Stop batch on first failure
+- **`webhook`** (string): URL to call when batch completes
+- **`webhookHeaders`** (object): Custom headers for webhook request
+- **`options`** (object): Scraper options applied to all URLs (same as `/api/scrape`)
+- **`individualOptions`** (object): URL-specific options
+  ```json
+  {
+    "https://example1.com": { "extractorFormat": "html" },
+    "https://example2.com": { "useBrowser": true }
+  }
+  ```
+
+#### **Sample API Calls**
+
+**Advanced Batch with Individual Options:**
+```bash
+curl -X POST http://localhost:3000/api/batch/scrape \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "urls": [
+      "https://news-site.com/article1",
+      "https://spa-app.com/dashboard",
+      "https://pdf-site.com/document"
+    ],
+    "concurrency": 2,
+    "maxRetries": 5,
+    "webhook": "https://your-app.com/batch-complete",
+    "options": {
+      "extractorFormat": "markdown",
+      "minDelay": 2000
+    },
+    "individualOptions": {
+      "https://spa-app.com/dashboard": {
+        "useBrowser": true,
+        "waitForSelector": ".dashboard-loaded",
+        "actions": [
+          {"type": "wait", "timeout": 5000}
+        ]
+      },
+      "https://pdf-site.com/document": {
+        "extractorFormat": "text"
+      }
+    }
+  }'
+```
+
+### Complete `/api/batch/scrape/:id/status` Options
+
+#### **URL Parameters**
+- **`:id`** (string): The batch ID returned from batch creation
+
+#### **Query Parameters**
+- **`includeResults`** (boolean, default: true): Include individual job results
+- **`format`** (enum, default: "json"): Response format ("json" or "csv")
+- **`limit`** (number): Limit number of results returned
+- **`offset`** (number): Offset for pagination
+
+#### **Sample API Calls**
+
+**Get Paginated Results:**
+```bash
+curl -X GET "http://localhost:3000/api/batch/scrape/550e8400.../status?limit=10&offset=20" \
+  -H "X-API-Key: your-secret-key"
+```
+
+### Complete `/api/batch/scrape/:id/download/*` Options
+
+#### **Endpoint Variations**
+1. **`/download/zip`** - Download as ZIP archive
+2. **`/download/json`** - Download as consolidated JSON
+3. **`/download/:jobId`** - Download individual result
+
+#### **Query Parameters**
+
+**For ZIP Download:**
+- **`format`** (enum, default: "markdown"): File format ("markdown", "html", "text", "json")
+- **`includeMetadata`** (boolean, default: true): Include metadata file
+- **`includeFailed`** (boolean, default: false): Include failed URLs info
+
+**For JSON Download:**
+- **`pretty`** (boolean, default: false): Pretty-print JSON
+- **`includeMetadata`** (boolean, default: true): Include batch metadata
+
+### Complete `/api/batch/scrape/:id` DELETE Options
+
+#### **Query Parameters**
+- **`force`** (boolean, default: false): Force cancel even if completing
+- **`cleanup`** (boolean, default: true): Clean up partial results
+
+**Force Cancel Example:**
+```bash
+curl -X DELETE "http://localhost:3000/api/batch/scrape/550e8400...?force=true" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -1781,6 +2172,178 @@ Status response shows exported files:
 | `/api/crawl` | POST | Start web crawl (supports `useMapDiscovery: true` for 60x faster discovery) |
 | `/api/crawl/:id` | GET | Get crawl status |
 | `/api/cache` | DELETE | Clear cache |
+
+### Complete `/api/crawl/:id` Options
+
+#### **Description**
+GET endpoint to check crawl job status and results.
+
+#### **URL Parameters**
+- **`:id`** (string): The crawl job ID
+
+#### **Query Parameters**
+- **`includeJobs`** (boolean, default: true): Include individual job details
+- **`format`** (enum, default: "json"): Response format ("json" or "summary")
+- **`limit`** (number): Limit job results
+- **`offset`** (number): Offset for pagination
+
+#### **Sample API Calls**
+
+**Get Full Crawl Status:**
+```bash
+curl -X GET "http://localhost:3000/api/crawl/abc123-def456" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Get Summary Only:**
+```bash
+curl -X GET "http://localhost:3000/api/crawl/abc123-def456?format=summary" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "status": "completed",
+  "crawl": {
+    "id": "abc123-def456",
+    "url": "https://example.com",
+    "totalPages": 847,
+    "completedPages": 845,
+    "failedPages": 2
+  },
+  "exportedFiles": {
+    "count": 845,
+    "outputDirectory": "./crawl-output/abc123-def456"
+  }
+}
+```
+
+### Complete `/api/cache` Options
+
+#### **Description**
+DELETE endpoint to clear the cache.
+
+#### **Query Parameters**
+- **`pattern`** (string): URL pattern to match for selective clearing
+- **`type`** (enum): Cache type to clear ("all", "scrape", "map")
+- **`olderThan`** (number): Clear entries older than X seconds
+- **`force`** (boolean, default: false): Force clear without confirmation
+
+#### **Sample API Calls**
+
+**Clear All Cache:**
+```bash
+curl -X DELETE "http://localhost:3000/api/cache" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Clear Specific Pattern:**
+```bash
+curl -X DELETE "http://localhost:3000/api/cache?pattern=example.com/*" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "message": "Cache cleared successfully",
+  "clearedEntries": 1523,
+  "freedSpace": "152MB"
+}
+```
+
+### Complete `/api/map/cache/stats` Options
+
+#### **Description**
+GET endpoint to retrieve URL discovery cache statistics.
+
+#### **Query Parameters**
+- **`detailed`** (boolean, default: false): Include detailed breakdown
+- **`groupBy`** (enum): Group statistics by ("domain", "date", "size")
+
+#### **Sample API Calls**
+
+**Get Detailed Stats by Domain:**
+```bash
+curl -X GET "http://localhost:3000/api/map/cache/stats?detailed=true&groupBy=domain" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "stats": {
+    "totalEntries": 523,
+    "totalSize": "45.2MB",
+    "hitRate": 0.85
+  },
+  "breakdown": {
+    "example.com": {
+      "entries": 125,
+      "size": "12.3MB"
+    }
+  }
+}
+```
+
+### Complete `/api/map/cache/clear` Options
+
+#### **Description**
+POST endpoint to clear URL discovery cache.
+
+#### **Request Body Parameters**
+- **`domains`** (string[]): Specific domains to clear
+- **`patterns`** (string[]): URL patterns to match
+- **`olderThan`** (string): ISO date to clear entries older than
+- **`confirmClear`** (boolean, default: false): Confirmation flag
+
+#### **Sample API Calls**
+
+**Clear Specific Domains:**
+```bash
+curl -X POST "http://localhost:3000/api/map/cache/clear" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-key" \
+  -d '{
+    "domains": ["example.com", "test.com"],
+    "confirmClear": true
+  }'
+```
+
+### Complete `/api/map/health` Options
+
+#### **Description**
+GET endpoint to check URL discovery service health.
+
+#### **Query Parameters**
+- **`verbose`** (boolean, default: false): Include detailed health metrics
+- **`checkDependencies`** (boolean, default: true): Check external dependencies
+
+#### **Sample API Calls**
+
+**Verbose Health Check:**
+```bash
+curl -X GET "http://localhost:3000/api/map/health?verbose=true" \
+  -H "X-API-Key: your-secret-key"
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "status": "healthy",
+  "uptime": 864000,
+  "metrics": {
+    "requestsPerMinute": 45,
+    "averageResponseTime": 2340,
+    "cacheHitRate": 0.85
+  }
+}
+```
 
 ## ⚙️ Configuration Options
 
