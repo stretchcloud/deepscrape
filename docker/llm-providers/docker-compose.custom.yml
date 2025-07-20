@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Custom LLM - Template for any OpenAI-compatible API server
+  custom-llm:
+    # Replace with your custom LLM image
+    image: ${CUSTOM_LLM_IMAGE:-your-llm-image:latest}
+    container_name: deepscrape-custom-llm
+    restart: unless-stopped
+    ports:
+      - "${CUSTOM_LLM_PORT:-8000}:${CUSTOM_LLM_INTERNAL_PORT:-8000}"
+    environment:
+      # Generic environment variables - customize as needed
+      - MODEL_NAME=${LLM_MODEL:-custom-model}
+      - API_KEY=${LLM_API_KEY:-dummy-key}
+      - MAX_TOKENS=${CUSTOM_LLM_MAX_TOKENS:-4096}
+      - TEMPERATURE=${CUSTOM_LLM_TEMPERATURE:-0.7}
+      # Add your custom environment variables here
+      # - CUSTOM_VAR=${CUSTOM_VAR:-default_value}
+    volumes:
+      # Model storage - customize path as needed
+      - custom_llm_models:/models
+      # Configuration - customize as needed
+      - ./custom-llm-config:/config
+    # Uncomment and modify if GPU support is needed
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    # Custom command - modify as needed
+    command: ${CUSTOM_LLM_COMMAND:-}
+    healthcheck:
+      # Adjust health check endpoint as needed
+      test: ["CMD", "curl", "-f", "http://localhost:${CUSTOM_LLM_INTERNAL_PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - deepscrape-network
+
+volumes:
+  custom_llm_models:
+    driver: local
+
+networks:
+  deepscrape-network:
+    external: true

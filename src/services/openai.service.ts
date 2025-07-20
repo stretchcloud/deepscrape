@@ -1,5 +1,12 @@
 import OpenAI from 'openai';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { 
+  LLMProvider, 
+  LLMResponse, 
+  LLMMessage, 
+  LLMCompletionOptions,
+  LLMProviderType 
+} from '../types/llm.types';
 import { logger } from '../utils/logger';
 
 interface OpenAIConfig {
@@ -8,13 +15,8 @@ interface OpenAIConfig {
   model: string;
 }
 
-interface LLMResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
-export class OpenAIService {
+export class OpenAIService implements LLMProvider {
   private client: OpenAI;
   private _model: string;
 
@@ -32,17 +34,40 @@ export class OpenAIService {
   get model(): string {
     return this._model;
   }
+  
+  /**
+   * Get the provider type
+   */
+  getProvider(): LLMProviderType {
+    return 'openai';
+  }
+  
+  /**
+   * Get the current model
+   */
+  getModel(): string {
+    return this._model;
+  }
 
   /**
    * Get completion from OpenAI
    */
   async getCompletion<T>(
-    messages: Array<{ role: string; content: string }>, 
-    options: { temperature?: number; maxTokens?: number } = {},
+    messages: LLMMessage[], 
+    options: LLMCompletionOptions = {},
     responseFormat?: { type: string; schema?: object }
   ): Promise<LLMResponse<T>> {
     try {
-      const { temperature = 0.2, maxTokens = 4000 } = options;
+      const { 
+        temperature = 0.2, 
+        maxTokens = 4000,
+        topP,
+        frequencyPenalty,
+        presencePenalty,
+        stop,
+        seed,
+        user
+      } = options;
 
       logger.info(`Sending request to OpenAI: ${this._model}`);
       
@@ -74,6 +99,12 @@ export class OpenAIService {
         messages: typedMessages,
         temperature,
         max_tokens: maxTokens,
+        top_p: topP,
+        frequency_penalty: frequencyPenalty,
+        presence_penalty: presencePenalty,
+        stop,
+        seed,
+        user,
         response_format: responseFormat as any
       });
       
@@ -88,13 +119,31 @@ export class OpenAIService {
           
         return {
           success: true,
-          data: parsedContent as T
+          data: parsedContent as T,
+          metadata: {
+            model: response.model,
+            provider: 'openai',
+            usage: response.usage ? {
+              promptTokens: response.usage.prompt_tokens,
+              completionTokens: response.usage.completion_tokens,
+              totalTokens: response.usage.total_tokens
+            } : undefined
+          }
         };
       } catch (parseError) {
         // If parsing fails, return the raw content
         return {
           success: true,
-          data: content as unknown as T
+          data: content as unknown as T,
+          metadata: {
+            model: response.model,
+            provider: 'openai',
+            usage: response.usage ? {
+              promptTokens: response.usage.prompt_tokens,
+              completionTokens: response.usage.completion_tokens,
+              totalTokens: response.usage.total_tokens
+            } : undefined
+          }
         };
       }
     } catch (error) {
@@ -124,7 +173,16 @@ export class OpenAIService {
       
       return {
         success: true,
-        data: embeddings
+        data: embeddings,
+        metadata: {
+          model: 'text-embedding-3-small',
+          provider: 'openai',
+          usage: response.usage ? {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: 0,
+            totalTokens: response.usage.total_tokens
+          } : undefined
+        }
       };
     } catch (error) {
       logger.error(`Error getting embeddings: ${error instanceof Error ? error.message : String(error)}`);

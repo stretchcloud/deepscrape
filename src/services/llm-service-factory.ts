@@ -1,4 +1,6 @@
 import { OpenAIService } from './openai.service';
+import { LocalLLMService } from './local-llm.service';
+import { LLMProvider, LLMProviderType, LLMConfig } from '../types/llm.types';
 import { logger } from '../utils/logger';
 
 /**
@@ -15,6 +17,21 @@ export enum TaskComplexity {
  * Always uses the OpenAI model specified in env variables
  */
 export class LLMServiceFactory {
+  /**
+   * Get LLM provider from environment variables
+   */
+  private static getLLMProvider(): LLMProviderType {
+    const provider = process.env.LLM_PROVIDER?.toLowerCase();
+    const validProviders: LLMProviderType[] = ['openai', 'vllm', 'ollama', 'localai', 'litellm', 'custom'];
+    
+    if (provider && validProviders.includes(provider as LLMProviderType)) {
+      return provider as LLMProviderType;
+    }
+    
+    // Default to OpenAI for backward compatibility
+    return 'openai';
+  }
+  
   /**
    * Create an OpenAI service instance
    */
@@ -47,11 +64,89 @@ export class LLMServiceFactory {
   }
   
   /**
+   * Create a local LLM service instance
+   */
+  static createLocalLLMService(provider: LLMProviderType): LLMProvider | null {
+    try {
+      // Get base configuration from environment
+      const baseUrl = process.env.LLM_BASE_URL;
+      const apiKey = process.env.LLM_API_KEY || 'dummy-key';
+      const model = process.env.LLM_MODEL;
+      const timeout = process.env.LLM_TIMEOUT ? parseInt(process.env.LLM_TIMEOUT) : undefined;
+      const maxRetries = process.env.LLM_MAX_RETRIES ? parseInt(process.env.LLM_MAX_RETRIES) : undefined;
+      
+      // Provider-specific defaults for base URL
+      const providerDefaults: Record<string, string> = {
+        vllm: 'http://localhost:8000/v1',
+        ollama: 'http://localhost:11434/v1',
+        localai: 'http://localhost:8080/v1',
+        litellm: 'http://localhost:4000',
+        custom: 'http://localhost:8000/v1'
+      };
+      
+      // Model defaults per provider
+      const modelDefaults: Record<string, string> = {
+        vllm: 'meta-llama/Llama-2-7b-chat-hf',
+        ollama: 'llama2',
+        localai: 'ggml-gpt4all-j',
+        litellm: 'gpt-3.5-turbo',
+        custom: 'local-model'
+      };
+      
+      const finalBaseUrl = baseUrl || providerDefaults[provider];
+      const finalModel = model || modelDefaults[provider];
+      
+      if (!finalBaseUrl) {
+        logger.warn(
+          `Local LLM service (${provider}) not configured correctly. Missing LLM_BASE_URL. ` +
+          'Make sure to set this variable in your .env file.'
+        );
+        return null;
+      }
+      
+      if (!finalModel) {
+        logger.warn(
+          `Local LLM service (${provider}) not configured correctly. Missing LLM_MODEL. ` +
+          'Make sure to set this variable in your .env file.'
+        );
+        return null;
+      }
+      
+      logger.info(`Creating ${provider} LLM service`, {
+        baseUrl: finalBaseUrl,
+        model: finalModel
+      });
+      
+      const config: LLMConfig = {
+        provider,
+        baseUrl: finalBaseUrl,
+        apiKey,
+        model: finalModel,
+        timeout,
+        maxRetries
+      };
+      
+      return new LocalLLMService(config);
+    } catch (error) {
+      logger.error(`Error creating ${provider} LLM service: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+  
+  /**
    * Create an LLM service
    * This is the main method to use for getting an LLM service instance
    */
-  static createLLMService(taskComplexity?: TaskComplexity): OpenAIService | null {
-    return this.createOpenAIService(taskComplexity);
+  static createLLMService(taskComplexity?: TaskComplexity): LLMProvider | null {
+    const provider = this.getLLMProvider();
+    
+    logger.info(`Creating LLM service with provider: ${provider}`);
+    
+    if (provider === 'openai') {
+      return this.createOpenAIService(taskComplexity);
+    } else {
+      return this.createLocalLLMService(provider);
+    }
   }
   
   /**

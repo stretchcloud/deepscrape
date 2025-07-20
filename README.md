@@ -1,12 +1,12 @@
 # 📚 DeepScrape – Intelligent Web Scraping & LLM-Powered Extraction
 
-> **AI-powered web scraping with intelligent extraction**
+> **AI-powered web scraping with intelligent extraction – Cloud or Local**
 
-Transform any website into structured data using Playwright automation and GPT-4o extraction. Built for modern web applications, RAG pipelines, and data workflows.
+Transform any website into structured data using Playwright automation and LLM-powered extraction. Built for modern web applications, RAG pipelines, and data workflows. Supports both cloud (OpenAI) and local LLMs (Ollama, vLLM, etc.) for complete data privacy.
 
 ## ✨ Features
 
-- **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI
+- **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI or local models
 - **📦 Batch Processing** - Process multiple URLs efficiently with controlled concurrency
 - **🧬 API-first** - REST endpoints secured with API keys, documented with Swagger.
 - **🎭 Browser Automation** - Full Playwright support with stealth mode  
@@ -16,6 +16,8 @@ Transform any website into structured data using Playwright automation and GPT-4
 - **🔄 Job Queue** - Background processing with BullMQ and Redis
 - **🕷️ Web Crawling** - Multi-page crawling with configurable strategies
 - **🐳 Docker Ready** - One-command deployment
+- **🏠 Local LLM Support** - Run completely offline with Ollama, vLLM, LocalAI, or LiteLLM
+- **🔒 Privacy First** - Keep your data processing entirely on-premises
 
 ## 🚀 Quick Start
 
@@ -34,7 +36,15 @@ Edit `.env` with your settings:
 
 ```env
 API_KEY=your-secret-key
+
+# Option 1: Use OpenAI (cloud)
+LLM_PROVIDER=openai
 OPENAI_API_KEY=your-openai-key
+
+# Option 2: Use local model (e.g., Ollama)
+# LLM_PROVIDER=ollama
+# LLM_MODEL=llama3:latest
+
 REDIS_HOST=localhost
 CACHE_ENABLED=true
 ```
@@ -94,7 +104,7 @@ curl -X POST http://localhost:3000/api/extract-schema \
 
 ### Summarize URL Content
 
-Scrapes a URL and uses an LLM (GPT-4o) to generate a concise summary of its content.
+Scrapes a URL and uses an LLM to generate a concise summary of its content. Works with both OpenAI and local models.
 
 ```bash
 curl -X POST http://localhost:3000/api/summarize \
@@ -413,9 +423,16 @@ Status response shows exported files:
 API_KEY=your-secret-key
 PORT=3000
 
-# OpenAI
+# LLM Configuration
+LLM_PROVIDER=openai  # or ollama, vllm, localai, litellm
+
+# For OpenAI
 OPENAI_API_KEY=your-key
-OPENAI_DEPLOYMENT_NAME=gpt-4o
+OPENAI_MODEL=gpt-4o
+
+# For Local Models
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=llama3:latest
 LLM_TEMPERATURE=0.2
 
 # Cache
@@ -456,6 +473,130 @@ docker run -d -p 3000:3000 --env-file .env deepscrape
 
 # Or use docker-compose
 docker-compose up -d
+```
+
+## 🤖 Using Local LLM Models
+
+DeepScrape supports local LLM models through Ollama, vLLM, LocalAI, and other OpenAI-compatible servers. This allows you to run extraction entirely on your own hardware without external API calls.
+
+### Quick Start with Ollama
+
+1. **Update your `.env` file:**
+```env
+# Switch from OpenAI to Ollama
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://ollama:11434/v1
+LLM_MODEL=llama3:latest  # or qwen:7b, mistral, etc.
+```
+
+2. **Start Ollama with Docker:**
+```bash
+# For macOS/Linux without GPU
+docker-compose -f docker-compose.yml -f docker-compose.llm.yml -f docker/llm-providers/docker-compose.ollama-mac.yml up -d
+
+# The first run will automatically pull your model
+```
+
+3. **Verify it's working:**
+```bash
+# Test the LLM provider by making an API call
+curl -X POST http://localhost:3000/api/summarize \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-key" \
+  -d '{"url": "https://example.com", "maxLength": 300}'
+```
+
+### Supported Local Providers
+
+| Provider | Best For | Docker Command |
+|----------|----------|----------------|
+| **Ollama** | Easy setup, many models | `make llm-ollama` |
+| **vLLM** | High performance (GPU) | `make llm-vllm` |
+| **LocalAI** | CPU inference | `make llm-localai` |
+| **LiteLLM** | Multiple providers | `make llm-litellm` |
+
+### Managing Models
+
+```bash
+# List available models
+docker exec deepscrape-ollama ollama list
+
+# Pull a new model
+docker exec deepscrape-ollama ollama pull llama3:70b
+
+# Remove a model
+docker exec deepscrape-ollama ollama rm llama3:70b
+```
+
+### Performance Tips
+
+- **Small models** (1-7B params): Good for summaries and simple extraction
+- **Medium models** (7-13B params): Better for complex schemas
+- **Large models** (70B+ params): Best quality but slower
+
+### Troubleshooting
+
+If extraction seems slow or hangs:
+```bash
+# Check container logs
+docker logs deepscrape-ollama
+docker logs deepscrape-app
+
+# Monitor resource usage
+docker stats
+
+# Clear cache if needed
+docker exec deepscrape-app sh -c "rm -rf /app/cache/*"
+```
+
+See [docs/LLM_PROVIDERS.md](docs/LLM_PROVIDERS.md) for detailed configuration options.
+
+### Configuration Files
+
+Provider-specific configurations are stored in the `config/` directory:
+
+```
+config/
+├── litellm/           # LiteLLM proxy configurations
+│   └── config.yaml    # Routes and provider settings
+└── localai/           # LocalAI model configurations
+    └── gpt4all-j.yaml # Example model configuration
+```
+
+To add custom models:
+- **LocalAI**: Create a YAML file in `config/localai/` with model parameters
+- **LiteLLM**: Edit `config/litellm/config.yaml` to add new routes or providers
+
+## 🔒 Privacy & Data Security
+
+DeepScrape can run entirely on your infrastructure without any external API calls:
+
+- **Local LLMs**: Process sensitive data using on-premises models
+- **No Data Leakage**: Your scraped content never leaves your network
+- **Compliance Ready**: Perfect for GDPR, HIPAA, or other regulatory requirements
+- **Air-gapped Operation**: Can run completely offline once models are downloaded
+
+### Example: Scraping Sensitive Documents
+
+```bash
+# Configure for local processing
+export LLM_PROVIDER=ollama
+export LLM_MODEL=llama3:latest
+
+# Scrape internal documents
+curl -X POST http://localhost:3000/api/extract-schema \
+  -H "X-API-Key: your-key" \
+  -d '{
+    "url": "https://internal.company.com/confidential-report",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "classification": {"type": "string"},
+        "summary": {"type": "string"},
+        "keyFindings": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }'
 ```
 
 ## Advanced Features
@@ -550,10 +691,10 @@ Welcome to the getting started guide...
                                       │
                            pulls job   │ pushes result
                                       ▼
- ┌─────────────────┐ Playwright ┌─────────────────┐  GPT-4o ┌──────────────┐
- │ Scraper Worker  │──────────▶│  Extractor      │────────▶│ OpenAI       │
+ ┌─────────────────┐ Playwright ┌─────────────────┐   LLM   ┌──────────────┐
+ │ Scraper Worker  │──────────▶│  Extractor      │────────▶│ OpenAI/Local │
  └─────────────────┘           └─────────────────┘         └──────────────┘
-   (Headless Browser)            (HTML → MD/Text/JSON)          (LLM API)
+   (Headless Browser)            (HTML → MD/Text/JSON)     (Cloud or On-Prem)
                                       │
                                       ▼
                                 Cache Layer (FS/Redis)
@@ -567,9 +708,11 @@ Welcome to the getting started guide...
 - [ ] 🧠 Automatic schema generation (LLM)
 - [ ] 📊 Prometheus metrics & Grafana dashboard
 - [ ] 🌐 Cloud-native cache backends (S3/Redis)
+- [x] 🏠 Local LLM support (Ollama, vLLM, LocalAI)
 - [ ] 🌈 Web UI playground
 - [ ] 🔔 Advanced webhook payloads with retry logic
 - [ ] 📈 Batch processing analytics and insights
+- [ ] 🤖 Auto-select best LLM based on task complexity
 
 ---
 

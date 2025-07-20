@@ -77,7 +77,7 @@ class LLMExtractor {
                     data: llmResponse.data,
                     metadata: {
                         extractionTime,
-                        modelName: this.llmService.model || 'gpt-4o'
+                        modelName: this.llmService.getModel() || 'gpt-4o'
                     }
                 }
             };
@@ -106,7 +106,13 @@ class LLMExtractor {
             systemMessage += 'Be precise and follow the schema exactly. If information is not available, use null or empty values.';
         }
         else if (extractionType === 'summary') {
-            systemMessage += 'Create a concise summary of the main points in the provided content.';
+            systemMessage += 'You are a professional content summarizer. Create a concise summary of the main points in the provided content. ';
+            systemMessage += 'CRITICAL: Output ONLY the final summary. Do NOT include: ';
+            systemMessage += '1) Your reasoning process or thoughts about what the user wants. ';
+            systemMessage += '2) Meta-commentary like "The user wants me to..." or "I need to..." or "Let me...". ';
+            systemMessage += '3) Any explanation of your approach or methodology. ';
+            systemMessage += '4) Any XML tags or markdown formatting for thinking. ';
+            systemMessage += 'Start directly with the summary content itself.';
         }
         else if (extractionType === 'qa') {
             systemMessage += 'Answer questions about the provided content accurately and concisely.';

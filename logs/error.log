@@ -15144,3 +15144,27 @@
 {"error":"could not renew lock for job 360","level":"error","message":"Worker error","timestamp":"2025-06-11 11:09:00"}
 {"error":"could not renew lock for job 379","level":"error","message":"Worker error","timestamp":"2025-06-11 11:09:00"}
 {"error":"could not renew lock for job 382","level":"error","message":"Worker error","timestamp":"2025-06-11 11:09:00"}
+{"error":"404 model \"qwen3:latest\" not found, try pulling it first","level":"error","message":"ollama completion error","model":"qwen3:latest","timestamp":"2025-07-20 19:30:42"}
+{"error":"404 model \"qwen3:latest\" not found, try pulling it first","level":"error","message":"ollama completion error","model":"qwen3:latest","timestamp":"2025-07-20 19:30:42"}
+{"error":"404 model \"qwen3:latest\" not found, try pulling it first","level":"error","message":"ollama embeddings error","timestamp":"2025-07-20 19:30:42"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:56"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:56"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:57"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:57"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:58"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:58"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:59"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:36:59"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:00"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:00"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:01"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:01"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:02"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:02"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:03"}
+{"error":"getaddrinfo ENOTFOUND redis","level":"error","message":"Worker error","timestamp":"2025-07-20 19:37:03"}
+{"level":"error","message":"Error scraping URL: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://example.com/\", waiting until \"domcontentloaded\"\n","timestamp":"2025-07-20 18:41:04"}
+{"level":"error","message":"Error occurred during scraping: Scraping error: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://example.com/\", waiting until \"domcontentloaded\"\n","timestamp":"2025-07-20 18:41:04"}
+{"level":"error","message":"Error scraping URL https://example.com: Scraping error: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://example.com/\", waiting until \"domcontentloaded\"\n","timestamp":"2025-07-20 18:41:04"}
+{"error":"Connection error.","level":"error","message":"ollama completion error","model":"qwen3:1.7b","timestamp":"2025-07-20 18:42:14"}
+{"level":"error","message":"LLM extraction failed: ollama error: Connection error.","timestamp":"2025-07-20 18:42:14"}

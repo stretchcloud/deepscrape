@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # LiteLLM - Unified API for 100+ LLMs
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: deepscrape-litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # LiteLLM configuration
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-1234}
+      - LITELLM_MODE=proxy
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-}
+      - STORE_MODEL_IN_DB=${LITELLM_STORE_MODEL_IN_DB:-true}
+      # OpenAI configuration (if using OpenAI through LiteLLM)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Anthropic configuration
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Google configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      # Cohere configuration
+      - COHERE_API_KEY=${COHERE_API_KEY:-}
+      # Replicate configuration
+      - REPLICATE_API_KEY=${REPLICATE_API_KEY:-}
+      # Hugging Face configuration
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
+      # Together AI configuration
+      - TOGETHERAI_API_KEY=${TOGETHERAI_API_KEY:-}
+      # Azure OpenAI configuration
+      - AZURE_API_KEY=${AZURE_API_KEY:-}
+      - AZURE_API_BASE=${AZURE_API_BASE:-}
+      - AZURE_API_VERSION=${AZURE_API_VERSION:-}
+      # Logging
+      - LITELLM_LOG=${LITELLM_LOG:-INFO}
+      # Telemetry
+      - LITELLM_TELEMETRY=${LITELLM_TELEMETRY:-false}
+    volumes:
+      # Configuration file
+      - ./config/litellm/config.yaml:/app/config.yaml
+      # Database persistence
+      - litellm_data:/app/data
+    command: >
+      --config /app/config.yaml
+      --port 4000
+      --num_workers 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - deepscrape-network
+
+volumes:
+  litellm_data:
+    driver: local
+
+networks:
+  deepscrape-network:
+    external: true

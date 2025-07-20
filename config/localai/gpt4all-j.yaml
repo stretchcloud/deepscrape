@@ -1,0 +1,36 @@
+# LocalAI Model Configuration for GPT4All-J
+name: gpt4all-j
+parameters:
+  model: ggml-gpt4all-j.bin
+  temperature: 0.2
+  top_k: 40
+  top_p: 0.95
+  threads: 4
+  max_tokens: 4000
+  repeat_penalty: 1.1
+  
+context_size: 2048
+f16: false
+gpu_layers: 0  # Set to number of layers to offload to GPU
+
+# Prompt template
+template:
+  chat: |
+    ### System:
+    {{.System}}
+    ### User:
+    {{.Input}}
+    ### Assistant:
+  
+  completion: |
+    {{.Input}}
+
+# Model download URL (optional)
+download_url: "https://gpt4all.io/models/ggml-gpt4all-j-v1.3-groovy.bin"
+
+# API compatibility
+openai:
+  # Makes this model available via OpenAI-compatible endpoint
+  enabled: true
+  # Model name as it appears in the API
+  model_name: "gpt4all-j"

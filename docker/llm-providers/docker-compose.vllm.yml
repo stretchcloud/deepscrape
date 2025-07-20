@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # vLLM - High-performance LLM inference server
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: deepscrape-vllm
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Model configuration
+      - MODEL=meta-llama/Llama-2-7b-chat-hf
+      # GPU configuration
+      - CUDA_VISIBLE_DEVICES=0
+      # vLLM specific settings
+      - VLLM_TENSOR_PARALLEL_SIZE=1
+      - VLLM_GPU_MEMORY_UTILIZATION=0.9
+      - VLLM_MAX_MODEL_LEN=4096
+      - VLLM_DTYPE=auto
+      # API configuration
+      - VLLM_API_KEY=${LLM_API_KEY:-dummy-key}
+    volumes:
+      # Model cache directory
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      --model ${MODEL}
+      --api-key ${VLLM_API_KEY}
+      --tensor-parallel-size ${VLLM_TENSOR_PARALLEL_SIZE}
+      --gpu-memory-utilization ${VLLM_GPU_MEMORY_UTILIZATION}
+      --max-model-len ${VLLM_MAX_MODEL_LEN}
+      --dtype ${VLLM_DTYPE}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - deepscrape-network
+
+networks:
+  deepscrape-network:
+    external: true

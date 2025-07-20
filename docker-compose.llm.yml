@@ -1,0 +1,30 @@
+# Extended Docker Compose configuration with LLM support
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.llm.yml -f docker/llm-providers/docker-compose.{provider}.yml up
+version: '3.8'
+
+services:
+  # Extend the main deepscrape service with LLM environment variables
+  deepscrape:
+    environment:
+      # LLM Provider configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-120000}
+      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-3}
+      # Provider-specific URLs (automatically set based on provider)
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      - LOCALAI_BASE_URL=http://localai:8080/v1
+      - LITELLM_BASE_URL=http://litellm:4000
+      - CUSTOM_BASE_URL=http://custom-llm:8000/v1
+    # Add depends_on for the selected LLM provider
+    # This will be overridden by the specific provider compose file
+    networks:
+      - deepscrape-network
+
+# Ensure the network exists
+networks:
+  deepscrape-network:
+    driver: bridge

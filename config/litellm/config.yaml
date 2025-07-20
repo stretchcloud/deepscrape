@@ -1,0 +1,86 @@
+# LiteLLM Proxy Configuration
+# This file configures the LiteLLM proxy server with model routing
+
+model_list:
+  # OpenAI models
+  - model_name: gpt-4
+    litellm_params:
+      model: openai/gpt-4
+      api_key: ${OPENAI_API_KEY}
+  
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: ${OPENAI_API_KEY}
+  
+  # Anthropic models
+  - model_name: claude-3-opus
+    litellm_params:
+      model: anthropic/claude-3-opus-20240229
+      api_key: ${ANTHROPIC_API_KEY}
+  
+  - model_name: claude-3-sonnet
+    litellm_params:
+      model: anthropic/claude-3-sonnet-20240229
+      api_key: ${ANTHROPIC_API_KEY}
+  
+  # Local models via Ollama
+  - model_name: llama2
+    litellm_params:
+      model: ollama/llama2
+      api_base: http://ollama:11434
+  
+  - model_name: mistral
+    litellm_params:
+      model: ollama/mistral
+      api_base: http://ollama:11434
+  
+  # Google models
+  - model_name: gemini-pro
+    litellm_params:
+      model: google/gemini-pro
+      api_key: ${GOOGLE_API_KEY}
+  
+  # Replicate models
+  - model_name: llama-2-70b-chat
+    litellm_params:
+      model: replicate/meta/llama-2-70b-chat
+      api_key: ${REPLICATE_API_KEY}
+
+# Router settings
+router_settings:
+  routing_strategy: "usage-based-routing"  # or "latency-based-routing"
+  model_group_alias:
+    gpt-4o: ["gpt-4", "claude-3-opus"]
+    gpt-3.5-turbo: ["gpt-3.5-turbo", "claude-3-sonnet", "mistral"]
+  
+  # Fallback models
+  fallback_models:
+    gpt-4: ["claude-3-opus", "gpt-3.5-turbo"]
+    claude-3-opus: ["gpt-4", "claude-3-sonnet"]
+  
+  # Rate limiting
+  max_parallel_requests: 100
+  timeout: 600  # 10 minutes
+  
+  # Caching
+  cache: true
+  cache_ttl: 3600  # 1 hour
+
+# General settings
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY}
+  database_url: ${DATABASE_URL}
+  otel_endpoint: ${OTEL_ENDPOINT}
+  
+  # Logging
+  log_level: ${LITELLM_LOG:-INFO}
+  json_logs: true
+  
+  # Security
+  allowed_ips: []  # Empty means allow all
+  blocked_ips: []
+  
+  # Monitoring
+  success_callback: ["otel"]
+  failure_callback: ["otel"]

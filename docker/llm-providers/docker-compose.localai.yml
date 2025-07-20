@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # LocalAI - OpenAI compatible API for local models
+  localai:
+    image: quay.io/go-skynet/local-ai:latest
+    container_name: deepscrape-localai
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # LocalAI configuration
+      - MODELS_PATH=/models
+      - CONTEXT_SIZE=${LOCALAI_CONTEXT_SIZE:-2048}
+      - THREADS=${LOCALAI_THREADS:-4}
+      - DEBUG=${LOCALAI_DEBUG:-false}
+      # API configuration
+      - API_KEY=${LLM_API_KEY:-}
+      # Model preloading
+      - PRELOAD_MODELS=${LOCALAI_PRELOAD_MODELS:-}
+      # Performance settings
+      - BUILD_TYPE=${LOCALAI_BUILD_TYPE:-cublas}
+      - GO_TAGS=stablediffusion
+    volumes:
+      # Model directory
+      - localai_models:/models
+      # Configuration directory
+      - ./config/localai:/config
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      --models-path /models
+      --context-size ${CONTEXT_SIZE}
+      --threads ${THREADS}
+      --api-key ${API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - deepscrape-network
+
+  # LocalAI model downloader
+  localai-downloader:
+    image: curlimages/curl:latest
+    container_name: deepscrape-localai-downloader
+    depends_on:
+      localai:
+        condition: service_healthy
+    environment:
+      - MODEL_URL=${LOCALAI_MODEL_URL:-}
+      - MODEL_NAME=${LLM_MODEL:-ggml-gpt4all-j}
+    volumes:
+      - localai_models:/models
+    command: >
+      sh -c "
+        if [ -n \"$${MODEL_URL}\" ]; then
+          echo 'Downloading model from: $${MODEL_URL}';
+          curl -L -o /models/$${MODEL_NAME}.bin \"$${MODEL_URL}\";
+          echo 'Model downloaded successfully';
+        else
+          echo 'No MODEL_URL specified, skipping download';
+        fi
+      "
+    networks:
+      - deepscrape-network
+
+volumes:
+  localai_models:
+    driver: local
+
+networks:
+  deepscrape-network:
+    external: true

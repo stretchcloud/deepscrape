@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Redis service for job queue and caching
   redis:
@@ -40,6 +38,9 @@ services:
       - ./cache:/app/cache
       - ./logs:/app/logs
       - ./crawl-output:/crawl-output
+      # Development: mount source code (comment out for production)
+      - ./src:/app/src
+      - ./dist:/app/dist
     depends_on:
       redis:
         condition: service_healthy
@@ -58,4 +59,5 @@ volumes:
 
 networks:
   deepscrape-network:
-    driver: bridge
+    external: true
+    name: deepscrape-network

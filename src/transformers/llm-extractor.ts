@@ -1,5 +1,5 @@
 import { ScraperResponse } from '../types';
-import { OpenAIService } from '../services/openai.service';
+import { LLMProvider, LLMMessage } from '../types/llm.types';
 import { 
   ExtractionOptions, 
   ExtractionResult, 
@@ -26,9 +26,9 @@ function limitTextSize(text: string, maxTokens = 15000): string {
 }
 
 export class LLMExtractor {
-  private llmService: OpenAIService;
+  private llmService: LLMProvider;
   
-  constructor(llmService: OpenAIService) {
+  constructor(llmService: LLMProvider) {
     this.llmService = llmService;
   }
   
@@ -108,7 +108,7 @@ export class LLMExtractor {
           data: llmResponse.data,
           metadata: {
             extractionTime,
-            modelName: this.llmService.model || 'gpt-4o'
+            modelName: this.llmService.getModel() || 'gpt-4o'
           }
         }
       };
@@ -133,10 +133,10 @@ export class LLMExtractor {
     title: string,
     url: string,
     options: ExtractionOptions
-  ): Array<{ role: string; content: string }> {
+  ): LLMMessage[] {
     const { schema, instructions, extractionType = 'structured', promptFormat = 'zero-shot' } = options;
     
-    const messages: Array<{ role: string; content: string }> = [];
+    const messages: LLMMessage[] = [];
     
     // System message defines the task
     let systemMessage = 'You are an expert web content analyzer and data extractor. ';
@@ -145,23 +145,29 @@ export class LLMExtractor {
       systemMessage += 'Extract structured data from the content based on the provided schema and output as JSON. ';
       systemMessage += 'Be precise and follow the schema exactly. If information is not available, use null or empty values.';
     } else if (extractionType === 'summary') {
-      systemMessage += 'Create a concise summary of the main points in the provided content.';
+      systemMessage += 'You are a professional content summarizer. Create a concise summary of the main points in the provided content. ';
+      systemMessage += 'CRITICAL: Output ONLY the final summary. Do NOT include: ';
+      systemMessage += '1) Your reasoning process or thoughts about what the user wants. ';
+      systemMessage += '2) Meta-commentary like "The user wants me to..." or "I need to..." or "Let me...". ';
+      systemMessage += '3) Any explanation of your approach or methodology. ';
+      systemMessage += '4) Any XML tags or markdown formatting for thinking. ';
+      systemMessage += 'Start directly with the summary content itself.';
     } else if (extractionType === 'qa') {
       systemMessage += 'Answer questions about the provided content accurately and concisely.';
     }
     
-    messages.push({ role: 'system', content: systemMessage });
+    messages.push({ role: 'system' as const, content: systemMessage });
     
     // If few-shot prompting is used and example data is provided
     if (promptFormat === 'few-shot' && options.exampleData) {
       messages.push({
-        role: 'user',
+        role: 'user' as const,
         content: 'Here is an example of the extraction format I want:\n' + 
           JSON.stringify(options.exampleData, null, 2)
       });
       
       messages.push({
-        role: 'assistant',
+        role: 'assistant' as const,
         content: 'I understand. I will extract information in that format.'
       });
     }
@@ -200,7 +206,7 @@ export class LLMExtractor {
       userMessage += '\n\nAdditional instructions: Extract the information and format as JSON';
     }
     
-    messages.push({ role: 'user', content: userMessage });
+    messages.push({ role: 'user' as const, content: userMessage });
     
     return messages;
   }
