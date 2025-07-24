@@ -59,7 +59,7 @@ router.post('/debug/transform', async (req, res) => {
       markdownLength: markdownResponse.content.length,
       contentType: markdownResponse.contentType,
       markdown: markdownResponse.content,
-      error: markdownResponse.error || null
+      error: markdownResponse.error ?? null
     });
   } catch (error) {
     logger.error(`Debug transformation error: ${error instanceof Error ? error.message : String(error)}`);

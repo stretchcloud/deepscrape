@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies (including devDependencies for build)
-RUN npm ci
+# Using --ignore-scripts for security during dependency installation
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -20,8 +21,8 @@ RUN npm run build
 FROM node:18-bullseye AS production
 
 # Install system dependencies and Chromium
-RUN apt-get update && apt-get install -y \
-    wget \
+# Using --no-install-recommends to avoid installing unnecessary packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
     libasound2 \
@@ -56,8 +57,9 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    xdg-utils \
     lsb-release \
+    wget \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -69,13 +71,15 @@ RUN groupadd --gid 1001 nodejs && \
 
 # Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
-
-# Install Playwright system dependencies as root
-RUN npx playwright install-deps chromium
+# Using --ignore-scripts for security during dependency installation
+RUN npm ci --only=production --ignore-scripts && \
+    npx playwright install-deps chromium
 
 # Copy built application from builder stage
 COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
+
+# Copy health check script with read-only permissions
+COPY --chown=deepscrape:nodejs --chmod=555 healthcheck.sh /app/healthcheck.sh
 
 # Create directories and set proper permissions
 RUN mkdir -p /app/cache /app/logs /home/deepscrape/.cache && \
@@ -97,7 +101,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD ["/app/healthcheck.sh"]
 
 # Start the application
 CMD ["node", "dist/index.js"]

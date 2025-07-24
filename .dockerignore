@@ -101,6 +101,19 @@ __tests__/
 # Firecrawl subdirectory (not needed for main app)
 firecrawl/
 
+# Security sensitive files
+*.key
+*.pem
+*.cert
+.env*
+!.env.example
+secrets/
+private/
+
+# Project specific files
+project_issues.csv
+CLAUDE.md
+
 # Temporary files
 tmp/
 temp/

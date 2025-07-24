@@ -53,7 +53,7 @@ async function crawl(req, res) {
         // Try to get robots.txt
         let robotsTxt = '';
         try {
-            robotsTxt = await crawler.getRobotsTxt(scrapeOptions.skipTlsVerification || false);
+            robotsTxt = await crawler.getRobotsTxt(scrapeOptions.skipTlsVerification ?? false);
             crawler.importRobotsTxt(robotsTxt);
         }
         catch (error) {
@@ -100,7 +100,7 @@ async function crawl(req, res) {
         logger_1.logger.error('Error initiating crawl', { error });
         res.status(500).json({
             success: false,
-            error: error.message || 'Internal server error'
+            error: error.message ?? 'Internal server error'
         });
     }
 }
@@ -129,11 +129,16 @@ async function getCrawlStatus(req, res) {
         });
         const jobStatuses = await Promise.all(jobStatusPromises);
         // Determine overall status
-        const status = storedCrawl.cancelled
-            ? 'cancelled'
-            : jobStatuses.every(j => j.status === 'completed') && await (0, redis_service_1.isCrawlFinished)(jobId)
-                ? 'completed'
-                : 'scraping';
+        let status;
+        if (storedCrawl.cancelled) {
+            status = 'cancelled';
+        }
+        else if (jobStatuses.every(j => j.status === 'completed') && await (0, redis_service_1.isCrawlFinished)(jobId)) {
+            status = 'completed';
+        }
+        else {
+            status = 'scraping';
+        }
         // Get completed jobs data
         const doneCount = await (0, redis_service_1.getCrawlDoneJobsCount)(jobId);
         const doneJobIds = await (0, redis_service_1.getCrawlDoneJobs)(jobId, start, end ?? -1);
@@ -145,18 +150,18 @@ async function getCrawlStatus(req, res) {
             const jobState = await job.getState();
             const returnValue = job.returnvalue;
             // Make sure to include content and contentType at the document level
-            let document = returnValue?.document || returnValue;
+            let document = returnValue?.document ?? returnValue;
             // Ensure we keep the content fields if they exist at the top level
-            if (returnValue && returnValue.content && !document.content) {
+            if (returnValue?.content && !document.content) {
                 document.content = returnValue.content;
             }
-            if (returnValue && returnValue.contentType && !document.contentType) {
+            if (returnValue?.contentType && !document.contentType) {
                 document.contentType = returnValue.contentType;
             }
             // Log to debug what we're returning
             logger_1.logger.debug(`Job ${job.id} document: ${document ? 'has document' : 'no document'}, ` +
-                `content length: ${document?.content?.length || 0}, ` +
-                `content type: ${document?.contentType || 'none'}`);
+                `content length: ${document?.content?.length ?? 0}, ` +
+                `content type: ${document?.contentType ?? 'none'}`);
             return {
                 id: job.id,
                 status: jobState,
@@ -181,7 +186,7 @@ async function getCrawlStatus(req, res) {
         logger_1.logger.error('Error getting crawl status', { error });
         res.status(500).json({
             success: false,
-            error: error.message || 'Internal server error'
+            error: error.message ?? 'Internal server error'
         });
     }
 }
@@ -205,7 +210,7 @@ async function cancelCrawlJob(req, res) {
         logger_1.logger.error('Error cancelling crawl', { error });
         res.status(500).json({
             success: false,
-            error: error.message || 'Internal server error'
+            error: error.message ?? 'Internal server error'
         });
     }
 }

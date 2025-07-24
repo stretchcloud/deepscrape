@@ -40,7 +40,7 @@ export class LLMServiceFactory {
       // Get configuration
       const apiKey = process.env.OPENAI_API_KEY;
       const organization = process.env.OPENAI_ORGANIZATION;
-      const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Default to gpt-4o
+      const model = process.env.OPENAI_MODEL ?? 'gpt-4o'; // Default to gpt-4o
       
       if (!apiKey) {
         logger.warn(
@@ -70,7 +70,7 @@ export class LLMServiceFactory {
     try {
       // Get base configuration from environment
       const baseUrl = process.env.LLM_BASE_URL;
-      const apiKey = process.env.LLM_API_KEY || 'dummy-key';
+      const apiKey = process.env.LLM_API_KEY ?? 'dummy-key';
       const model = process.env.LLM_MODEL;
       const timeout = process.env.LLM_TIMEOUT ? parseInt(process.env.LLM_TIMEOUT) : undefined;
       const maxRetries = process.env.LLM_MAX_RETRIES ? parseInt(process.env.LLM_MAX_RETRIES) : undefined;
@@ -93,8 +93,8 @@ export class LLMServiceFactory {
         custom: 'local-model'
       };
       
-      const finalBaseUrl = baseUrl || providerDefaults[provider];
-      const finalModel = model || modelDefaults[provider];
+      const finalBaseUrl = baseUrl ?? providerDefaults[provider];
+      const finalModel = model ?? modelDefaults[provider];
       
       if (!finalBaseUrl) {
         logger.warn(

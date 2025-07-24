@@ -1,8 +1,7 @@
 import { Job } from 'bullmq';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { WebCrawler } from './crawler';
-import { getCrawl, saveCrawl, markCrawlFinished, addCrawlJobs, addExportedFile } from '../services/redis.service';
+import { getCrawl, markCrawlFinished, addCrawlJobs, addExportedFile } from '../services/redis.service';
 import { ScraperManager } from './scraper-manager';
 import { fileExportService } from '../services/file-export.service';
 import axios from 'axios';
@@ -95,7 +94,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     // Setup hooks if needed - for now we'll just use the default empty object
     hooks: {},
     // Use browser-based crawling if specified
-    useBrowser: crawl.crawlerOptions.useBrowser || false,
+    useBrowser: crawl.crawlerOptions.useBrowser ?? false,
     // Enable URL deduplication by default
     deduplicateSimilarUrls: true
   });
@@ -109,7 +108,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     crawlId, 
     url,
     strategy: crawler.getStrategy(),
-    useBrowser: crawl.crawlerOptions.useBrowser || false
+    useBrowser: crawl.crawlerOptions.useBrowser ?? false
   });
   
   let filteredLinks: string[] = [];
@@ -121,8 +120,8 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     // Use browser-based discovery
     try {
       filteredLinks = await crawler.discoverUrlsWithBrowser(
-        crawl.crawlerOptions.maxDepth || 5,
-        crawl.crawlerOptions.limit || 100
+        crawl.crawlerOptions.maxDepth ?? 5,
+        crawl.crawlerOptions.limit ?? 100
       );
       
       logger.info(`Browser-based discovery completed for ${url}. Found ${filteredLinks.length} URLs`, {
@@ -141,13 +140,13 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
       const result = await crawler.crawlPage(url, scrapeOptions.skipTlsVerification);
       filteredLinks = crawler.filterLinks(
         result.links, 
-        crawl.crawlerOptions.limit || 100, 
-        crawl.crawlerOptions.maxDepth || 5
+        crawl.crawlerOptions.limit ?? 100, 
+        crawl.crawlerOptions.maxDepth ?? 5
       );
     }
   } else {
     // Use regular crawling
-    const { html, links } = await crawler.crawlPage(
+    const { links } = await crawler.crawlPage(
       url, 
       scrapeOptions.skipTlsVerification
     );
@@ -155,8 +154,8 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     // Filter links based on crawler options
     filteredLinks = crawler.filterLinks(
       links, 
-      crawl.crawlerOptions.limit || 100, 
-      crawl.crawlerOptions.maxDepth || 5
+      crawl.crawlerOptions.limit ?? 100, 
+      crawl.crawlerOptions.maxDepth ?? 5
     );
   }
   
@@ -167,9 +166,9 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     scrapeOptions: {
       ...scrapeOptions,
       // Ensure extractorFormat is set to markdown for consistent processing
-      extractorFormat: scrapeOptions.extractorFormat || 'markdown',
+      extractorFormat: scrapeOptions.extractorFormat ?? 'markdown',
       // If we're using browser mode, pass that to each page job
-      useBrowser: crawl.crawlerOptions.useBrowser || false
+      useBrowser: crawl.crawlerOptions.useBrowser ?? false
     }
   }));
   
@@ -193,7 +192,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     initialUrl: url,
     discoveredCount: filteredLinks.length,
     strategy: crawler.getStrategy(),
-    usedBrowser: crawl.crawlerOptions.useBrowser || false,
+    usedBrowser: crawl.crawlerOptions.useBrowser ?? false,
     outputDir: fileExportService.getCrawlOutputDir(crawlId)
   });
   
@@ -203,7 +202,7 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
     links: filteredLinks,
     discoveredCount: filteredLinks.length,
     strategy: crawler.getStrategy(),
-    usedBrowser: crawl.crawlerOptions.useBrowser || false,
+    usedBrowser: crawl.crawlerOptions.useBrowser ?? false,
     outputDirectory: fileExportService.getCrawlOutputDir(crawlId)
   };
 }
@@ -214,10 +213,10 @@ async function handleCrawlKickoff(crawlId: string, url: string, scrapeOptions: a
 function buildEnhancedScrapeOptions(scrapeOptions: any, useBrowser: boolean): any {
   return {
     ...scrapeOptions,
-    extractorFormat: scrapeOptions.extractorFormat || 'markdown',
+    extractorFormat: scrapeOptions.extractorFormat ?? 'markdown',
     skipCache: false,
     onlyMainContent: scrapeOptions.onlyMainContent !== false,
-    waitForTimeout: scrapeOptions.waitForTimeout || 2000,
+    waitForTimeout: scrapeOptions.waitForTimeout ?? 2000,
     useBrowser: useBrowser,
     stealthMode: useBrowser ? true : undefined,
     blockResources: useBrowser ? true : undefined,
@@ -234,9 +233,13 @@ function buildEnhancedScrapeOptions(scrapeOptions: any, useBrowser: boolean): an
  * Extract original HTML from scrape result
  */
 function extractOriginalHtml(result: any): string | null {
-  return result.contentType === 'markdown' && result.metadata?.originalHtml 
-    ? result.metadata.originalHtml 
-    : (result.contentType === 'html' ? result.content : null);
+  if (result.contentType === 'markdown' && result.metadata?.originalHtml) {
+    return result.metadata.originalHtml;
+  } else if (result.contentType === 'html') {
+    return result.content;
+  } else {
+    return null;
+  }
 }
 
 /**
@@ -256,7 +259,7 @@ async function exportPageContent(
     const exportedFilePath = await fileExportService.exportPage(
       url,
       result.content,
-      result.title || 'Untitled',
+      result.title ?? 'Untitled',
       crawlId,
       {
         status: result.metadata?.status,
@@ -320,7 +323,7 @@ async function handlePageScrape(url: string, scrapeOptions: any, crawlId: string
   const result = await scraperManager.scrape(url, enhancedOptions);
   
   logger.info(`Crawl ${crawlId}: Completed scraping page ${url}`, {
-    contentLength: result.content?.length || 0,
+    contentLength: result.content?.length ?? 0,
     contentType: result.contentType,
     status: result.metadata?.status,
     usedBrowser: useBrowser
@@ -328,7 +331,7 @@ async function handlePageScrape(url: string, scrapeOptions: any, crawlId: string
   
   const originalHtml = extractOriginalHtml(result);
   
-  logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
+  logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length ?? 0}`);
   
   await exportPageContent(url, result, crawlId, useBrowser);
   

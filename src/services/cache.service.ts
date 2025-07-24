@@ -26,13 +26,13 @@ interface CacheMetadata {
  * Implements a file-based cache system for scraper responses
  */
 export class CacheService {
-  private options: CacheOptions;
+  private readonly options: CacheOptions;
   
   constructor(options?: Partial<CacheOptions>) {
     this.options = {
       enabled: process.env.CACHE_ENABLED === 'true',
-      ttl: Number(process.env.CACHE_TTL || 3600), // Default: 1 hour
-      directory: process.env.CACHE_DIRECTORY || './cache',
+      ttl: Number(process.env.CACHE_TTL ?? 3600), // Default: 1 hour
+      directory: process.env.CACHE_DIRECTORY ?? './cache',
       ...options
     };
     
@@ -94,7 +94,7 @@ export class CacheService {
       const metadataFile = path.join(this.options.directory, `${cacheKey}.meta.json`);
       
       const now = Date.now();
-      const ttl = metadata.customTtl || this.options.ttl;
+      const ttl = metadata.customTtl ?? this.options.ttl;
       
       // Create metadata
       const cacheMetadata: CacheMetadata = {
@@ -167,7 +167,8 @@ export class CacheService {
    * Generate a deterministic cache key from a string
    */
   private generateCacheKey(key: string): string {
-    return crypto.createHash('md5').update(key).digest('hex');
+    // Using SHA-256 instead of MD5 for better security (though this is just for cache keys)
+    return crypto.createHash('sha256').update(key).digest('hex');
   }
   
   /**

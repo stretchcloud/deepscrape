@@ -1,12 +1,9 @@
-import express from 'express';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import scraperManager from '../../scraper/scraper-manager';
-import { ScraperOptions, ScraperResponse, BrowserAction } from '../../types';
 import { logger } from '../../utils/logger';
 import { apiKeyAuth as auth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
-import { Schema } from '../../types/schema';
 import { ExtractionResult } from '../../types/schema';
 
 // Extended ScraperResponse interface to include extraction results
@@ -84,7 +81,7 @@ router.post(
           url,
           metadata: {
             processingTime,
-            fromCache: response.metadata?.fromCache || false
+            fromCache: response.metadata?.fromCache ?? false
           }
         });
       }
@@ -92,7 +89,7 @@ router.post(
       return res.json({
         success: true,
         url: response.url,
-        title: response.title || "",
+        title: response.title ?? "",
         content: response.content,
         contentType: response.contentType,
         metadata: {
@@ -147,7 +144,7 @@ router.post(
       // Combine options with extraction options and force markdown format
       const scrapingOptions = {
         ...options,
-        extractorFormat: options.extractorFormat || 'markdown', // Default to markdown
+        extractorFormat: options.extractorFormat ?? 'markdown', // Default to markdown
         extractionOptions: {
           schema,
           instructions: options.instructions,
@@ -168,7 +165,7 @@ router.post(
           url,
           metadata: {
             processingTime,
-            fromCache: response.metadata?.fromCache || false
+            fromCache: response.metadata?.fromCache ?? false
           }
         });
       }
@@ -192,7 +189,7 @@ router.post(
         // Fallback to basic data if no extraction was performed
         formattedResponse = {
           url: extendedResponse.url,
-          title: extendedResponse.title || "No title available",
+          title: extendedResponse.title ?? "No title available",
           contentPreview: extendedResponse.content.substring(0, 500) + "..."
         };
         logger.warn('No structured data available, using basic content preview');
@@ -240,7 +237,7 @@ router.post(
  * Format a header section with title and URL
  */
 function formatMarkdownHeader(url: string, title: string, warningMessage: string | null): string {
-  let markdown = `# ${title || 'Extracted Content'}\n\n`;
+  let markdown = `# ${title ?? 'Extracted Content'}\n\n`;
   markdown += `URL: ${url}\n\n`;
   
   if (warningMessage) {
@@ -381,7 +378,7 @@ router.post(
         extractionOptions: {
           instructions: `Provide a concise summary of the content in about ${maxLength} words.
             Focus on the main points and key information.`,
-          temperature: options.temperature || 0.3,
+          temperature: options.temperature ?? 0.3,
           maxTokens: maxLength * 2, // Approximation for token limit
           extractionType: 'summarize'
         }
@@ -398,7 +395,7 @@ router.post(
           url,
           metadata: {
             processingTime,
-            fromCache: response.metadata?.fromCache || false
+            fromCache: response.metadata?.fromCache ?? false
           }
         });
       }

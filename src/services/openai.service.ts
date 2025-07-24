@@ -17,8 +17,8 @@ interface OpenAIConfig {
 
 
 export class OpenAIService implements LLMProvider {
-  private client: OpenAI;
-  private _model: string;
+  private readonly client: OpenAI;
+  private readonly _model: string;
 
   constructor(config: OpenAIConfig) {
     this.client = new OpenAI({
@@ -132,6 +132,7 @@ export class OpenAIService implements LLMProvider {
         };
       } catch (parseError) {
         // If parsing fails, return the raw content
+        logger.warn(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         return {
           success: true,
           data: content as unknown as T,

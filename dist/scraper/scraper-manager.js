@@ -19,8 +19,8 @@ class ScraperManager {
         // Initialize cache service
         this.cacheService = new cache_service_1.CacheService({
             enabled: process.env.CACHE_ENABLED === 'true',
-            ttl: Number(process.env.CACHE_TTL || 3600),
-            directory: process.env.CACHE_DIRECTORY || './cache'
+            ttl: Number(process.env.CACHE_TTL ?? 3600),
+            directory: process.env.CACHE_DIRECTORY ?? './cache'
         });
         // LLM extractor will be initialized lazily or explicitly
         this.llmExtractor = null;
@@ -200,7 +200,7 @@ class ScraperManager {
         try {
             logger_1.logger.info(`Starting scraping process for URL: ${url}`);
             // Check cache first
-            const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache || false);
+            const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache ?? false);
             if (cachedResponse) {
                 return cachedResponse;
             }
@@ -242,10 +242,10 @@ class ScraperManager {
             if (scraperResponse.contentType !== 'html' || !scraperResponse.content) {
                 return scraperResponse;
             }
-            // Use a simple regex to strip all HTML tags
+            // Strip HTML tags using a safer approach to avoid regex backtracking
             const textContent = scraperResponse.content
-                .replace(/<[^>]*>/g, ' ') // Replace HTML tags with spaces
-                .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                .replace(/<[^>]+>/g, ' ') // Replace HTML tags with spaces (using + instead of * to avoid empty matches)
+                .replace(/\s{2,}/g, ' ') // Replace 2 or more spaces with single space (more specific)
                 .trim(); // Trim extra spaces
             return {
                 ...scraperResponse,

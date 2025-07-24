@@ -109,6 +109,7 @@ export class UrlNormalizationService {
       const path = parsedUrl.pathname.toLowerCase();
       return fileExtensions.some(ext => path.endsWith(ext));
     } catch (error) {
+      logger.debug('Invalid URL format', { url, error: (error as Error).message });
       return false;
     }
   }
@@ -138,13 +139,14 @@ export class UrlNormalizationService {
             hostname.startsWith('192.168.') ||
             hostname.startsWith('10.') ||
             hostname.startsWith('172.16.') ||
-            hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) {
+            /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) {
           return false;
         }
       }
       
       return true;
     } catch (error) {
+      logger.debug('Invalid URL for validation', { url, error: (error as Error).message });
       return false;
     }
   }
@@ -162,6 +164,7 @@ export class UrlNormalizationService {
       if (path === '' || path === '/') return 0;
       return path.split('/').filter(Boolean).length;
     } catch (error) {
+      logger.debug('Failed to get URL depth', { url, error: (error as Error).message });
       return 0;
     }
   }

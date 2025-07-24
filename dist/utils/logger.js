@@ -13,7 +13,7 @@ if (!fs_1.default.existsSync(logDir)) {
     fs_1.default.mkdirSync(logDir, { recursive: true });
 }
 const logger = winston_1.default.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL ?? 'info',
     format: winston_1.default.format.combine(winston_1.default.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), winston_1.default.format.errors({ stack: true }), winston_1.default.format.json()),
     transports: [
         // Console transport for development

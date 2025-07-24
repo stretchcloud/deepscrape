@@ -67,19 +67,14 @@ export class ContentCleaner {
    * Remove unnecessary attributes to clean up the HTML
    */
   private removeAttributes($: cheerio.CheerioAPI): void {
-    // List of attributes to remove
-    const attributesToRemove = [
-      'onclick', 'onmouseover', 'onmouseout', 'onload', 'onerror',
-      'data-track', 'data-tracking', 'data-analytics', 'data-ga',
-      'style', 'class', 'id', // Sometimes you may want to keep these for structure
-      'tabindex', 'role', 'aria-*', // Accessibility attributes
-    ];
-    
-    // For now, only remove event handlers and tracking attributes
+    // Remove event handlers and tracking attributes
     $('*').each((_i, el) => {
-      for (const attr of Object.keys((el as any).attribs || {})) {
-        if (attr.startsWith('on') || attr.includes('track') || attr.includes('analytics')) {
-          $(el).removeAttr(attr);
+      const element = el as any;
+      if (element.attribs) {
+        for (const attr of Object.keys(element.attribs)) {
+          if (attr.startsWith('on') || attr.includes('track') || attr.includes('analytics')) {
+            $(el).removeAttr(attr);
+          }
         }
       }
     });
@@ -271,8 +266,8 @@ export class ContentCleaner {
     let current = startElement.nextSibling;
     while (current) {
       if (current.nodeType === 1) {
-        const nodeName = (current as any).tagName?.toLowerCase();
-        if (nodeName && nodeName.match(/^h[1-2]$/)) {
+        const nodeName = current.tagName?.toLowerCase();
+        if (nodeName?.match(/^h[1-2]$/)) {
           break;
         }
         container.append(cheerio.load('')(current).clone());
@@ -308,7 +303,7 @@ export class ContentCleaner {
   private extractMainContentHtml(mainContent: cheerio.Cheerio<any>): string {
     const $mainContentWrapper = cheerio.load('')('<div class="main-content-wrapper"></div>');
     $mainContentWrapper.append(mainContent.clone());
-    const mainContentHtml = $mainContentWrapper.html() || '';
+    const mainContentHtml = $mainContentWrapper.html() ?? '';
     
     const $finalCheck = cheerio.load(mainContentHtml);
     const finalHeadings = $finalCheck('h1, h2, h3, h4, h5, h6').length;

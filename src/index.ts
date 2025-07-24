@@ -8,7 +8,6 @@ import path from 'path';
 import scraperRoutes from './api/routes/scraper';
 import crawlerRoutes from './api/routes/crawler.routes';
 import batchScrapeRoutes from './api/routes/batch-scrape.routes';
-import { apiKeyAuth } from './api/middleware/auth.middleware';
 import { logger } from './utils/logger';
 import { initQueue, initializeWorker, closeQueue } from './services/queue.service';
 
@@ -30,11 +29,17 @@ const accessLogStream = fs.createWriteStream(
 );
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ?? 3000;
 
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // CORS support
+// Configure CORS with specific origins for security
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || false, // Set to specific origins in production
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions)); // CORS support with security settings
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
 app.use(morgan('combined', { stream: accessLogStream })); // HTTP request logging
@@ -94,7 +99,7 @@ async function initializeCrawlQueue() {
 // Start server
 app.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
   
   // Initialize crawl queue after server starts
   await initializeCrawlQueue();

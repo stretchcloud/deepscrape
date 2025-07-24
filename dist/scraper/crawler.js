@@ -91,7 +91,8 @@ class WebCrawler {
             const normalizedLinkUrl = new url_1.URL(normalizedLink);
             return normalizedLinkUrl.pathname.startsWith(normalizedInitialUrl.pathname);
         }
-        catch (_) {
+        catch (error) {
+            logger_1.logger.debug(`Error parsing URL: ${error instanceof Error ? error.message : String(error)}`);
             return false;
         }
     }
@@ -173,7 +174,8 @@ class WebCrawler {
             const path = parsedUrl.pathname.toLowerCase();
             return fileExtensions.some(ext => path.endsWith(ext));
         }
-        catch (e) {
+        catch (error) {
+            logger_1.logger.debug(`Error checking file extension: ${error instanceof Error ? error.message : String(error)}`);
             return false;
         }
     }
@@ -187,7 +189,8 @@ class WebCrawler {
                 return 0;
             return path.split('/').filter(Boolean).length;
         }
-        catch (e) {
+        catch (error) {
+            logger_1.logger.debug(`Error getting URL depth: ${error instanceof Error ? error.message : String(error)}`);
             return 0;
         }
     }
@@ -285,8 +288,8 @@ class WebCrawler {
                         const url = new url_1.URL(href, baseUrl);
                         links.push(url.href);
                     }
-                    catch (e) {
-                        // Invalid URL, ignore
+                    catch (error) {
+                        logger_1.logger.debug(`Invalid URL found in href: ${href}, error: ${error instanceof Error ? error.message : String(error)}`);
                     }
                 }
             });
@@ -459,7 +462,7 @@ class WebCrawler {
                     }
                 });
                 this.urlQueue.push(...urls);
-                this.urlQueue.sort((a, b) => (this.urlScores.get(b) || 0) - (this.urlScores.get(a) || 0));
+                this.urlQueue.sort((a, b) => (this.urlScores.get(b) ?? 0) - (this.urlScores.get(a) ?? 0));
                 break;
             case crawler_1.CrawlStrategy.BFS:
             default:
@@ -497,7 +500,8 @@ class WebCrawler {
             }
             return score;
         }
-        catch (e) {
+        catch (error) {
+            logger_1.logger.debug(`Error calculating link relevance: ${error instanceof Error ? error.message : String(error)}`);
             return -100;
         }
     }
@@ -506,7 +510,7 @@ class WebCrawler {
      * @returns The strategy name as a string
      */
     getStrategy() {
-        return this.strategy || 'bfs';
+        return this.strategy ?? 'bfs';
     }
     /**
      * Discover all URLs from a starting point using browser-based crawling
@@ -520,9 +524,7 @@ class WebCrawler {
             this.useBrowser = true;
         }
         // Initialize PlaywrightService if not already initialized
-        if (!this.playwrightService) {
-            this.playwrightService = new playwright_service_1.PlaywrightService();
-        }
+        this.playwrightService ?? (this.playwrightService = new playwright_service_1.PlaywrightService());
         // Configure playwright options for discovery
         const playwrightOptions = {
             waitTime: 2000,

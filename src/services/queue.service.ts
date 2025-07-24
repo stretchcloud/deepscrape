@@ -1,8 +1,7 @@
 import { Job, Worker } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
-import { redisClient } from './redis.service';
-import { logger } from '../utils/logger';
 import { markCrawlJobDone, addCrawlJob } from './redis.service';
+import { logger } from '../utils/logger';
 import { processCrawlJob, setAddJobsToQueueFn } from '../scraper/crawler-processor';
 import { EnhancedQueueService } from './enhanced-queue.service';
 
@@ -10,15 +9,15 @@ const QUEUE_NAME = 'deepscrape-crawler-queue';
 
 // Initialize enhanced queue service with crawler-specific configuration
 const enhancedQueue = new EnhancedQueueService(QUEUE_NAME, {
-  concurrency: parseInt(process.env.CRAWLER_CONCURRENCY || '5'),
-  maxJobs: parseInt(process.env.CRAWLER_MAX_JOBS || '1000'),
-  lockDuration: parseInt(process.env.CRAWLER_LOCK_DURATION || '300000'), // 5 minutes for crawler jobs
-  lockRenewTime: parseInt(process.env.CRAWLER_LOCK_RENEW_TIME || '60000'), // 1 minute
-  retryAttempts: parseInt(process.env.CRAWLER_RETRY_ATTEMPTS || '3'),
-  retryDelay: parseInt(process.env.CRAWLER_RETRY_DELAY || '5000'),
+  concurrency: parseInt(process.env.CRAWLER_CONCURRENCY ?? '5'),
+  maxJobs: parseInt(process.env.CRAWLER_MAX_JOBS ?? '1000'),
+  lockDuration: parseInt(process.env.CRAWLER_LOCK_DURATION ?? '300000'), // 5 minutes for crawler jobs
+  lockRenewTime: parseInt(process.env.CRAWLER_LOCK_RENEW_TIME ?? '60000'), // 1 minute
+  retryAttempts: parseInt(process.env.CRAWLER_RETRY_ATTEMPTS ?? '3'),
+  retryDelay: parseInt(process.env.CRAWLER_RETRY_DELAY ?? '5000'),
   enableDynamicScaling: process.env.CRAWLER_ENABLE_DYNAMIC_SCALING === 'true',
-  maxConcurrency: parseInt(process.env.CRAWLER_MAX_CONCURRENCY || '20'),
-  minConcurrency: parseInt(process.env.CRAWLER_MIN_CONCURRENCY || '1')
+  maxConcurrency: parseInt(process.env.CRAWLER_MAX_CONCURRENCY ?? '20'),
+  minConcurrency: parseInt(process.env.CRAWLER_MIN_CONCURRENCY ?? '1')
 });
 
 // Legacy compatibility - expose the underlying queue

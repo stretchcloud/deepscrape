@@ -2,7 +2,6 @@ import TurndownService from 'turndown';
 import { ScraperResponse } from '../types';
 import { logger } from '../utils/logger';
 import * as cheerio from 'cheerio';
-import { Element, Node } from 'domhandler';
 
 // List of selectors for elements that should be removed as they're not part of the main content
 const EXCLUDE_NON_MAIN_TAGS = [
@@ -95,7 +94,7 @@ const MAIN_CONTENT_SELECTORS = [
 const CONTENT_THRESHOLD = 20;
 
 export class HtmlToMarkdownTransformer {
-  private turndownService: TurndownService;
+  private readonly turndownService: TurndownService;
 
   constructor() {
     // Initialize Turndown with options
@@ -133,12 +132,11 @@ export class HtmlToMarkdownTransformer {
           node.nodeName === 'PRE' &&
           node.firstChild &&
           node.firstChild.nodeName === 'CODE'
-        ) ? true : false;
+        ) || false;
       },
       replacement: (content, node) => {
-        const code = node.textContent || '';
-        const language = node.firstChild && 
-          (node.firstChild as HTMLElement).className
+        const code = node.textContent ?? '';
+        const language = (node.firstChild as HTMLElement)?.className
             ? (node.firstChild as HTMLElement).className.replace('language-', '')
             : '';
         
@@ -167,7 +165,8 @@ export class HtmlToMarkdownTransformer {
         // Prevent line breaks inside links by replacing them
         let linkContent = content.trim().replace(/\n/g, ' ');
         
-        return `[${linkContent}](${finalHref}${title ? ` "${title}"` : ''})`;
+        const titleAttr = title ? ` "${title}"` : '';
+        return `[${linkContent}](${finalHref}${titleAttr})`;
       }
     });
 
@@ -197,7 +196,7 @@ export class HtmlToMarkdownTransformer {
         const isOrdered = parent && parent.nodeName === 'OL';
         
         // Handle index properly for ordered lists
-        const index = parent ? Array.from(parent.childNodes || [])
+        const index = parent ? Array.from(parent.childNodes ?? [])
           .filter(n => n.nodeType === 1 && (n as HTMLElement).tagName === 'LI')
           .indexOf(node as HTMLElement) + 1 : 1;
         
@@ -223,9 +222,9 @@ export class HtmlToMarkdownTransformer {
     this.turndownService.addRule('images', {
       filter: 'img',
       replacement: (content, node) => {
-        const alt = (node as HTMLElement).getAttribute('alt') || '';
-        const src = (node as HTMLElement).getAttribute('src') || '';
-        const title = (node as HTMLElement).getAttribute('title') || '';
+        const alt = (node as HTMLElement).getAttribute('alt') ?? '';
+        const src = (node as HTMLElement).getAttribute('src') ?? '';
+        const title = (node as HTMLElement).getAttribute('title') ?? '';
         
         if (!src) return '';
         
@@ -240,7 +239,8 @@ export class HtmlToMarkdownTransformer {
           finalSrc = src.startsWith('/') ? `${this.baseUrl}${src}` : `${this.baseUrl}/${src}`;
         }
         
-        return `![${alt}](${finalSrc}${title ? ` "${title}"` : ''})`;
+        const titleAttr = title ? ` "${title}"` : '';
+        return `![${alt}](${finalSrc}${titleAttr})`;
       }
     });
 
@@ -257,7 +257,7 @@ export class HtmlToMarkdownTransformer {
     // Remove consecutive newlines
     this.turndownService.addRule('removeConsecutiveNewlines', {
       filter: (node) => {
-        return node.nodeType === 3 && /\n\s*\n/.test(node.nodeValue || '');
+        return node.nodeType === 3 && /\n\s*\n/.test(node.nodeValue ?? '');
       },
       replacement: (content) => {
         return content.replace(/\n\s*\n/g, '\n\n');
@@ -316,7 +316,7 @@ export class HtmlToMarkdownTransformer {
       const finalHeadings = $extracted('[data-preserve-heading="true"]').length;
       logger.debug(`After cleaning, extracted content has ${finalHeadings} headings`);
       
-      return $extracted.html() || '';
+      return $extracted.html() ?? '';
     }
     
     // If extraction failed, fall back to heading-based approach
@@ -420,9 +420,7 @@ export class HtmlToMarkdownTransformer {
 
     // Clean attributes that aren't necessary for markdown
     $('*').each((_, el) => {
-      // Using type assertion to access attribs
       const element = el as any;
-      
       // Skip if element doesn't have attributes
       if (!element.attribs) return;
       
@@ -430,7 +428,7 @@ export class HtmlToMarkdownTransformer {
       Object.keys(attrs).forEach(attr => {
         // Keep only essential attributes
         if (!['href', 'src', 'alt', 'title', 'colspan', 'rowspan'].includes(attr)) {
-          $(element).removeAttr(attr);
+          $(el).removeAttr(attr);
         }
       });
     });
@@ -456,7 +454,7 @@ export class HtmlToMarkdownTransformer {
       if ($(table).find('thead').length === 0 && $(table).find('th').length === 0) {
         const firstRow = $(table).find('tr').first();
         firstRow.find('td').each((_, cell) => {
-          const content = $(cell).html() || '';
+          const content = $(cell).html() ?? '';
           $(cell).replaceWith(`<th>${content}</th>`);
         });
         
@@ -584,7 +582,7 @@ export class HtmlToMarkdownTransformer {
    * Check if we should stop at this heading
    */
   private shouldStopAtHeading(node: any): boolean {
-    const tagName = (node as any).tagName?.toLowerCase();
+    const tagName = node.tagName?.toLowerCase();
     return tagName && tagName.match(/^h[1-2]$/);
   }
 
@@ -593,7 +591,7 @@ export class HtmlToMarkdownTransformer {
    */
   private getContainerHtml($container: cheerio.Cheerio<any>): string {
     const $result = $container.parent();
-    return $result.html() || '';
+    return $result.html() ?? '';
   }
   
   /**
@@ -607,7 +605,7 @@ export class HtmlToMarkdownTransformer {
     if (mainContentSelector) {
       const mainContent = $(mainContentSelector);
       if (mainContent.length && this.isContentRich(mainContent)) {
-        return $('<div>').append(mainContent.clone()).html() || '';
+        return $('<div>').append(mainContent.clone()).html() ?? '';
       }
     }
     
@@ -646,7 +644,7 @@ export class HtmlToMarkdownTransformer {
     const textLength = text.length;
     
     // Text/HTML ratio (higher = better)
-    const html = element.html() || '';
+    const html = element.html() ?? '';
     const htmlLength = html.length;
     const textToHtmlRatio = htmlLength > 0 ? textLength / htmlLength : 0;
     
@@ -726,7 +724,7 @@ export class HtmlToMarkdownTransformer {
     candidates.sort((a, b) => b.score - a.score);
     
     if (candidates.length && candidates[0].score > CONTENT_THRESHOLD) {
-      return $('<div>').append(candidates[0].element.clone()).html() || '';
+      return $('<div>').append(candidates[0].element.clone()).html() ?? '';
     }
     
     // Fallback to original approach if no good candidate is found
@@ -736,7 +734,7 @@ export class HtmlToMarkdownTransformer {
   /**
    * Content fingerprints to identify real content vs. boilerplate
    */
-  private contentFingerprints = [
+  private readonly contentFingerprints = [
     { selector: 'article', weight: 10 },
     { selector: '[role="main"]', weight: 9 },
     { selector: '.post-content', weight: 8 },
@@ -750,7 +748,7 @@ export class HtmlToMarkdownTransformer {
    */
   private isLikelyNonContent(element: any): boolean {
     // Check for signals that indicate non-content
-    const classId = (element.attr('class') || '') + ' ' + (element.attr('id') || '');
+    const classId = (element.attr('class') ?? '') + ' ' + (element.attr('id') ?? '');
     const text = element.text().trim();
     
     // Check against common non-content patterns
@@ -791,22 +789,22 @@ export class HtmlToMarkdownTransformer {
       .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
       .replace(/(#+\s[^\n]*)\n([^\n])/g, '$1\n\n$2')
       
-      // Improve list formatting
-      .replace(/\n(\s*[-*+])\s{2,}/g, '\n$1 ')
+      // Improve list formatting - limit whitespace matching to avoid backtracking
+      .replace(/\n(\s{0,10}[-*+])\s{2,5}/g, '\n$1 ')
       
-      // Improve code block formatting
-      .replace(/\n```([^`\n]*)\n/g, '\n\n```$1\n')
-      .replace(/\n([^`\n]+)```\n/g, '\n$1```\n\n')
+      // Improve code block formatting - limit matching to avoid backtracking
+      .replace(/\n```([^`\n]{0,100})\n/g, '\n\n```$1\n')
+      .replace(/\n([^`\n]{1,500})```\n/g, '\n$1```\n\n')
       
       // Remove trailing whitespace on lines
       .replace(/[ \t]*$/gm, '')
       
-      // Make sure links have spaces from surrounding text when needed
-      .replace(/([a-z0-9])(\[[^\]]*\]\([^)]*\))/g, '$1 $2')
-      .replace(/(\[[^\]]*\]\([^)]*\))([a-z0-9])/g, '$1 $2')
+      // Make sure links have spaces from surrounding text when needed - limit matching
+      .replace(/([a-z0-9])(\[[^\]]{0,200}\]\([^)]{0,500}\))/g, '$1 $2')
+      .replace(/(\[[^\]]{0,200}\]\([^)]{0,500}\))([a-z0-9])/g, '$1 $2')
       
-      // Normalize URLs to absolute paths
-      .replace(/\]\(([^)]+)\)/g, (match, url) => {
+      // Normalize URLs to absolute paths - limit URL length
+      .replace(/\]\(([^)]{1,2000})\)/g, (match, url) => {
         // Skip URLs that are already absolute or anchors
         if (!url || url.startsWith('http') || url.startsWith('#') || url.startsWith('mailto:')) {
           return match;
@@ -822,7 +820,7 @@ export class HtmlToMarkdownTransformer {
       // Fix inconsistent table formatting
       .replace(/\n\s*\|\s*\n/g, '\n|\n')
       
-      // Ensure paragraphs are separated by blank lines
+      // Ensure paragraphs are separated by blank lines - use non-greedy matching
       .replace(/([^\n])\n([^\n\s#>*-])/g, '$1\n\n$2')
       
       // Remove "Skip to content" and similar accessibility links
@@ -875,7 +873,8 @@ export class HtmlToMarkdownTransformer {
       try {
         const urlObj = new URL(scraperResponse.url);
         this.baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
-      } catch (e) {
+      } catch (error) {
+        logger.debug(`Error parsing URL: ${error instanceof Error ? error.message : String(error)}`);
         this.baseUrl = ''; // Set a default value if URL parsing fails
       }
 
@@ -894,7 +893,7 @@ export class HtmlToMarkdownTransformer {
       
       // Check for headings in the markdown
       const headingLines = markdown.match(/^#+\s.+$/gm);
-      logger.info(`Markdown contains ${headingLines?.length || 0} heading lines`);
+      logger.info(`Markdown contains ${headingLines?.length ?? 0} heading lines`);
       
       // Post-process the markdown
       const cleanedMarkdown = this.cleanMarkdown(markdown);

@@ -14,8 +14,8 @@ import { logger } from '../utils/logger';
  * Service for interacting with local LLM servers via OpenAI-compatible API
  */
 export class LocalLLMService implements LLMProvider {
-  private client: OpenAI;
-  private config: LLMConfig;
+  private readonly client: OpenAI;
+  private readonly config: LLMConfig;
   
   constructor(config: LLMConfig) {
     this.config = config;
@@ -113,6 +113,93 @@ export class LocalLLMService implements LLMProvider {
   }
   
   /**
+   * Build request parameters for chat completion
+   */
+  private buildRequestParams(
+    messages: ChatCompletionMessageParam[],
+    options: LLMCompletionOptions,
+    responseFormat?: { type: string; schema?: object }
+  ): any {
+    const requestParams: any = {
+      model: this.getModelName(),
+      messages,
+      temperature: options.temperature ?? 0.2,
+      max_tokens: options.maxTokens ?? 4000,
+      top_p: options.topP,
+      frequency_penalty: options.frequencyPenalty,
+      presence_penalty: options.presencePenalty,
+      stop: options.stop,
+      seed: options.seed,
+      user: options.user,
+    };
+    
+    // Add response format only if supported by provider
+    if (this.supportsResponseFormat() && responseFormat) {
+      requestParams.response_format = responseFormat;
+    }
+    
+    // Disable thinking mode for Qwen models
+    if (this.isQwenModel()) {
+      logger.debug('Detected Qwen model, attempting to disable thinking mode');
+      requestParams.extra_body = {
+        chat_template_kwargs: { enable_thinking: false }
+      };
+    }
+    
+    return requestParams;
+  }
+
+  /**
+   * Process and parse response content
+   */
+  private processResponseContent<T>(content: string | null): T {
+    if (!content) {
+      return content as T;
+    }
+
+    // Clean thinking tags from Qwen models as a fallback
+    if (this.isQwenModel() && content.includes('<think>')) {
+      logger.debug('Cleaning thinking tags from Qwen response');
+      content = this.cleanThinkingTags(content);
+    }
+    
+    // Parse JSON if expected
+    try {
+      return typeof content === 'string' && content.trim().startsWith('{')
+        ? JSON.parse(content)
+        : content as T;
+    } catch (parseError) {
+      logger.debug('Response is not JSON, returning as-is', {
+        error: parseError instanceof Error ? parseError.message : String(parseError)
+      });
+      return content as T;
+    }
+  }
+
+  /**
+   * Build error message based on error type
+   */
+  private buildErrorMessage(error: unknown): string {
+    let errorMessage = `${this.config.provider} error: `;
+    
+    if (error instanceof Error) {
+      if (error.message.includes('ECONNREFUSED')) {
+        errorMessage += `Cannot connect to ${this.config.baseUrl}. Make sure the ${this.config.provider} server is running.`;
+      } else if (error.message.includes('404')) {
+        errorMessage += `Model ${this.config.model} not found. Check available models.`;
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Request timed out. Try increasing LLM_TIMEOUT.';
+      } else {
+        errorMessage += error.message;
+      }
+    } else {
+      errorMessage += String(error);
+    }
+    
+    return errorMessage;
+  }
+
+  /**
    * Get a completion from the local LLM
    */
   async getCompletion<T>(
@@ -132,39 +219,14 @@ export class LocalLLMService implements LLMProvider {
       // Convert messages to OpenAI format
       const typedMessages = this.convertMessages(messages);
       
-      // Create the completion request with provider-specific adjustments
-      const requestParams: any = {
-        model: this.getModelName(),
-        messages: typedMessages,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.maxTokens ?? 4000,
-        top_p: options.topP,
-        frequency_penalty: options.frequencyPenalty,
-        presence_penalty: options.presencePenalty,
-        stop: options.stop,
-        seed: options.seed,
-        user: options.user,
-      };
+      // Build request parameters
+      const requestParams = this.buildRequestParams(typedMessages, options, responseFormat);
       
-      // Add response format only if supported by provider
-      if (this.supportsResponseFormat() && responseFormat) {
-        requestParams.response_format = responseFormat;
-      }
-      
-      // Disable thinking mode for Qwen models
-      if (this.isQwenModel()) {
-        logger.debug('Detected Qwen model, attempting to disable thinking mode');
-        // For Ollama, we need to pass this through extra_body
-        // Note: This may not be supported by all Ollama versions
-        requestParams.extra_body = {
-          chat_template_kwargs: { enable_thinking: false }
-        };
-      }
-      
+      // Make the API call
       const response = await this.client.chat.completions.create(requestParams);
       
       const latency = Date.now() - startTime;
-      let content = response.choices[0].message.content;
+      const content = response.choices[0].message.content;
       
       logger.debug(`Received response from ${this.config.provider}`, {
         model: response.model,
@@ -172,22 +234,8 @@ export class LocalLLMService implements LLMProvider {
         tokensUsed: response.usage?.total_tokens
       });
       
-      // Clean thinking tags from Qwen models as a fallback
-      if (this.isQwenModel() && content && content.includes('<think>')) {
-        logger.debug('Cleaning thinking tags from Qwen response');
-        content = this.cleanThinkingTags(content);
-      }
-      
-      // Parse JSON if expected
-      let parsedContent: T;
-      try {
-        parsedContent = typeof content === 'string' && content.trim().startsWith('{')
-          ? JSON.parse(content)
-          : content as T;
-      } catch (parseError) {
-        logger.debug('Response is not JSON, returning as-is');
-        parsedContent = content as T;
-      }
+      // Process the response content
+      const parsedContent = this.processResponseContent<T>(content);
       
       return {
         success: true,
@@ -209,25 +257,9 @@ export class LocalLLMService implements LLMProvider {
         model: this.config.model
       });
       
-      // Handle specific error types
-      let errorMessage = `${this.config.provider} error: `;
-      if (error instanceof Error) {
-        if (error.message.includes('ECONNREFUSED')) {
-          errorMessage += `Cannot connect to ${this.config.baseUrl}. Make sure the ${this.config.provider} server is running.`;
-        } else if (error.message.includes('404')) {
-          errorMessage += `Model ${this.config.model} not found. Check available models.`;
-        } else if (error.message.includes('timeout')) {
-          errorMessage += 'Request timed out. Try increasing LLM_TIMEOUT.';
-        } else {
-          errorMessage += error.message;
-        }
-      } else {
-        errorMessage += String(error);
-      }
-      
       return {
         success: false,
-        error: errorMessage,
+        error: this.buildErrorMessage(error),
       };
     }
   }

@@ -2,8 +2,7 @@ import { ScraperResponse } from '../types';
 import { LLMProvider, LLMMessage } from '../types/llm.types';
 import { 
   ExtractionOptions, 
-  ExtractionResult, 
-  Schema
+  ExtractionResult
 } from '../types/schema';
 import { logger } from '../utils/logger';
 
@@ -26,7 +25,7 @@ function limitTextSize(text: string, maxTokens = 15000): string {
 }
 
 export class LLMExtractor {
-  private llmService: LLMProvider;
+  private readonly llmService: LLMProvider;
   
   constructor(llmService: LLMProvider) {
     this.llmService = llmService;
@@ -76,8 +75,8 @@ export class LLMExtractor {
       const llmResponse = await this.llmService.getCompletion<T>(
         messages,
         {
-          temperature: options.temperature || 0.2,
-          maxTokens: options.maxTokens || 4000
+          temperature: options.temperature ?? 0.2,
+          maxTokens: options.maxTokens ?? 4000
         },
         responseFormat
       );
@@ -108,7 +107,7 @@ export class LLMExtractor {
           data: llmResponse.data,
           metadata: {
             extractionTime,
-            modelName: this.llmService.getModel() || 'gpt-4o'
+            modelName: this.llmService.getModel() ?? 'gpt-4o'
           }
         }
       };

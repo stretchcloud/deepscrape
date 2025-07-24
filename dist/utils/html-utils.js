@@ -19,8 +19,9 @@ function extractLinks(html, baseUrl) {
                     const url = new URL(href, baseUrl);
                     links.push(url.href);
                 }
-                catch (e) {
+                catch (error) {
                     // Invalid URL, ignore
+                    console.debug(`Invalid URL found in href: ${href}, error: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
         });

@@ -46,14 +46,14 @@ export interface SystemLoad {
  * Includes job locking, dynamic concurrency, and sophisticated error handling
  */
 export class EnhancedQueueService {
-  private queue: Queue;
+  private readonly queue: Queue;
   private worker: Worker | null = null;
-  private queueEvents: QueueEvents;
-  private redis: Redis;
-  private config: QueueConfig;
+  private readonly queueEvents: QueueEvents;
+  private readonly redis: Redis;
+  private readonly config: QueueConfig;
   private isShuttingDown = false;
-  private lockExtensionIntervals = new Map<string, NodeJS.Timeout>();
-  private throughputTracker = {
+  private readonly lockExtensionIntervals = new Map<string, NodeJS.Timeout>();
+  private readonly throughputTracker = {
     processedJobs: 0,
     startTime: Date.now(),
     lastResetTime: Date.now()
@@ -61,23 +61,23 @@ export class EnhancedQueueService {
 
   constructor(queueName: string, config: Partial<QueueConfig> = {}) {
     this.config = {
-      concurrency: parseInt(process.env.QUEUE_CONCURRENCY || '5'),
-      maxJobs: parseInt(process.env.QUEUE_MAX_JOBS || '1000'),
-      lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION || '120000'), // 2 minutes
-      lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME || '30000'), // 30 seconds
-      retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS || '3'),
-      retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY || '5000'),
+      concurrency: parseInt(process.env.QUEUE_CONCURRENCY ?? '5'),
+      maxJobs: parseInt(process.env.QUEUE_MAX_JOBS ?? '1000'),
+      lockDuration: parseInt(process.env.QUEUE_LOCK_DURATION ?? '120000'), // 2 minutes
+      lockRenewTime: parseInt(process.env.QUEUE_LOCK_RENEW_TIME ?? '30000'), // 30 seconds
+      retryAttempts: parseInt(process.env.QUEUE_RETRY_ATTEMPTS ?? '3'),
+      retryDelay: parseInt(process.env.QUEUE_RETRY_DELAY ?? '5000'),
       enableDynamicScaling: process.env.QUEUE_ENABLE_DYNAMIC_SCALING === 'true',
-      maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY || '20'),
-      minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY || '1'),
+      maxConcurrency: parseInt(process.env.QUEUE_MAX_CONCURRENCY ?? '20'),
+      minConcurrency: parseInt(process.env.QUEUE_MIN_CONCURRENCY ?? '1'),
       ...config
     };
 
     const connection: ConnectionOptions = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.REDIS_DB || '0'),
+      host: process.env.REDIS_HOST ?? 'localhost',
+      port: parseInt(process.env.REDIS_PORT ?? '6379'),
+      password: process.env.REDIS_PASSWORD ?? undefined,
+      db: parseInt(process.env.REDIS_DB ?? '0'),
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       maxRetriesPerRequest: 3,
@@ -260,9 +260,9 @@ export class EnhancedQueueService {
       },
       {
         connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-          password: process.env.REDIS_PASSWORD || undefined,
+          host: process.env.REDIS_HOST ?? 'localhost',
+          port: parseInt(process.env.REDIS_PORT ?? '6379'),
+          password: process.env.REDIS_PASSWORD ?? undefined,
         },
         concurrency: this.config.concurrency,
         lockDuration: this.config.lockDuration,
@@ -438,7 +438,8 @@ export class EnhancedQueueService {
    */
   private generateJobId(jobName: string, data: any): string {
     const crypto = require('crypto');
-    const hash = crypto.createHash('md5');
+    // Using SHA-256 instead of MD5 for better security (though this is just for job IDs)
+    const hash = crypto.createHash('sha256');
     hash.update(jobName);
     hash.update(JSON.stringify(data));
     return hash.digest('hex');
