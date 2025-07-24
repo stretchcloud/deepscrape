@@ -64,6 +64,9 @@ describe('LLM Provider Tests', () => {
   describe('LocalLLMService', () => {
     let mockClient: any;
     
+    // Define mock implementation outside of nested structure
+    const createMockOpenAI = () => mockClient;
+    
     beforeEach(() => {
       // Mock OpenAI client
       mockClient = {
@@ -81,7 +84,7 @@ describe('LLM Provider Tests', () => {
       };
       
       jest.mock('openai', () => {
-        return jest.fn().mockImplementation(() => mockClient);
+        return jest.fn().mockImplementation(createMockOpenAI);
       });
     });
     

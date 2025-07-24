@@ -69,9 +69,9 @@ export class ContentCleaner {
   private removeAttributes($: cheerio.CheerioAPI): void {
     // Remove event handlers and tracking attributes
     $('*').each((_i, el) => {
-      const element = el as any;
-      if (element.attribs) {
-        for (const attr of Object.keys(element.attribs)) {
+      // Check if element has attributes (only Element nodes have attribs)
+      if ('attribs' in el && el.attribs) {
+        for (const attr of Object.keys(el.attribs)) {
           if (attr.startsWith('on') || attr.includes('track') || attr.includes('analytics')) {
             $(el).removeAttr(attr);
           }
