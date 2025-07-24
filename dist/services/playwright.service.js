@@ -138,7 +138,7 @@ class PlaywrightService extends events_1.EventEmitter {
      * Get user agent based on options
      */
     getUserAgent(options) {
-        return options.userAgent ||
+        return options.userAgent ??
             (options.rotateUserAgent ? this.getNextUserAgent() : new user_agents_1.default().toString());
     }
     /**
@@ -147,7 +147,7 @@ class PlaywrightService extends events_1.EventEmitter {
     buildContextOptions(options, userAgent) {
         const contextOptions = {
             userAgent,
-            viewport: options.viewport || { width: 1920, height: 1080 },
+            viewport: options.viewport ?? { width: 1920, height: 1080 },
             ignoreHTTPSErrors: true,
             bypassCSP: true,
             javaScriptEnabled: true,
@@ -182,12 +182,15 @@ class PlaywrightService extends events_1.EventEmitter {
      * Setup context features like stealth mode and resource blocking
      */
     async setupContextFeatures(options) {
+        if (!this.context) {
+            throw new Error('Browser context not initialized');
+        }
         if (options.stealthMode) {
             await this._setupStealthMode(this.context);
             logger_1.logger.info('Stealth mode configured for browser context');
         }
         if (options.blockResources === true) {
-            await this._setupResourceBlocking(this.context, options.logRequests || false);
+            await this._setupResourceBlocking(this.context, options.logRequests ?? false);
             logger_1.logger.info('Resource blocking configured');
         }
     }
@@ -277,7 +280,7 @@ class PlaywrightService extends events_1.EventEmitter {
     buildContextOptionsForRetry(options) {
         const contextOptions = {
             userAgent: options.userAgent,
-            viewport: options.viewport || { width: 1920, height: 1080 },
+            viewport: options.viewport ?? { width: 1920, height: 1080 },
             ignoreHTTPSErrors: true,
             bypassCSP: true,
             javaScriptEnabled: true,
@@ -298,11 +301,14 @@ class PlaywrightService extends events_1.EventEmitter {
      * Reapply stealth and blocking settings to new context
      */
     async reapplyContextSettings(options) {
+        if (!this.context) {
+            throw new Error('Browser context not initialized');
+        }
         if (options.stealthMode) {
             await this._setupStealthMode(this.context);
         }
         if (options.blockResources === true) {
-            await this._setupResourceBlocking(this.context, options.logRequests || false);
+            await this._setupResourceBlocking(this.context, options.logRequests ?? false);
         }
     }
     /**
@@ -394,10 +400,10 @@ class PlaywrightService extends events_1.EventEmitter {
      * Wait for page load and perform scrolling
      */
     async waitAndScroll(page, options) {
-        const waitTime = options.waitTime || 1000;
+        const waitTime = options.waitTime ?? 1000;
         await page.waitForTimeout(waitTime);
         logger_1.logger.debug(`Waited for ${waitTime}ms after page load`);
-        await this._simulateHumanScrolling(page, options.maxScrolls || 3);
+        await this._simulateHumanScrolling(page, options.maxScrolls ?? 3);
     }
     /**
      * Extract page content, title, and links
@@ -473,7 +479,7 @@ class PlaywrightService extends events_1.EventEmitter {
                 throw error;
             }
         }
-        throw lastError || new Error(`Failed to crawl ${url} after ${retries} retries`);
+        throw lastError ?? new Error(`Failed to crawl ${url} after ${retries} retries`);
     }
     /**
      * Perform the actual crawling operation without retry logic
@@ -488,7 +494,7 @@ class PlaywrightService extends events_1.EventEmitter {
         try {
             await this._addHumanBehavior(page);
             const response = await this.navigateWithRetry(page, url);
-            const status = response?.status() || 200;
+            const status = response?.status() ?? 200;
             logger_1.logger.info(`Page loaded with status: ${status}`);
             if (status >= 400) {
                 return this.handleErrorStatus(url, status);
@@ -535,7 +541,7 @@ class PlaywrightService extends events_1.EventEmitter {
         }
         catch (error) {
             // Don't fail if human behavior simulation fails
-            logger_1.logger.debug('Error simulating human behavior, continuing with navigation');
+            logger_1.logger.debug(`Error simulating human behavior, continuing with navigation: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     /**
@@ -596,6 +602,7 @@ class PlaywrightService extends events_1.EventEmitter {
         }
         catch (error) {
             // Don't fail if scrolling fails
+            logger_1.logger.debug(`Error during human-like scrolling: ${error instanceof Error ? error.message : String(error)}`);
             logger_1.logger.debug('Error during human-like scrolling, continuing with extraction');
         }
     }
@@ -613,12 +620,12 @@ class PlaywrightService extends events_1.EventEmitter {
         this.urlsInProgress = new Set();
         this.totalDiscovered = 0;
         this.totalCrawled = 0;
-        const maxDepth = options.maxDiscoveryDepth || 3;
-        const limit = options.discoveryLimit || 100;
-        const includePaths = options.includePaths || [];
-        const excludePaths = options.excludePaths || [];
-        const excludeDomains = options.excludeDomains || [];
-        const baseUrl = options.baseUrl || new URL(startUrl).origin;
+        const maxDepth = options.maxDiscoveryDepth ?? 3;
+        const limit = options.discoveryLimit ?? 100;
+        const includePaths = options.includePaths ?? [];
+        const excludePaths = options.excludePaths ?? [];
+        const excludeDomains = options.excludeDomains ?? [];
+        const baseUrl = options.baseUrl ?? new URL(startUrl).origin;
         // Add the start URL to the discovered set
         this.discoveredUrls.add(startUrl);
         this.totalDiscovered++;
@@ -758,7 +765,7 @@ class PlaywrightService extends events_1.EventEmitter {
                 });
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => {
-                        // Create a plugins array that satisfies PluginArray interface
+                        // Return an array-like object similar to PluginArray
                         const plugins = [];
                         // Add a fake plugin
                         Object.defineProperty(plugins, 'length', { value: 1 });

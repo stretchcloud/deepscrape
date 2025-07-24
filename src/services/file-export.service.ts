@@ -13,10 +13,10 @@ export interface ExportOptions {
 }
 
 export class FileExportService {
-  private outputDir: string;
+  private readonly outputDir: string;
   
   constructor(outputDir?: string) {
-    this.outputDir = outputDir || process.env.CRAWL_OUTPUT_DIR || './crawl-output';
+    this.outputDir = outputDir ?? process.env.CRAWL_OUTPUT_DIR ?? './crawl-output';
     this.ensureOutputDirectory();
   }
 
@@ -76,6 +76,7 @@ export class FileExportService {
       return filename + '.md';
     } catch (error) {
       // Fallback to a simple filename if URL parsing fails
+      logger.warn('Failed to parse URL for filename generation', { url, error: error instanceof Error ? error.message : String(error) });
       const timestamp = this.formatTimestampForFilename(new Date().toISOString());
       const hash = this.sanitizeStringForFilename(Buffer.from(url).toString('base64')).substring(0, 16);
       return `${timestamp}_${crawlId.substring(0, 8)}_${hash}.md`;
@@ -133,8 +134,7 @@ export class FileExportService {
   private formatTimestampForFilename(isoString: string): string {
     // Manual replacement of colons and periods to avoid regex
     let formatted = '';
-    for (let i = 0; i < isoString.length; i++) {
-      const char = isoString[i];
+    for (const char of isoString) {
       if (char === ':' || char === '.') {
         formatted += '-';
       } else {
@@ -159,11 +159,11 @@ export class FileExportService {
     let lastWasUnderscore = false;
     
     // Manual character-by-character processing to avoid regex
-    for (let i = 0; i < path.length; i++) {
-      const char = path[i];
-      
+    let i = 0;
+    for (const char of path) {
       // Skip leading and trailing slashes
       if (char === '/' && (i === 0 || i === path.length - 1)) {
+        i++;
         continue;
       }
       
@@ -174,13 +174,12 @@ export class FileExportService {
           char === '-' || char === '.') {
         sanitized += char;
         lastWasUnderscore = false;
-      } else {
+      } else if (!lastWasUnderscore) {
         // Replace other characters with underscore, but avoid consecutive underscores
-        if (!lastWasUnderscore) {
-          sanitized += '_';
-          lastWasUnderscore = true;
-        }
+        sanitized += '_';
+        lastWasUnderscore = true;
       }
+      i++;
     }
     
     // Remove trailing underscore if present
@@ -203,9 +202,7 @@ export class FileExportService {
     let lastWasUnderscore = false;
     
     // Manual character-by-character processing
-    for (let i = 0; i < str.length; i++) {
-      const char = str[i];
-      
+    for (const char of str) {
       // Allow alphanumeric, dash, dot, underscore, equals, ampersand (for query params)
       if ((char >= 'a' && char <= 'z') || 
           (char >= 'A' && char <= 'Z') || 
@@ -213,12 +210,10 @@ export class FileExportService {
           char === '-' || char === '.' || char === '=' || char === '&') {
         sanitized += char;
         lastWasUnderscore = false;
-      } else {
+      } else if (!lastWasUnderscore) {
         // Replace other characters with underscore, but avoid consecutive underscores
-        if (!lastWasUnderscore) {
-          sanitized += '_';
-          lastWasUnderscore = true;
-        }
+        sanitized += '_';
+        lastWasUnderscore = true;
       }
     }
     
@@ -237,8 +232,7 @@ export class FileExportService {
     if (!key) return false;
     
     // Manual validation to avoid regex
-    for (let i = 0; i < key.length; i++) {
-      const char = key[i];
+    for (const char of key) {
       const isValid = (char >= 'a' && char <= 'z') || 
                      (char >= 'A' && char <= 'Z') || 
                      (char >= '0' && char <= '9') || 
@@ -471,7 +465,8 @@ export class FileExportService {
         metadata = this.parseFrontmatterLines(frontmatterLines);
       }
     } catch (e) {
-      // Ignore parsing errors
+      // Log parsing errors but continue
+      logger.debug('Failed to parse frontmatter', { error: e instanceof Error ? e.message : String(e) });
     }
     
     return metadata;

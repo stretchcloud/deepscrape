@@ -54,8 +54,8 @@ const ioredis_1 = __importDefault(require("ioredis"));
 const logger_1 = require("../utils/logger");
 // Connect to Redis using the Docker configuration
 const redisClient = new ioredis_1.default({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379')
+    host: process.env.REDIS_HOST ?? 'localhost',
+    port: parseInt(process.env.REDIS_PORT ?? '6379')
 });
 exports.redisClient = redisClient;
 redisClient.on('error', (err) => {
@@ -81,7 +81,7 @@ async function saveCrawl(id, data) {
             strategy: data.strategy,
             useBrowser: data.useBrowser
         },
-        scrapeOptions: data.scrapeOptions || {},
+        scrapeOptions: data.scrapeOptions ?? {},
         createdAt: Date.now(),
         robots: data.robots
     };
@@ -170,9 +170,14 @@ async function getCrawlDoneJobs(crawlId, start = 0, end = -1) {
         // If we have success jobs, convert the set to an array and handle pagination
         if (successJobs.length > 0) {
             // Apply pagination manually since Redis sets don't support range slicing
-            const paginatedJobs = start === 0 && end === -1
-                ? successJobs
-                : successJobs.slice(start, end === -1 ? undefined : end + 1);
+            let paginatedJobs;
+            if (start === 0 && end === -1) {
+                paginatedJobs = successJobs;
+            }
+            else {
+                const endIndex = end === -1 ? undefined : end + 1;
+                paginatedJobs = successJobs.slice(start, endIndex);
+            }
             logger_1.logger.debug(`Found ${successJobs.length} completed jobs for crawl ${crawlId}, returning ${paginatedJobs.length}`);
             return paginatedJobs;
         }
@@ -301,7 +306,7 @@ async function generateCrawlSummary(crawlId) {
             failedPages: failedJobs,
             startTime: new Date(crawl.createdAt).toISOString(),
             endTime: completedAt ? new Date(parseInt(completedAt)).toISOString() : new Date().toISOString(),
-            exportedFiles: exportedFiles.reverse(), // Reverse to get chronological order
+            exportedFiles: [...exportedFiles].reverse(), // Reverse to get chronological order
             crawlOptions: crawl.crawlerOptions
         };
         await fileExportService.exportCrawlSummary(crawlId, summary);

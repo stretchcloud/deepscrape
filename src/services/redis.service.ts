@@ -3,8 +3,8 @@ import { logger } from '../utils/logger';
 
 // Connect to Redis using the Docker configuration
 const redisClient = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379')
+  host: process.env.REDIS_HOST ?? 'localhost',
+  port: parseInt(process.env.REDIS_PORT ?? '6379')
 });
 
 redisClient.on('error', (err) => {
@@ -50,7 +50,7 @@ export async function saveCrawl(
       strategy: data.strategy,
       useBrowser: data.useBrowser
     },
-    scrapeOptions: data.scrapeOptions || {},
+    scrapeOptions: data.scrapeOptions ?? {},
     createdAt: Date.now(),
     robots: data.robots
   };
@@ -58,7 +58,7 @@ export async function saveCrawl(
   await redisClient.set(`crawl:${id}`, JSON.stringify(storedCrawl));
 }
 
-export async function getCrawl(id: string): Promise<any | null> {
+export async function getCrawl(id: string): Promise<any> {
   try {
     const data = await redisClient.get(`crawl:${id}`);
     if (!data) return null;
@@ -151,9 +151,13 @@ export async function getCrawlDoneJobs(crawlId: string, start = 0, end = -1): Pr
     // If we have success jobs, convert the set to an array and handle pagination
     if (successJobs.length > 0) {
       // Apply pagination manually since Redis sets don't support range slicing
-      const paginatedJobs = start === 0 && end === -1 
-        ? successJobs 
-        : successJobs.slice(start, end === -1 ? undefined : end + 1);
+      let paginatedJobs: string[];
+      if (start === 0 && end === -1) {
+        paginatedJobs = successJobs;
+      } else {
+        const endIndex = end === -1 ? undefined : end + 1;
+        paginatedJobs = successJobs.slice(start, endIndex);
+      }
       
       logger.debug(`Found ${successJobs.length} completed jobs for crawl ${crawlId}, returning ${paginatedJobs.length}`);
       return paginatedJobs;
@@ -296,7 +300,7 @@ async function generateCrawlSummary(crawlId: string): Promise<void> {
       failedPages: failedJobs,
       startTime: new Date(crawl.createdAt).toISOString(),
       endTime: completedAt ? new Date(parseInt(completedAt)).toISOString() : new Date().toISOString(),
-      exportedFiles: exportedFiles.reverse(), // Reverse to get chronological order
+      exportedFiles: [...exportedFiles].reverse(), // Reverse to get chronological order
       crawlOptions: crawl.crawlerOptions
     };
     

@@ -91,7 +91,7 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         // Setup hooks if needed - for now we'll just use the default empty object
         hooks: {},
         // Use browser-based crawling if specified
-        useBrowser: crawl.crawlerOptions.useBrowser || false,
+        useBrowser: crawl.crawlerOptions.useBrowser ?? false,
         // Enable URL deduplication by default
         deduplicateSimilarUrls: true
     });
@@ -103,7 +103,7 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         crawlId,
         url,
         strategy: crawler.getStrategy(),
-        useBrowser: crawl.crawlerOptions.useBrowser || false
+        useBrowser: crawl.crawlerOptions.useBrowser ?? false
     });
     let filteredLinks = [];
     // If using browser, use browser-based URL discovery
@@ -111,7 +111,7 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         logger_1.logger.info(`Using browser-based discovery for crawl ${crawlId}`);
         // Use browser-based discovery
         try {
-            filteredLinks = await crawler.discoverUrlsWithBrowser(crawl.crawlerOptions.maxDepth || 5, crawl.crawlerOptions.limit || 100);
+            filteredLinks = await crawler.discoverUrlsWithBrowser(crawl.crawlerOptions.maxDepth ?? 5, crawl.crawlerOptions.limit ?? 100);
             logger_1.logger.info(`Browser-based discovery completed for ${url}. Found ${filteredLinks.length} URLs`, {
                 crawlId,
                 discoveredCount: filteredLinks.length
@@ -126,14 +126,14 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
             // Fallback to regular crawling on error
             logger_1.logger.info(`Falling back to regular crawling for ${url}`);
             const result = await crawler.crawlPage(url, scrapeOptions.skipTlsVerification);
-            filteredLinks = crawler.filterLinks(result.links, crawl.crawlerOptions.limit || 100, crawl.crawlerOptions.maxDepth || 5);
+            filteredLinks = crawler.filterLinks(result.links, crawl.crawlerOptions.limit ?? 100, crawl.crawlerOptions.maxDepth ?? 5);
         }
     }
     else {
         // Use regular crawling
-        const { html, links } = await crawler.crawlPage(url, scrapeOptions.skipTlsVerification);
+        const { links } = await crawler.crawlPage(url, scrapeOptions.skipTlsVerification);
         // Filter links based on crawler options
-        filteredLinks = crawler.filterLinks(links, crawl.crawlerOptions.limit || 100, crawl.crawlerOptions.maxDepth || 5);
+        filteredLinks = crawler.filterLinks(links, crawl.crawlerOptions.limit ?? 100, crawl.crawlerOptions.maxDepth ?? 5);
     }
     // Create jobs for each discovered URL
     const jobsData = filteredLinks.map(link => ({
@@ -142,9 +142,9 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         scrapeOptions: {
             ...scrapeOptions,
             // Ensure extractorFormat is set to markdown for consistent processing
-            extractorFormat: scrapeOptions.extractorFormat || 'markdown',
+            extractorFormat: scrapeOptions.extractorFormat ?? 'markdown',
             // If we're using browser mode, pass that to each page job
-            useBrowser: crawl.crawlerOptions.useBrowser || false
+            useBrowser: crawl.crawlerOptions.useBrowser ?? false
         }
     }));
     // Add jobs to the queue using injected function
@@ -164,7 +164,7 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         initialUrl: url,
         discoveredCount: filteredLinks.length,
         strategy: crawler.getStrategy(),
-        usedBrowser: crawl.crawlerOptions.useBrowser || false,
+        usedBrowser: crawl.crawlerOptions.useBrowser ?? false,
         outputDir: file_export_service_1.fileExportService.getCrawlOutputDir(crawlId)
     });
     // Return discovery result
@@ -173,7 +173,7 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
         links: filteredLinks,
         discoveredCount: filteredLinks.length,
         strategy: crawler.getStrategy(),
-        usedBrowser: crawl.crawlerOptions.useBrowser || false,
+        usedBrowser: crawl.crawlerOptions.useBrowser ?? false,
         outputDirectory: file_export_service_1.fileExportService.getCrawlOutputDir(crawlId)
     };
 }
@@ -183,10 +183,10 @@ async function handleCrawlKickoff(crawlId, url, scrapeOptions) {
 function buildEnhancedScrapeOptions(scrapeOptions, useBrowser) {
     return {
         ...scrapeOptions,
-        extractorFormat: scrapeOptions.extractorFormat || 'markdown',
+        extractorFormat: scrapeOptions.extractorFormat ?? 'markdown',
         skipCache: false,
         onlyMainContent: scrapeOptions.onlyMainContent !== false,
-        waitForTimeout: scrapeOptions.waitForTimeout || 2000,
+        waitForTimeout: scrapeOptions.waitForTimeout ?? 2000,
         useBrowser: useBrowser,
         stealthMode: useBrowser ? true : undefined,
         blockResources: useBrowser ? true : undefined,
@@ -202,9 +202,15 @@ function buildEnhancedScrapeOptions(scrapeOptions, useBrowser) {
  * Extract original HTML from scrape result
  */
 function extractOriginalHtml(result) {
-    return result.contentType === 'markdown' && result.metadata?.originalHtml
-        ? result.metadata.originalHtml
-        : (result.contentType === 'html' ? result.content : null);
+    if (result.contentType === 'markdown' && result.metadata?.originalHtml) {
+        return result.metadata.originalHtml;
+    }
+    else if (result.contentType === 'html') {
+        return result.content;
+    }
+    else {
+        return null;
+    }
 }
 /**
  * Export page content to file and track it
@@ -214,7 +220,7 @@ async function exportPageContent(url, result, crawlId, useBrowser) {
         return;
     }
     try {
-        const exportedFilePath = await file_export_service_1.fileExportService.exportPage(url, result.content, result.title || 'Untitled', crawlId, {
+        const exportedFilePath = await file_export_service_1.fileExportService.exportPage(url, result.content, result.title ?? 'Untitled', crawlId, {
             status: result.metadata?.status,
             contentType: result.contentType,
             loadTime: result.metadata?.loadTime,
@@ -268,13 +274,13 @@ async function handlePageScrape(url, scrapeOptions, crawlId) {
     const enhancedOptions = buildEnhancedScrapeOptions(scrapeOptions, useBrowser);
     const result = await scraperManager.scrape(url, enhancedOptions);
     logger_1.logger.info(`Crawl ${crawlId}: Completed scraping page ${url}`, {
-        contentLength: result.content?.length || 0,
+        contentLength: result.content?.length ?? 0,
         contentType: result.contentType,
         status: result.metadata?.status,
         usedBrowser: useBrowser
     });
     const originalHtml = extractOriginalHtml(result);
-    logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length || 0}`);
+    logger_1.logger.info(`Returning content for ${url}, type: ${result.contentType}, length: ${result.content?.length ?? 0}`);
     await exportPageContent(url, result, crawlId, useBrowser);
     return buildPageScrapeResponse(result, originalHtml, useBrowser);
 }

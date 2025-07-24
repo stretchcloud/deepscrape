@@ -1,4 +1,4 @@
-import { ScraperOptions, ScraperResponse, BrowserAction } from '../types';
+import { ScraperOptions, ScraperResponse } from '../types';
 import { PlaywrightScraper } from './playwright-scraper';
 import { HttpScraper } from './http-scraper';
 import { ContentCleaner } from '../transformers/content-cleaner';
@@ -26,8 +26,8 @@ export class ScraperManager {
     // Initialize cache service
     this.cacheService = new CacheService({
       enabled: process.env.CACHE_ENABLED === 'true',
-      ttl: Number(process.env.CACHE_TTL || 3600),
-      directory: process.env.CACHE_DIRECTORY || './cache'
+      ttl: Number(process.env.CACHE_TTL ?? 3600),
+      directory: process.env.CACHE_DIRECTORY ?? './cache'
     });
     
     // LLM extractor will be initialized lazily or explicitly
@@ -255,7 +255,7 @@ export class ScraperManager {
       logger.info(`Starting scraping process for URL: ${url}`);
       
       // Check cache first
-      const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache || false);
+      const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache ?? false);
       if (cachedResponse) {
         return cachedResponse;
       }
@@ -305,11 +305,11 @@ export class ScraperManager {
         return scraperResponse;
       }
 
-      // Use a simple regex to strip all HTML tags
+      // Strip HTML tags using a safer approach to avoid regex backtracking
       const textContent = scraperResponse.content
-        .replace(/<[^>]*>/g, ' ') // Replace HTML tags with spaces
-        .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
-        .trim();                 // Trim extra spaces
+        .replace(/<[^>]+>/g, ' ')  // Replace HTML tags with spaces (using + instead of * to avoid empty matches)
+        .replace(/\s{2,}/g, ' ')   // Replace 2 or more spaces with single space (more specific)
+        .trim();                   // Trim extra spaces
 
       return {
         ...scraperResponse,

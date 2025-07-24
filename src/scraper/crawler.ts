@@ -1,46 +1,45 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { load } from "cheerio";
 import { URL } from "url";
 import robotsParser, { Robot } from "robots-parser";
 import https from "https";
 import { logger } from "../utils/logger";
-import { extractLinks } from "../utils/html-utils";
 import { CrawlStrategy, CrawlerHooks, CrawlerOptions } from "../types/crawler";
 import { PlaywrightService, PlaywrightOptions } from "../services/playwright.service";
 import { UrlNormalizationService } from "../services/url-normalization.service";
 
 export class WebCrawler {
-  private jobId: string;
-  private initialUrl: string;
-  private baseUrl: string;
-  private includes: string[];
-  private excludes: string[];
-  private maxCrawledLinks: number;
-  private maxCrawledDepth: number;
-  private visited: Set<string> = new Set();
-  private crawledUrls: Map<string, string> = new Map();
-  private lockedUrls: Set<string> = new Set();
-  private redirectMapping: Map<string, string> = new Map();
-  private deduplicateSimilarUrls: boolean = true;
-  private limit: number;
-  private robotsTxtUrl: string;
+  private readonly jobId: string;
+  private readonly initialUrl: string;
+  private readonly baseUrl: string;
+  private readonly includes: string[];
+  private readonly excludes: string[];
+  private readonly maxCrawledLinks: number;
+  private readonly maxCrawledDepth: number;
+  private readonly visited: Set<string> = new Set();
+  private readonly crawledUrls: Map<string, string> = new Map();
+  private readonly lockedUrls: Set<string> = new Set();
+  private readonly redirectMapping: Map<string, string> = new Map();
+  private readonly deduplicateSimilarUrls: boolean = true;
+  private readonly limit: number;
+  private readonly robotsTxtUrl: string;
   public robots: Robot;
-  private allowBackwardCrawling: boolean;
-  private allowExternalContentLinks: boolean;
-  private allowSubdomains: boolean;
-  private ignoreRobotsTxt: boolean;
-  private regexOnFullURL: boolean;
-  private logger: typeof logger;
-  private sitemapsHit: Set<string> = new Set();
-  private maxDiscoveryDepth: number | undefined;
-  private currentDiscoveryDepth: number;
-  private strategy: CrawlStrategy;
-  private hooks: CrawlerHooks;
-  private urlQueue: string[] = [];
-  private urlScores: Map<string, number> = new Map();
+  private readonly allowBackwardCrawling: boolean;
+  private readonly allowExternalContentLinks: boolean;
+  private readonly allowSubdomains: boolean;
+  private readonly ignoreRobotsTxt: boolean;
+  private readonly regexOnFullURL: boolean;
+  private readonly logger: typeof logger;
+  private readonly sitemapsHit: Set<string> = new Set();
+  private readonly maxDiscoveryDepth: number | undefined;
+  private readonly currentDiscoveryDepth: number;
+  private readonly strategy: CrawlStrategy;
+  private readonly hooks: CrawlerHooks;
+  private readonly urlQueue: string[] = [];
+  private readonly urlScores: Map<string, number> = new Map();
   private playwrightService: PlaywrightService | null = null;
   private useBrowser: boolean = false;
-  private urlNormalizationService = UrlNormalizationService;
+  private readonly urlNormalizationService = UrlNormalizationService;
 
   constructor({
     jobId,
@@ -138,7 +137,8 @@ export class WebCrawler {
       const normalizedInitialUrl = new URL(this.initialUrl);
       const normalizedLinkUrl = new URL(normalizedLink);
       return normalizedLinkUrl.pathname.startsWith(normalizedInitialUrl.pathname);
-    } catch (_) {
+    } catch (error) {
+      logger.debug(`Error parsing URL: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -237,7 +237,8 @@ export class WebCrawler {
       const parsedUrl = new URL(url);
       const path = parsedUrl.pathname.toLowerCase();
       return fileExtensions.some(ext => path.endsWith(ext));
-    } catch (e) {
+    } catch (error) {
+      logger.debug(`Error checking file extension: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
@@ -251,7 +252,8 @@ export class WebCrawler {
         
       if (path === '') return 0;
       return path.split('/').filter(Boolean).length;
-    } catch (e) {
+    } catch (error) {
+      logger.debug(`Error getting URL depth: ${error instanceof Error ? error.message : String(error)}`);
       return 0;
     }
   }
@@ -364,8 +366,8 @@ export class WebCrawler {
           try {
             const url = new URL(href, baseUrl);
             links.push(url.href);
-          } catch (e) {
-            // Invalid URL, ignore
+          } catch (error) {
+            logger.debug(`Invalid URL found in href: ${href}, error: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
       });
@@ -567,7 +569,7 @@ export class WebCrawler {
         this.urlQueue.push(...urls);
         
         this.urlQueue.sort((a, b) => 
-          (this.urlScores.get(b) || 0) - (this.urlScores.get(a) || 0)
+          (this.urlScores.get(b) ?? 0) - (this.urlScores.get(a) ?? 0)
         );
         break;
 
@@ -613,7 +615,8 @@ export class WebCrawler {
       }
       
       return score;
-    } catch (e) {
+    } catch (error) {
+      logger.debug(`Error calculating link relevance: ${error instanceof Error ? error.message : String(error)}`);
       return -100;
     }
   }
@@ -623,7 +626,7 @@ export class WebCrawler {
    * @returns The strategy name as a string
    */
   public getStrategy(): string {
-    return this.strategy || 'bfs';
+    return this.strategy ?? 'bfs';
   }
 
   /**
@@ -639,9 +642,7 @@ export class WebCrawler {
     }
 
     // Initialize PlaywrightService if not already initialized
-    if (!this.playwrightService) {
-      this.playwrightService = new PlaywrightService();
-    }
+    this.playwrightService ??= new PlaywrightService();
 
     // Configure playwright options for discovery
     const playwrightOptions: PlaywrightOptions = {

@@ -38,7 +38,7 @@ class LLMServiceFactory {
             // Get configuration
             const apiKey = process.env.OPENAI_API_KEY;
             const organization = process.env.OPENAI_ORGANIZATION;
-            const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Default to gpt-4o
+            const model = process.env.OPENAI_MODEL ?? 'gpt-4o'; // Default to gpt-4o
             if (!apiKey) {
                 logger_1.logger.warn('OpenAI service not configured correctly. Missing environment variable: OPENAI_API_KEY. ' +
                     'Make sure to set this variable in your .env file.');
@@ -63,7 +63,7 @@ class LLMServiceFactory {
         try {
             // Get base configuration from environment
             const baseUrl = process.env.LLM_BASE_URL;
-            const apiKey = process.env.LLM_API_KEY || 'dummy-key';
+            const apiKey = process.env.LLM_API_KEY ?? 'dummy-key';
             const model = process.env.LLM_MODEL;
             const timeout = process.env.LLM_TIMEOUT ? parseInt(process.env.LLM_TIMEOUT) : undefined;
             const maxRetries = process.env.LLM_MAX_RETRIES ? parseInt(process.env.LLM_MAX_RETRIES) : undefined;
@@ -83,8 +83,8 @@ class LLMServiceFactory {
                 litellm: 'gpt-3.5-turbo',
                 custom: 'local-model'
             };
-            const finalBaseUrl = baseUrl || providerDefaults[provider];
-            const finalModel = model || modelDefaults[provider];
+            const finalBaseUrl = baseUrl ?? providerDefaults[provider];
+            const finalModel = model ?? modelDefaults[provider];
             if (!finalBaseUrl) {
                 logger_1.logger.warn(`Local LLM service (${provider}) not configured correctly. Missing LLM_BASE_URL. ` +
                     'Make sure to set this variable in your .env file.');

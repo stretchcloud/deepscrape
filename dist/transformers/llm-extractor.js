@@ -50,8 +50,8 @@ class LLMExtractor {
                 : undefined;
             // Make the LLM API call
             const llmResponse = await this.llmService.getCompletion(messages, {
-                temperature: options.temperature || 0.2,
-                maxTokens: options.maxTokens || 4000
+                temperature: options.temperature ?? 0.2,
+                maxTokens: options.maxTokens ?? 4000
             }, responseFormat);
             const extractionTime = Date.now() - startTime;
             if (!llmResponse.success) {
@@ -77,7 +77,7 @@ class LLMExtractor {
                     data: llmResponse.data,
                     metadata: {
                         extractionTime,
-                        modelName: this.llmService.getModel() || 'gpt-4o'
+                        modelName: this.llmService.getModel() ?? 'gpt-4o'
                     }
                 }
             };

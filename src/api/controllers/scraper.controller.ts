@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { ScraperManager } from '../../scraper/scraper-manager';
-import { ApiResponse, ScrapeRequest, ScraperOptions } from '../../types';
+import { ApiResponse } from '../../types';
 import { logger } from '../../utils/logger';
 
 // Initialize scraper manager

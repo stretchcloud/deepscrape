@@ -26,10 +26,10 @@ class PlaywrightScraper {
      */
     getDefaultOptions(options) {
         return {
-            timeout: options.timeout || 30000,
+            timeout: options.timeout ?? 30000,
             blockAds: options.blockAds !== false,
             blockResources: options.blockResources !== false,
-            userAgent: options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            userAgent: options.userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         };
     }
     /**
@@ -38,7 +38,7 @@ class PlaywrightScraper {
     buildLaunchOptions(options, isEcommerce) {
         const launchOptions = {
             headless: !isEcommerce, // Use non-headless for e-commerce to bypass bot detection
-            executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH ?? process.env.PUPPETEER_EXECUTABLE_PATH ?? undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -117,7 +117,7 @@ class PlaywrightScraper {
                 await page.waitForSelector(options.waitForSelector, { timeout });
             }
             catch (error) {
-                logger_1.logger.warn(`Timeout waiting for selector: ${options.waitForSelector}`);
+                logger_1.logger.warn(`Timeout waiting for selector: ${options.waitForSelector}, error: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
         // Amazon-specific scrolling
@@ -126,7 +126,7 @@ class PlaywrightScraper {
             await this.performRandomScrolling(page);
         }
         // Additional wait time
-        const waitTime = options.waitForTimeout !== undefined ? options.waitForTimeout : 0;
+        const waitTime = options.waitForTimeout ?? 0;
         if (waitTime > 0) {
             logger_1.logger.info(`Waiting additional ${waitTime}ms`);
             await page.waitForTimeout(waitTime);
@@ -149,7 +149,7 @@ class PlaywrightScraper {
             const responseInfo = await page.evaluate(() => {
                 const perf = window.performance.getEntriesByType('navigation')[0];
                 return {
-                    status: perf?.responseStatus || 0,
+                    status: perf?.responseStatus ?? 0,
                     headers: {}
                 };
             });
@@ -202,7 +202,7 @@ class PlaywrightScraper {
                 if (isEcommerce) {
                     logger_1.logger.info('E-commerce site detected, using enhanced anti-bot measures');
                 }
-                logger_1.logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions || {})}`);
+                logger_1.logger.info(`Launching browser with options: ${JSON.stringify(options.puppeteerLaunchOptions ?? {})}`);
                 const launchOptions = this.buildLaunchOptions(options, isEcommerce);
                 browser = await playwright_1.chromium.launch(launchOptions);
                 const context = await browser.newContext({
@@ -280,7 +280,7 @@ class PlaywrightScraper {
             // Convert the response to ScraperResponse format
             return {
                 url: response.url,
-                title: response.title || '',
+                title: response.title ?? '',
                 content: response.content,
                 contentType: 'html',
                 metadata: {
@@ -362,7 +362,7 @@ class PlaywrightScraper {
      * Execute a scroll action
      */
     async executeScrollAction(page, action) {
-        const position = action.position || 0;
+        const position = action.position ?? 0;
         await page.evaluate((pos) => {
             window.scrollTo(0, pos);
         }, position);
@@ -371,7 +371,7 @@ class PlaywrightScraper {
      * Execute a wait action
      */
     async executeWaitAction(page, action) {
-        const timeout = action.timeout || 1000;
+        const timeout = action.timeout ?? 1000;
         await page.waitForTimeout(timeout);
     }
     /**
@@ -417,13 +417,13 @@ class PlaywrightScraper {
      */
     async executeActionSafely(page, action) {
         try {
-            logger_1.logger.info(`Performing action: ${action.type} ${action.selector || ''}`);
+            logger_1.logger.info(`Performing action: ${action.type} ${action.selector ?? ''}`);
             await this.executeSingleAction(page, action);
             await page.waitForTimeout(500); // Small delay between actions
         }
         catch (error) {
             if (action.optional) {
-                logger_1.logger.warn(`Optional action failed: ${action.type} ${action.selector || ''} - ${error instanceof Error ? error.message : String(error)}`);
+                logger_1.logger.warn(`Optional action failed: ${action.type} ${action.selector ?? ''} - ${error instanceof Error ? error.message : String(error)}`);
             }
             else {
                 throw error;
@@ -448,23 +448,23 @@ class PlaywrightScraper {
             // Extract key product information using Amazon's specific selectors
             const productInfo = await page.evaluate(() => {
                 // Common selectors for Amazon product pages
-                const productTitle = document.querySelector('#productTitle')?.textContent?.trim() || '';
-                const brand = document.querySelector('#bylineInfo')?.textContent?.trim() || '';
-                const price = document.querySelector('.a-price .a-offscreen')?.textContent?.trim() ||
-                    document.querySelector('#priceblock_ourprice')?.textContent?.trim() ||
-                    document.querySelector('#corePrice_feature_div .a-price .a-offscreen')?.textContent?.trim() || '';
-                const rating = document.querySelector('#acrPopover')?.getAttribute('title')?.trim() ||
-                    document.querySelector('.a-icon-star')?.textContent?.trim() || '';
+                const productTitle = document.querySelector('#productTitle')?.textContent?.trim() ?? '';
+                const brand = document.querySelector('#bylineInfo')?.textContent?.trim() ?? '';
+                const price = document.querySelector('.a-price .a-offscreen')?.textContent?.trim() ??
+                    document.querySelector('#priceblock_ourprice')?.textContent?.trim() ??
+                    document.querySelector('#corePrice_feature_div .a-price .a-offscreen')?.textContent?.trim() ?? '';
+                const rating = document.querySelector('#acrPopover')?.getAttribute('title')?.trim() ??
+                    document.querySelector('.a-icon-star')?.textContent?.trim() ?? '';
                 // Technical specifications
                 const techSpecs = {};
-                const techSpecsTable = document.querySelector('.a-section.a-spacing-medium.a-spacing-top-small .a-section.a-spacing-small table') ||
-                    document.querySelector('#productDetails_techSpec_section_1') ||
+                const techSpecsTable = document.querySelector('.a-section.a-spacing-medium.a-spacing-top-small .a-section.a-spacing-small table') ??
+                    document.querySelector('#productDetails_techSpec_section_1') ??
                     document.querySelector('#productDetails_detailBullets_sections1');
                 if (techSpecsTable) {
                     const rows = techSpecsTable.querySelectorAll('tr');
                     rows.forEach(row => {
-                        const key = row.querySelector('th')?.textContent?.trim() || '';
-                        const value = row.querySelector('td')?.textContent?.trim() || '';
+                        const key = row.querySelector('th')?.textContent?.trim() ?? '';
+                        const value = row.querySelector('td')?.textContent?.trim() ?? '';
                         if (key && value) {
                             techSpecs[key] = value;
                         }
@@ -482,7 +482,7 @@ class PlaywrightScraper {
                     });
                 }
                 // Enhanced content for product description
-                const productDescription = document.querySelector('#productDescription')?.innerHTML || '';
+                const productDescription = document.querySelector('#productDescription')?.innerHTML ?? '';
                 // Product details
                 const detailBullets = document.querySelector('#detailBullets_feature_div');
                 const detailBulletsContent = detailBullets ? detailBullets.innerHTML : '';

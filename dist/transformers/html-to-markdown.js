@@ -170,12 +170,11 @@ class HtmlToMarkdownTransformer {
             filter: (node) => {
                 return (node.nodeName === 'PRE' &&
                     node.firstChild &&
-                    node.firstChild.nodeName === 'CODE') ? true : false;
+                    node.firstChild.nodeName === 'CODE') || false;
             },
             replacement: (content, node) => {
-                const code = node.textContent || '';
-                const language = node.firstChild &&
-                    node.firstChild.className
+                const code = node.textContent ?? '';
+                const language = node.firstChild?.className
                     ? node.firstChild.className.replace('language-', '')
                     : '';
                 return '\n\n```' + language + '\n' + code.trim() + '\n```\n\n';
@@ -199,7 +198,8 @@ class HtmlToMarkdownTransformer {
                 }
                 // Prevent line breaks inside links by replacing them
                 let linkContent = content.trim().replace(/\n/g, ' ');
-                return `[${linkContent}](${finalHref}${title ? ` "${title}"` : ''})`;
+                const titleAttr = title ? ` "${title}"` : '';
+                return `[${linkContent}](${finalHref}${titleAttr})`;
             }
         });
         // Enhance heading formatting
@@ -225,7 +225,7 @@ class HtmlToMarkdownTransformer {
                 const parent = node.parentNode;
                 const isOrdered = parent && parent.nodeName === 'OL';
                 // Handle index properly for ordered lists
-                const index = parent ? Array.from(parent.childNodes || [])
+                const index = parent ? Array.from(parent.childNodes ?? [])
                     .filter(n => n.nodeType === 1 && n.tagName === 'LI')
                     .indexOf(node) + 1 : 1;
                 const prefix = isOrdered ? `${index}. ` : `${options.bulletListMarker} `;
@@ -246,9 +246,9 @@ class HtmlToMarkdownTransformer {
         this.turndownService.addRule('images', {
             filter: 'img',
             replacement: (content, node) => {
-                const alt = node.getAttribute('alt') || '';
-                const src = node.getAttribute('src') || '';
-                const title = node.getAttribute('title') || '';
+                const alt = node.getAttribute('alt') ?? '';
+                const src = node.getAttribute('src') ?? '';
+                const title = node.getAttribute('title') ?? '';
                 if (!src)
                     return '';
                 // Handle base64 images - either remove or limit them
@@ -260,7 +260,8 @@ class HtmlToMarkdownTransformer {
                 if (!src.startsWith('http') && !src.startsWith('data:')) {
                     finalSrc = src.startsWith('/') ? `${this.baseUrl}${src}` : `${this.baseUrl}/${src}`;
                 }
-                return `![${alt}](${finalSrc}${title ? ` "${title}"` : ''})`;
+                const titleAttr = title ? ` "${title}"` : '';
+                return `![${alt}](${finalSrc}${titleAttr})`;
             }
         });
         // Remove empty or whitespace-only paragraphs
@@ -275,7 +276,7 @@ class HtmlToMarkdownTransformer {
         // Remove consecutive newlines
         this.turndownService.addRule('removeConsecutiveNewlines', {
             filter: (node) => {
-                return node.nodeType === 3 && /\n\s*\n/.test(node.nodeValue || '');
+                return node.nodeType === 3 && /\n\s*\n/.test(node.nodeValue ?? '');
             },
             replacement: (content) => {
                 return content.replace(/\n\s*\n/g, '\n\n');
@@ -322,7 +323,7 @@ class HtmlToMarkdownTransformer {
             // Check heading count after cleaning
             const finalHeadings = $extracted('[data-preserve-heading="true"]').length;
             logger_1.logger.debug(`After cleaning, extracted content has ${finalHeadings} headings`);
-            return $extracted.html() || '';
+            return $extracted.html() ?? '';
         }
         // If extraction failed, fall back to heading-based approach
         logger_1.logger.debug('Initial extraction failed, trying heading-based approach');
@@ -404,7 +405,6 @@ class HtmlToMarkdownTransformer {
         $('.loading, .spinner, .loader, [class*="loading"], [class*="spinner"], [class*="loader"]').remove();
         // Clean attributes that aren't necessary for markdown
         $('*').each((_, el) => {
-            // Using type assertion to access attribs
             const element = el;
             // Skip if element doesn't have attributes
             if (!element.attribs)
@@ -413,7 +413,7 @@ class HtmlToMarkdownTransformer {
             Object.keys(attrs).forEach(attr => {
                 // Keep only essential attributes
                 if (!['href', 'src', 'alt', 'title', 'colspan', 'rowspan'].includes(attr)) {
-                    $(element).removeAttr(attr);
+                    $(el).removeAttr(attr);
                 }
             });
         });
@@ -436,7 +436,7 @@ class HtmlToMarkdownTransformer {
             if ($(table).find('thead').length === 0 && $(table).find('th').length === 0) {
                 const firstRow = $(table).find('tr').first();
                 firstRow.find('td').each((_, cell) => {
-                    const content = $(cell).html() || '';
+                    const content = $(cell).html() ?? '';
                     $(cell).replaceWith(`<th>${content}</th>`);
                 });
                 const thead = $('<thead></thead>');
@@ -544,7 +544,7 @@ class HtmlToMarkdownTransformer {
      */
     getContainerHtml($container) {
         const $result = $container.parent();
-        return $result.html() || '';
+        return $result.html() ?? '';
     }
     /**
      * Extract main content using multiple strategies
@@ -556,7 +556,7 @@ class HtmlToMarkdownTransformer {
         if (mainContentSelector) {
             const mainContent = $(mainContentSelector);
             if (mainContent.length && this.isContentRich(mainContent)) {
-                return $('<div>').append(mainContent.clone()).html() || '';
+                return $('<div>').append(mainContent.clone()).html() ?? '';
             }
         }
         // Second attempt: Use text density analysis
@@ -589,7 +589,7 @@ class HtmlToMarkdownTransformer {
         const text = element.text().trim();
         const textLength = text.length;
         // Text/HTML ratio (higher = better)
-        const html = element.html() || '';
+        const html = element.html() ?? '';
         const htmlLength = html.length;
         const textToHtmlRatio = htmlLength > 0 ? textLength / htmlLength : 0;
         // Presence of headings, paragraphs, lists (more = better)
@@ -654,7 +654,7 @@ class HtmlToMarkdownTransformer {
         // Sort by score and take the highest scoring element
         candidates.sort((a, b) => b.score - a.score);
         if (candidates.length && candidates[0].score > CONTENT_THRESHOLD) {
-            return $('<div>').append(candidates[0].element.clone()).html() || '';
+            return $('<div>').append(candidates[0].element.clone()).html() ?? '';
         }
         // Fallback to original approach if no good candidate is found
         return $.html();
@@ -664,7 +664,7 @@ class HtmlToMarkdownTransformer {
      */
     isLikelyNonContent(element) {
         // Check for signals that indicate non-content
-        const classId = (element.attr('class') || '') + ' ' + (element.attr('id') || '');
+        const classId = (element.attr('class') ?? '') + ' ' + (element.attr('id') ?? '');
         const text = element.text().trim();
         // Check against common non-content patterns
         const nonContentPatterns = [
@@ -697,18 +697,18 @@ class HtmlToMarkdownTransformer {
             // Fix spacing around headings (ensure heading has empty lines around it)
             .replace(/([^\n])\n(#+\s)/g, '$1\n\n$2')
             .replace(/(#+\s[^\n]*)\n([^\n])/g, '$1\n\n$2')
-            // Improve list formatting
-            .replace(/\n(\s*[-*+])\s{2,}/g, '\n$1 ')
-            // Improve code block formatting
-            .replace(/\n```([^`\n]*)\n/g, '\n\n```$1\n')
-            .replace(/\n([^`\n]+)```\n/g, '\n$1```\n\n')
+            // Improve list formatting - limit whitespace matching to avoid backtracking
+            .replace(/\n(\s{0,10}[-*+])\s{2,5}/g, '\n$1 ')
+            // Improve code block formatting - limit matching to avoid backtracking
+            .replace(/\n```([^`\n]{0,100})\n/g, '\n\n```$1\n')
+            .replace(/\n([^`\n]{1,500})```\n/g, '\n$1```\n\n')
             // Remove trailing whitespace on lines
             .replace(/[ \t]*$/gm, '')
-            // Make sure links have spaces from surrounding text when needed
-            .replace(/([a-z0-9])(\[[^\]]*\]\([^)]*\))/g, '$1 $2')
-            .replace(/(\[[^\]]*\]\([^)]*\))([a-z0-9])/g, '$1 $2')
-            // Normalize URLs to absolute paths
-            .replace(/\]\(([^)]+)\)/g, (match, url) => {
+            // Make sure links have spaces from surrounding text when needed - limit matching
+            .replace(/([a-z0-9])(\[[^\]]{0,200}\]\([^)]{0,500}\))/g, '$1 $2')
+            .replace(/(\[[^\]]{0,200}\]\([^)]{0,500}\))([a-z0-9])/g, '$1 $2')
+            // Normalize URLs to absolute paths - limit URL length
+            .replace(/\]\(([^)]{1,2000})\)/g, (match, url) => {
             // Skip URLs that are already absolute or anchors
             if (!url || url.startsWith('http') || url.startsWith('#') || url.startsWith('mailto:')) {
                 return match;
@@ -722,7 +722,7 @@ class HtmlToMarkdownTransformer {
         })
             // Fix inconsistent table formatting
             .replace(/\n\s*\|\s*\n/g, '\n|\n')
-            // Ensure paragraphs are separated by blank lines
+            // Ensure paragraphs are separated by blank lines - use non-greedy matching
             .replace(/([^\n])\n([^\n\s#>*-])/g, '$1\n\n$2')
             // Remove "Skip to content" and similar accessibility links
             .replace(/\[Skip to [cC]ontent\]\([^)]*\)/g, '')
@@ -766,7 +766,8 @@ class HtmlToMarkdownTransformer {
                 const urlObj = new URL(scraperResponse.url);
                 this.baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
             }
-            catch (e) {
+            catch (error) {
+                logger_1.logger.debug(`Error parsing URL: ${error instanceof Error ? error.message : String(error)}`);
                 this.baseUrl = ''; // Set a default value if URL parsing fails
             }
             // Pre-clean the HTML - enable main content extraction by default
@@ -781,7 +782,7 @@ class HtmlToMarkdownTransformer {
             logger_1.logger.debug(`Raw markdown generated. Size: ${markdown.length} characters`);
             // Check for headings in the markdown
             const headingLines = markdown.match(/^#+\s.+$/gm);
-            logger_1.logger.info(`Markdown contains ${headingLines?.length || 0} heading lines`);
+            logger_1.logger.info(`Markdown contains ${headingLines?.length ?? 0} heading lines`);
             // Post-process the markdown
             const cleanedMarkdown = this.cleanMarkdown(markdown);
             logger_1.logger.debug(`Cleaned markdown. Size: ${cleanedMarkdown.length} characters`);

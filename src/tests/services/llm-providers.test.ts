@@ -1,7 +1,7 @@
 import { LLMServiceFactory } from '../../services/llm-service-factory';
 import { LocalLLMService } from '../../services/local-llm.service';
 import { OpenAIService } from '../../services/openai.service';
-import { LLMProvider, LLMMessage } from '../../types/llm.types';
+import { LLMMessage } from '../../types/llm.types';
 
 describe('LLM Provider Tests', () => {
   const originalEnv = process.env;
@@ -66,20 +66,22 @@ describe('LLM Provider Tests', () => {
     
     beforeEach(() => {
       // Mock OpenAI client
-      jest.mock('openai', () => {
-        return jest.fn().mockImplementation(() => ({
-          chat: {
-            completions: {
-              create: jest.fn()
-            }
-          },
-          embeddings: {
+      mockClient = {
+        chat: {
+          completions: {
             create: jest.fn()
-          },
-          models: {
-            list: jest.fn()
           }
-        }));
+        },
+        embeddings: {
+          create: jest.fn()
+        },
+        models: {
+          list: jest.fn()
+        }
+      };
+      
+      jest.mock('openai', () => {
+        return jest.fn().mockImplementation(() => mockClient);
       });
     });
     
@@ -104,23 +106,8 @@ describe('LLM Provider Tests', () => {
         model: 'library/llama2:latest'
       });
       
-      const messages: LLMMessage[] = [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { role: 'user', content: 'Hello' }
-      ];
-      
-      // Mock the response
-      const mockResponse = {
-        choices: [{
-          message: { content: 'Hi there!' }
-        }],
-        model: 'llama2:latest',
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 5,
-          total_tokens: 15
-        }
-      };
+      // Test model name formatting
+      // Messages and mockResponse were not being used in this test
       
       // This would need proper mocking setup in a real test
       // For now, we're just testing the service creation

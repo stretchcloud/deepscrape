@@ -25,3 +25,6 @@ firecrawl/
 
 crawl-output/
 
+dist
+.vscode/
+.claude
