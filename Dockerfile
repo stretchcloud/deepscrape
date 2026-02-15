@@ -14,7 +14,6 @@ RUN npm ci --ignore-scripts
 # Copy source code and build files (excluding sensitive data via .dockerignore)
 COPY src/ ./src/
 COPY tsconfig.json ./
-COPY *.md ./
 
 # Build the application
 RUN npm run build
@@ -78,7 +77,7 @@ RUN groupadd --gid 1001 nodejs && \
     npx playwright install-deps chromium
 
 # Copy built application from builder stage with secure permissions (no write access)
-COPY --from=builder --chown=deepscrape:nodejs --chmod=555 /app/dist ./dist
+COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
 
 # Create directories and set proper permissions
 RUN mkdir -p /app/cache /app/logs /home/deepscrape/.cache && \

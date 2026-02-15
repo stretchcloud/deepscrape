@@ -12,6 +12,9 @@ logs/*.log
 logs/combined.log
 logs/error.log
 
+# Nginx runtime data
+nginx/certs/
+nginx/www/
 
 # Cache
 cache/

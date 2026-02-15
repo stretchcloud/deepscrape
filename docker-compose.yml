@@ -52,6 +52,34 @@ services:
     networks:
       - deepscrape-network
 
+  # Nginx reverse proxy for HTTPS
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: deepscrape-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/www:/var/www/certbot
+      - ./nginx/certs:/etc/letsencrypt
+    depends_on:
+      - deepscrape
+    networks:
+      - deepscrape-network
+
+  # Certbot for Let's Encrypt renewals
+  certbot:
+    image: certbot/certbot:v2.10.0
+    container_name: deepscrape-certbot
+    volumes:
+      - ./nginx/www:/var/www/certbot
+      - ./nginx/certs:/etc/letsencrypt
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h; done"
+    networks:
+      - deepscrape-network
+
 volumes:
   redis_data:
     driver: local
