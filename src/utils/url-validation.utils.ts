@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { assertPublicUrl } from './ssrf-guard';
 
 /**
  * URL validation and normalization utilities
@@ -6,52 +7,26 @@ import { logger } from './logger';
 export class URLValidationUtils {
 
   /**
-   * Check if a URL is valid and accessible
+   * Cheap, synchronous format/scheme validity check.
+   *
+   * This intentionally does NOT attempt SSRF/private-IP filtering — that is
+   * enforced at fetch time by the async `assertPublicUrl` guard (which resolves
+   * DNS and re-checks every redirect hop). Doing a naive substring/prefix check
+   * here previously produced false positives (e.g. rejecting a legitimate page
+   * whose path contained "javascript" or "mailto:").
    */
   static isValidUrl(url: string): boolean {
     try {
       const urlObj = new URL(url);
 
-      // Only allow HTTP and HTTPS protocols
+      // Only allow HTTP and HTTPS protocols (scheme is the authoritative check).
       if (!['http:', 'https:'].includes(urlObj.protocol)) {
         return false;
       }
 
-      // Reject suspicious or dangerous URLs
-      const dangerousPatterns = [
-        'javascript:',
-        'data:',
-        'vbscript:',
-        'file:',
-        'about:',
-        'blob:',
-        'mailto:',
-        'tel:',
-        'ftp:'
-      ];
-
-      const lowerUrl = url.toLowerCase();
-      if (dangerousPatterns.some(pattern => lowerUrl.includes(pattern))) {
-        return false;
-      }
-
-      // Check for reasonable hostname
+      // Require a plausible hostname with a dot (or an IP literal).
       if (!urlObj.hostname || urlObj.hostname.length < 3) {
         return false;
-      }
-
-      // Reject local/private IPs in production
-      if (process.env.NODE_ENV === 'production') {
-        const hostname = urlObj.hostname;
-        if (
-          hostname === 'localhost' ||
-          hostname.startsWith('127.') ||
-          hostname.startsWith('192.168.') ||
-          hostname.startsWith('10.') ||
-          hostname.startsWith('172.')
-        ) {
-          return false;
-        }
       }
 
       return true;
@@ -131,13 +106,13 @@ export class URLValidationUtils {
             const regex = new RegExp(filter, 'i'); // case insensitive
             return regex.test(path);
           }
-          
+
           // Fallback to simple string matching (case insensitive)
           const filterLower = filter.toLowerCase();
           const pathLower = path.toLowerCase();
-          
+
           // Support contains, startsWith, and exact matches
-          return pathLower.includes(filterLower) || 
+          return pathLower.includes(filterLower) ||
                  pathLower.startsWith('/' + filterLower) ||
                  pathLower === filterLower;
         } catch (regexError) {
@@ -280,6 +255,9 @@ export class URLValidationUtils {
    */
   static async checkUrlExists(url: string, timeout: number = 5000): Promise<boolean> {
     try {
+      // SSRF pre-flight so discovery HEAD-probes can't scan internal hosts.
+      await assertPublicUrl(url);
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 

@@ -1,105 +1,50 @@
-# Multi-stage build for smaller image
-FROM node:18-bullseye AS builder
+# ---- Build stage ----
+FROM node:20-bookworm-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install all deps (incl. dev) for the TypeScript build. --ignore-scripts avoids
+# running arbitrary package postinstall scripts.
 COPY package*.json ./
-
-# Install ALL dependencies (including devDependencies for build)
-# Using --ignore-scripts for security to prevent execution of untrusted scripts
 RUN npm ci --ignore-scripts
 
-# Copy source code and build files (excluding sensitive data via .dockerignore)
-COPY src/ ./src/
 COPY tsconfig.json ./
-
-# Build the application
+COPY src/ ./src/
 RUN npm run build
 
-# Production stage
-FROM node:18-bullseye AS production
+# ---- Production stage ----
+# Official Playwright image: matches the installed playwright version and ships
+# Chromium + all system libraries, so we don't hand-maintain an apt list or run a
+# separate browser install. PLAYWRIGHT_BROWSERS_PATH=/ms-playwright is preset.
+FROM mcr.microsoft.com/playwright:v1.52.0-jammy AS production
 
-# Install system dependencies and Chromium
-# Using --no-install-recommends for security to avoid installing unnecessary packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgcc1 \
-    libgconf-2-4 \
-    libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
-    lsb-release \
-    wget \
-    xdg-utils \
+# tini as PID 1 to reap zombie Chromium helper processes.
+RUN apt-get update && apt-get install -y --no-install-recommends tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy package files first
+# Production dependencies only.
 COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-# Create non-root user, install dependencies, and setup Playwright
-# Using --ignore-scripts for security to prevent execution of untrusted scripts
-RUN groupadd --gid 1001 nodejs && \
-    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home deepscrape && \
-    npm ci --only=production --ignore-scripts && \
-    npx playwright install-deps chromium
+# Built application.
+COPY --from=builder /app/dist ./dist
 
-# Copy built application from builder stage with secure permissions (no write access)
-COPY --from=builder --chown=deepscrape:nodejs /app/dist ./dist
+# Writable runtime directories, owned by the non-root pwuser that ships with the
+# Playwright image (uid 1000).
+RUN mkdir -p /app/cache /app/logs /app/crawl-output /app/batch-output \
+    && chown -R pwuser:pwuser /app
 
-# Create directories and set proper permissions
-RUN mkdir -p /app/cache /app/logs /home/deepscrape/.cache && \
-    touch /app/logs/access.log /app/logs/combined.log /app/logs/error.log && \
-    chown -R deepscrape:nodejs /app /home/deepscrape/.cache
+USER pwuser
 
-# Switch to non-root user
-USER deepscrape
-
-# Install Playwright browsers as the deepscrape user
-RUN npx playwright install chromium
-
-# Set Playwright environment variables
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/deepscrape/.cache/ms-playwright
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
-
-# Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+# Liveness check hits the process; readiness (Redis) is a separate endpoint.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["node", "-e", "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
-# Start the application
+# tini reaps zombies; then start the app.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "dist/index.js"]

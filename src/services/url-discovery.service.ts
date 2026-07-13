@@ -1,6 +1,8 @@
 import { SitemapParserService } from './sitemap-parser.service';
 import { URLValidationUtils } from '../utils/url-validation.utils';
 import { logger } from '../utils/logger';
+import { assertPublicUrl, ssrfSafeRequestConfig } from '../utils/ssrf-guard';
+import { extractChildLinks } from '../scraper/crawl-links';
 import { redisClient } from './redis.service';
 import { PlaywrightService } from './playwright.service';
 import { randomBytes } from 'crypto';
@@ -27,7 +29,7 @@ export class URLDiscoveryService {
   private readonly playwrightService: PlaywrightService;
   private readonly cachePrefix = 'url-discovery';
   private readonly cacheDuration = 48 * 60 * 60; // 48 hours
-  
+
   // Rate limiting configuration from environment variables
   private readonly config = {
     minDelay: parseInt(process.env.DISCOVERY_MIN_DELAY || '500'),
@@ -67,33 +69,33 @@ export class URLDiscoveryService {
     baseDelay: number = 1000
   ): Promise<T> {
     let lastError: Error | undefined;
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
         lastError = error as Error;
-        
+
         // Check if this is a rate limiting error
-        const isRateLimit = lastError.message.includes('429') || 
+        const isRateLimit = lastError.message.includes('429') ||
                            lastError.message.toLowerCase().includes('rate limit') ||
                            lastError.message.toLowerCase().includes('too many requests');
-        
+
         if (attempt === maxRetries || !isRateLimit) {
           break;
         }
-        
+
         const backoffDelay = this.calculateBackoffDelay(attempt, baseDelay);
         logger.warn(`Request failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${backoffDelay}ms`, {
           error: lastError.message,
           attempt: attempt + 1,
           delay: backoffDelay
         });
-        
+
         await this.delay(backoffDelay);
       }
     }
-    
+
     throw lastError || new Error('Operation failed with unknown error');
   }
 
@@ -162,9 +164,11 @@ export class URLDiscoveryService {
 
       // Phase 1: Fast sitemap discovery (usually finds most URLs)
       const sitemapPromises: Promise<DiscoveryMethodResult>[] = [];
-      
+
       if (!skipSitemaps) {
-        sitemapPromises.push(this.runSitemapDiscovery(url, Math.floor(maxUrls * 0.6)));
+        // Let the sitemap fill the full budget (previously capped at 60%, which
+        // forced needless browser crawling even when the sitemap had plenty).
+        sitemapPromises.push(this.runSitemapDiscovery(url, maxUrls));
         sitemapPromises.push(this.runRobotsSitemapDiscovery(url));
       }
 
@@ -175,7 +179,7 @@ export class URLDiscoveryService {
 
       // Run fast discovery methods in parallel
       const sitemapResults = await Promise.allSettled(sitemapPromises);
-      
+
       // Process sitemap results
       sitemapResults.forEach((result) => {
         if (result.status === 'fulfilled') {
@@ -185,6 +189,15 @@ export class URLDiscoveryService {
         }
       });
 
+      // Phase 1.5: Subdomain expansion — when includeSubdomains is set, actively
+      // discover sibling subdomains (docs., blog., …) and pull each sitemap.
+      if (includeSubdomains && !skipSitemaps) {
+        const subResult = await this.runSubdomainDiscovery(url, maxUrls);
+        allUrls.push(...subResult.urls);
+        methodCounts.sitemap += subResult.urls.length;
+        logger.info(`Subdomain discovery added ${subResult.urls.length} URLs`, { url });
+      }
+
       // Phase 2: Browser crawling only if we haven't found enough URLs
       const currentUrlCount = allUrls.length;
       logger.info(`Fast discovery completed: ${currentUrlCount} URLs found`, {
@@ -192,24 +205,28 @@ export class URLDiscoveryService {
         methods: methodCounts
       });
 
-      if (!sitemapsOnly && currentUrlCount < maxUrls * 0.8) {
+      // Only fall back to (slow) browser crawling when fast discovery was sparse.
+      // A site with a real sitemap has already given us its URLs, so crawling
+      // would just add latency without finding meaningfully more.
+      const sparseThreshold = Math.min(maxUrls, 30);
+      if (!sitemapsOnly && currentUrlCount < sparseThreshold) {
         logger.info('Running supplemental browser crawling', {
           url,
           currentUrls: currentUrlCount,
           targetUrls: maxUrls
         });
-        
+
         const crawlResult = await this.runBrowserDiscovery(
-          url, 
-          Math.floor(maxUrls * 0.3), 
-          rateLimiting, 
+          url,
+          Math.floor(maxUrls * 0.3),
+          rateLimiting,
           {
             ...crawlOptions,
             maxCrawlDepth: Math.min(crawlOptions?.maxCrawlDepth || 2, 2), // Limit depth for speed
             enableDeepCrawling: currentUrlCount < maxUrls * 0.5 // Only deep crawl if we really need more URLs
           }
         );
-        
+
         allUrls.push(...crawlResult.urls);
         methodCounts.crawling += crawlResult.urls.length;
       }
@@ -378,7 +395,7 @@ export class URLDiscoveryService {
           url,
           crawlOptions
         });
-        
+
         discoveryPromises.push(
           this.streamBrowserDiscovery(url, timeoutMs, maxUrls, createBatchHandler('browser'))
         );
@@ -465,7 +482,7 @@ export class URLDiscoveryService {
 
       // Use existing sitemap parser but with streaming callback
       const urls = await this.sitemapParser.discoverFromSitemaps(url, 10000);
-      
+
       logger.info(`Sitemap discovery found ${urls.length} URLs`, { url, urlsFound: urls.length });
 
       if (urls.length === 0) {
@@ -486,19 +503,19 @@ export class URLDiscoveryService {
         await urlHandler(batch);
         urlsFound += batch.length;
         batchesStreamed++;
-        
-        logger.info(`Streamed sitemap batch ${batchesStreamed}`, { 
-          batchSize: batch.length, 
-          totalUrlsFound: urlsFound 
+
+        logger.info(`Streamed sitemap batch ${batchesStreamed}`, {
+          batchSize: batch.length,
+          totalUrlsFound: urlsFound
         });
 
         // Small delay to allow other methods to interleave
         await new Promise(resolve => setTimeout(resolve, 10));
       }
 
-      logger.info('Sitemap discovery completed successfully', { 
-        url, 
-        urlsFound, 
+      logger.info('Sitemap discovery completed successfully', {
+        url,
+        urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
@@ -511,15 +528,15 @@ export class URLDiscoveryService {
         completed: true
       };
     } catch (error) {
-      logger.error('Sitemap discovery failed with error', { 
-        url, 
+      logger.error('Sitemap discovery failed with error', {
+        url,
         error: (error as Error).message,
         stack: (error as Error).stack,
         urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
-      
+
       return {
         method: 'sitemap',
         urlsFound,
@@ -575,18 +592,18 @@ export class URLDiscoveryService {
         urlsFound += batch.length;
         batchesStreamed++;
 
-        logger.info(`Streamed browser batch ${batchesStreamed}`, { 
-          batchSize: batch.length, 
-          totalUrlsFound: urlsFound 
+        logger.info(`Streamed browser batch ${batchesStreamed}`, {
+          batchSize: batch.length,
+          totalUrlsFound: urlsFound
         });
 
         // Small delay to allow interleaving with other methods
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      logger.info('Browser discovery completed successfully', { 
-        url, 
-        urlsFound, 
+      logger.info('Browser discovery completed successfully', {
+        url,
+        urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
@@ -599,15 +616,15 @@ export class URLDiscoveryService {
         completed: true
       };
     } catch (error) {
-      logger.error('Browser discovery failed with error', { 
-        url, 
+      logger.error('Browser discovery failed with error', {
+        url,
         error: (error as Error).message,
         stack: (error as Error).stack,
         urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
-      
+
       return {
         method: 'browser',
         urlsFound,
@@ -657,10 +674,10 @@ export class URLDiscoveryService {
       for (let i = 0; i < testUrls.length; i += batchSize) {
         // Check if we're running out of time
         if (Date.now() - startTime > timeout * 0.8) { // Use 80% of available time
-          logger.info('Common paths discovery timeout approaching, stopping early', { 
-            url, 
+          logger.info('Common paths discovery timeout approaching, stopping early', {
+            url,
             testedSoFar: i,
-            urlsFound 
+            urlsFound
           });
           break;
         }
@@ -732,7 +749,7 @@ export class URLDiscoveryService {
 
       const sitemapUrls = this.extractSitemapUrls(robotsContent);
       const results = await this.processSitemaps(sitemapUrls, urlHandler);
-      
+
       urlsFound = results.urlsFound;
       batchesStreamed = results.batchesStreamed;
 
@@ -753,6 +770,7 @@ export class URLDiscoveryService {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
+      await assertPublicUrl(robotsUrl);
       const response = await fetch(robotsUrl, {
         signal: controller.signal,
         headers: { 'User-Agent': 'DeepScraper/1.0 Discovery Bot' }
@@ -772,7 +790,7 @@ export class URLDiscoveryService {
   private extractSitemapUrls(robotsContent: string): string[] {
     const sitemapUrls: string[] = [];
     const lines = robotsContent.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.toLowerCase().startsWith('sitemap:')) {
@@ -782,7 +800,7 @@ export class URLDiscoveryService {
         }
       }
     }
-    
+
     return sitemapUrls;
   }
 
@@ -790,7 +808,7 @@ export class URLDiscoveryService {
    * Process multiple sitemaps and stream URLs
    */
   private async processSitemaps(
-    sitemapUrls: string[], 
+    sitemapUrls: string[],
     urlHandler: (urls: string[]) => Promise<void>
   ): Promise<{urlsFound: number, batchesStreamed: number}> {
     let urlsFound = 0;
@@ -818,7 +836,7 @@ export class URLDiscoveryService {
    * Stream URLs in batches with delay
    */
   private async streamUrlsInBatches(
-    urls: string[], 
+    urls: string[],
     urlHandler: (urls: string[]) => Promise<void>
   ): Promise<{urlsFound: number, batchesStreamed: number}> {
     let urlsFound = 0;
@@ -840,11 +858,11 @@ export class URLDiscoveryService {
    * Create standardized streaming result
    */
   private createStreamingResult(
-    method: 'sitemap' | 'browser' | 'commonPaths' | 'robots' | 'search' | 'documents', 
-    urlsFound: number, 
-    batchesStreamed: number, 
-    startTime: number, 
-    completed: boolean, 
+    method: 'sitemap' | 'browser' | 'commonPaths' | 'robots' | 'search' | 'documents',
+    urlsFound: number,
+    batchesStreamed: number,
+    startTime: number,
+    completed: boolean,
     error?: string
   ): StreamingMethodResult {
     return {
@@ -874,7 +892,7 @@ export class URLDiscoveryService {
       logger.info('Starting streaming document file discovery', { url });
 
       const baseUrl = new URL(url);
-      
+
       // Common document file extensions to test
       const documentExtensions = [
         '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
@@ -921,14 +939,14 @@ export class URLDiscoveryService {
       // Test URLs in batches to avoid overwhelming the server
       const batchSize = 3; // Smaller batches to be more respectful
       const maxTests = Math.min(testUrls.length, 50); // Limit to 50 tests for faster discovery
-      
+
       for (let i = 0; i < maxTests; i += batchSize) {
         // Check if we're running out of time
         if (Date.now() - startTime > timeout * 0.8) { // Use 80% of available time
-          logger.info('Document discovery timeout approaching, stopping early', { 
-            url, 
+          logger.info('Document discovery timeout approaching, stopping early', {
+            url,
             testedSoFar: i,
-            urlsFound 
+            urlsFound
           });
           break;
         }
@@ -953,8 +971,8 @@ export class URLDiscoveryService {
           await urlHandler(validUrls);
           urlsFound += validUrls.length;
           batchesStreamed++;
-          
-          logger.info(`Found ${validUrls.length} document files`, { 
+
+          logger.info(`Found ${validUrls.length} document files`, {
             urls: validUrls.slice(0, 2) // Log first 2 for debugging
           });
         }
@@ -963,9 +981,9 @@ export class URLDiscoveryService {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      logger.info('Document discovery completed successfully', { 
-        url, 
-        urlsFound, 
+      logger.info('Document discovery completed successfully', {
+        url,
+        urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
@@ -978,15 +996,15 @@ export class URLDiscoveryService {
         completed: true
       };
     } catch (error) {
-      logger.error('Document discovery failed with error', { 
-        url, 
+      logger.error('Document discovery failed with error', {
+        url,
         error: (error as Error).message,
         stack: (error as Error).stack,
         urlsFound,
         batchesStreamed,
         timeTaken: Date.now() - startTime
       });
-      
+
       return {
         method: 'documents',
         urlsFound,
@@ -1020,6 +1038,91 @@ export class URLDiscoveryService {
     }
   }
 
+  /** Registrable base domain from a hostname (naive last-two-labels heuristic). */
+  private baseDomainOf(hostname: string): string {
+    const labels = hostname.split('.').filter(Boolean);
+    return labels.length > 2 ? labels.slice(-2).join('.') : hostname;
+  }
+
+  /**
+   * Discover sibling subdomains of the seed's registrable domain and pull each
+   * one's sitemap. `includeSubdomains` alone only *allows* subdomain URLs through
+   * the filter; it does not find them, because each subdomain (docs., blog., …)
+   * has its own sitemap that the seed's sitemap never references. This method
+   * bridges that gap: it collects subdomains linked from the seed page plus a
+   * small curated set of common ones, then runs sitemap discovery on each.
+   */
+  private async runSubdomainDiscovery(seedUrl: string, maxUrls: number): Promise<DiscoveryMethodResult> {
+    const startTime = Date.now();
+    try {
+      const seed = new URL(seedUrl);
+      const baseDomain = this.baseDomainOf(seed.hostname);
+      const hosts = new Set<string>();
+      hosts.add(seed.hostname);
+
+      // 1) Subdomains linked from the seed page.
+      try {
+        await assertPublicUrl(seedUrl);
+        const resp = await axios.get(seedUrl, {
+          timeout: 12000,
+          maxContentLength: 8 * 1024 * 1024,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DeepScrape/1.0)' },
+          ...ssrfSafeRequestConfig()
+        });
+        for (const link of extractChildLinks(String(resp.data), seedUrl)) {
+          try {
+            const h = new URL(link).hostname;
+            if (h === baseDomain || h.endsWith('.' + baseDomain)) hosts.add(h);
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        logger.debug(`Subdomain seed fetch failed: ${(err as Error).message}`);
+      }
+
+      // 2) A small curated set of common subdomains (caught even if unlinked).
+      for (const s of ['www', 'docs', 'blog', 'community', 'rules', 'help', 'support', 'developer', 'learn']) {
+        hosts.add(`${s}.${baseDomain}`);
+      }
+
+      const hostList = [...hosts];
+      logger.info(`Subdomain discovery for ${baseDomain}: probing ${hostList.length} hosts`, { hosts: hostList });
+
+      // 3) Sitemap discovery per subdomain, in parallel (failures are ignored).
+      const perHostBudget = maxUrls;
+      const results = await Promise.allSettled(
+        hostList.map(h => this.sitemapParser.discoverFromSitemaps(`https://${h}`, perHostBudget))
+      );
+
+      // Keep per-host lists so we can interleave. Without this, one huge subdomain
+      // (e.g. a forum with 28k threads) would fill the entire maxUrls budget and
+      // starve smaller subdomains like docs. Round-robin interleaving guarantees
+      // every discovered subdomain is represented when the result is capped.
+      const lists: string[][] = [];
+      const counts: Record<string, number> = {};
+      results.forEach((r, i) => {
+        const arr = r.status === 'fulfilled' ? r.value : [];
+        if (arr.length > 0) {
+          lists.push(arr);
+          counts[hostList[i]] = arr.length;
+        }
+      });
+      logger.info('Subdomain sitemap URL counts (pre-cap)', counts);
+
+      const urls: string[] = [];
+      for (let idx = 0, more = true; more; idx++) {
+        more = false;
+        for (const list of lists) {
+          if (idx < list.length) { urls.push(list[idx]); more = true; }
+        }
+      }
+
+      return { urls, method: 'sitemap', timeTaken: Date.now() - startTime };
+    } catch (error) {
+      logger.error('Subdomain discovery failed', { error: (error as Error).message });
+      return { urls: [], method: 'sitemap', timeTaken: Date.now() - startTime, error: (error as Error).message };
+    }
+  }
+
 
   /**
    * Method 3: Browser-based crawling discovery
@@ -1048,7 +1151,7 @@ export class URLDiscoveryService {
         const { BrowserPoolService } = await import('./browser-pool.service');
         const browserPool = BrowserPoolService.getInstance();
         await browserPool.resizePool(crawlOptions.browserPoolSize);
-        
+
         logger.info('Browser pool resized for crawling', {
           browserPoolSize: crawlOptions.browserPoolSize
         });
@@ -1074,7 +1177,7 @@ export class URLDiscoveryService {
         error: (error as Error).message,
         timeTaken: Date.now() - startTime
       });
-      
+
       return {
         urls: [],
         method: 'crawling',
@@ -1109,7 +1212,7 @@ export class URLDiscoveryService {
       // Add Microsoft Learn specific paths for Azure discovery
       if (url.includes('learn.microsoft.com') && url.includes('/azure/')) {
         commonPaths = [
-          '/en-us/azure/', '/azure/', 
+          '/en-us/azure/', '/azure/',
           '/en-us/azure/active-directory/', '/en-us/azure/app-service/',
           '/en-us/azure/virtual-machines/', '/en-us/azure/storage/',
           '/en-us/azure/cosmos-db/', '/en-us/azure/sql-database/',
@@ -1124,17 +1227,17 @@ export class URLDiscoveryService {
 
       // Test common paths - use batching if rate limiting is specified
       let urls: string[] = [];
-      
+
       // Force aggressive rate limiting for Microsoft Learn to avoid blocking
       const forceBatching = url.includes('microsoft.com');
       const effectiveBatchSize = forceBatching ? 2 : (rateLimiting?.batchSize || commonPaths.length);
       const effectiveDelay = forceBatching ? 1000 : (rateLimiting?.sitemapDelay || 0);
-      
+
       if (effectiveBatchSize < commonPaths.length) {
         // Use batched approach for rate limiting
         for (let i = 0; i < commonPaths.length; i += effectiveBatchSize) {
           const batch = commonPaths.slice(i, i + effectiveBatchSize);
-          
+
           const batchPromises = batch.map(async (path) => {
             const testUrl = baseUrl + path;
             try {
@@ -1150,9 +1253,9 @@ export class URLDiscoveryService {
           const batchUrls = batchResults
             .filter(result => result.status === 'fulfilled' && result.value)
             .map(result => (result as PromiseFulfilledResult<string>).value);
-          
+
           urls.push(...batchUrls);
-          
+
           // Add delay between batches if specified
           if (i + effectiveBatchSize < commonPaths.length && effectiveDelay > 0) {
             await this.delay(effectiveDelay);
@@ -1219,7 +1322,7 @@ export class URLDiscoveryService {
    */
   private async runDocumentDiscovery(url: string, rateLimiting?: any): Promise<DiscoveryMethodResult> {
     const startTime = Date.now();
-    
+
     try {
       // Add timeout protection
       const timeoutMs = rateLimiting?.browserTimeout || 10000;
@@ -1228,9 +1331,9 @@ export class URLDiscoveryService {
       );
 
       const discoveryPromise = this.discoverDocumentUrls(url, rateLimiting);
-      
+
       const urls = await Promise.race([discoveryPromise, timeoutPromise]);
-      
+
       return {
         urls,
         method: 'documents',
@@ -1256,7 +1359,7 @@ export class URLDiscoveryService {
   private async discoverDocumentUrls(url: string, rateLimiting?: any): Promise<string[]> {
     const baseUrl = new URL(url).origin;
     const documentUrls: string[] = [];
-    
+
     // Document file extensions to discover
     const documentExtensions = [
       '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
@@ -1275,7 +1378,7 @@ export class URLDiscoveryService {
 
     // Generate potential document URLs
     const potentialUrls: string[] = [];
-    
+
     // Add document paths with extensions
     for (const path of documentPaths) {
       for (const ext of documentExtensions) {
@@ -1300,18 +1403,20 @@ export class URLDiscoveryService {
     // Check URLs in batches with rate limiting
     const batchSize = rateLimiting?.batchSize || 5;
     const minDelay = rateLimiting?.minDelay || 500;
-    
+
     for (let i = 0; i < potentialUrls.length; i += batchSize) {
       const batch = potentialUrls.slice(i, i + batchSize);
-      
+
       const batchPromises = batch.map(async (docUrl) => {
         try {
+          await assertPublicUrl(docUrl);
           const response = await axios.head(docUrl, {
             timeout: 5000,
             headers: { 'User-Agent': 'DeepScraper/1.0 Document Discovery' },
-            validateStatus: (status) => status < 400
+            validateStatus: (status) => status < 400,
+            ...ssrfSafeRequestConfig()
           });
-          
+
           if (response.status === 200) {
             return docUrl;
           }
@@ -1322,7 +1427,7 @@ export class URLDiscoveryService {
       });
 
       const batchResults = await Promise.allSettled(batchPromises);
-      
+
       batchResults.forEach((result) => {
         if (result.status === 'fulfilled' && result.value) {
           documentUrls.push(result.value);

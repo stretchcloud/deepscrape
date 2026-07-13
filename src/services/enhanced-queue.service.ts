@@ -22,6 +22,7 @@ export interface JobOptions {
   attempts?: number;
   removeOnComplete?: number;
   removeOnFail?: number;
+  jobId?: string; // explicit BullMQ job id (so Redis-tracked ids match)
 }
 
 export interface QueueStats {
@@ -124,8 +125,9 @@ export class EnhancedQueueService {
       throw new Error('Queue is shutting down, cannot add new jobs');
     }
 
-    // Generate job ID to prevent duplicates if needed
-    const jobId = options.priority !== undefined ? undefined : this.generateJobId(jobName, data);
+    // Prefer an explicit jobId (so Redis-tracked ids match BullMQ ids). Fall back
+    // to a derived id for de-duplication only when no explicit id is provided.
+    const jobId = options.jobId ?? this.generateJobId(jobName, data);
 
     const jobOptions = {
       priority: options.priority ?? 0,
@@ -183,6 +185,8 @@ export class EnhancedQueueService {
           type: 'exponential' as const,
           delay: this.config.retryDelay,
         },
+        // Honor an explicit jobId so Redis-tracked ids match BullMQ ids.
+        ...(job.opts?.jobId ? { jobId: job.opts.jobId } : {})
       }
     }));
 

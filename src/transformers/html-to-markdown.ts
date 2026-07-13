@@ -1,6 +1,7 @@
 import TurndownService from 'turndown';
 import { ScraperResponse } from '../types';
 import { logger } from '../utils/logger';
+import { pruneToFitHtml } from './content-filter';
 import * as cheerio from 'cheerio';
 import { Element, Node } from 'domhandler';
 
@@ -287,34 +288,34 @@ export class HtmlToMarkdownTransformer {
     // First, set a special attribute on headings to make sure we can find them again
     $('h1, h2, h3, h4, h5, h6').attr('data-preserve-heading', 'true');
 
-    // Try advanced content extraction
-    const extractedContent = this.extractMainContent(html);
+    // Baseline of how much real text the page has, so we can detect an
+    // over-aggressive extraction that would drop the actual content.
+    const fullTextLen = $('body').text().replace(/\s+/g, ' ').trim().length;
+
+    // Try advanced content extraction. IMPORTANT: pass the CURRENT marked DOM
+    // (via $.html()) rather than the original raw `html`, so the heading markers
+    // survive into the extracted content. The previous code re-parsed the raw
+    // string, so markers were never present, extractedHeadings was always 0, and
+    // for any page with an h1/h2 it fell back to heading-only reconstruction —
+    // silently discarding nested main content.
+    const extractedContent = this.extractMainContent($.html());
     if (extractedContent && extractedContent.trim().length > 0) {
       // Load the extracted content into a new Cheerio instance for final cleaning
       const $extracted = cheerio.load(extractedContent);
 
-      // Check if we have headings in the extracted content
-      const extractedHeadings = $extracted('[data-preserve-heading="true"]').length;
-      logger.debug(`Extracted content contains ${extractedHeadings} preserved headings`);
-
-      if (extractedHeadings === 0) {
-        // If no headings, this might not be the right content - try an alternative approach
-        logger.debug('No headings in extracted content, attempting heading-based extraction');
-
-        // Try a heading-based approach - get all h1, h2 elements and their content
-        const headingContent = this.extractHeadingsAndContent($);
-        if (headingContent && headingContent.trim().length > 0) {
-          logger.debug('Successfully extracted content using heading-based approach');
-          return headingContent;
-        }
-      }
-
       // Apply final cleaning to the extracted content
       this.removeUnwantedElements($extracted);
 
-      // Check heading count after cleaning
-      const finalHeadings = $extracted('[data-preserve-heading="true"]').length;
-      logger.debug(`After cleaning, extracted content has ${finalHeadings} headings`);
+      // Guard against dropping (nearly) everything: if the extracted main content
+      // has far less text than the page had, the extractor likely mis-selected —
+      // fall back to cleaning the full body instead of returning a stub.
+      const extractedTextLen = $extracted('body').text().replace(/\s+/g, ' ').trim().length
+        || cheerio.load(extractedContent).root().text().replace(/\s+/g, ' ').trim().length;
+      if (fullTextLen > 200 && extractedTextLen < fullTextLen * 0.2) {
+        logger.debug(`Extracted content too small (${extractedTextLen}/${fullTextLen}); falling back to full-body cleaning`);
+        this.removeUnwantedElements($);
+        return $.html();
+      }
 
       return $extracted.html() || '';
     }
@@ -777,6 +778,23 @@ export class HtmlToMarkdownTransformer {
    * Clean up markdown content after conversion
    */
   private cleanMarkdown(markdown: string): string {
+    // Protect fenced code blocks from the prose-oriented regexes below (which
+    // otherwise inject blank lines between code lines and break list numbering
+    // inside code). Extract them, run cleanup on the prose, then restore.
+    const codeBlocks: string[] = [];
+    const withoutCode = markdown.replace(/```[\s\S]*?```/g, (block) => {
+      codeBlocks.push(block);
+      return ` CODEBLOCK_${codeBlocks.length - 1} `;
+    });
+
+    const cleaned = this.applyMarkdownCleanup(withoutCode);
+
+    // Restore code blocks verbatim.
+    return cleaned.replace(/ CODEBLOCK_(\d+) /g, (_, i) => codeBlocks[Number(i)] ?? '');
+  }
+
+  /** The prose-oriented markdown cleanup chain (code blocks already extracted). */
+  private applyMarkdownCleanup(markdown: string): string {
     return markdown
       // Normalize newlines first
       .replace(/\r\n/g, '\n')
@@ -844,9 +862,9 @@ export class HtmlToMarkdownTransformer {
   /**
    * Transform HTML to Markdown
    */
-  transform(scraperResponse: ScraperResponse): ScraperResponse {
+  transform(scraperResponse: ScraperResponse, onlyMainContent = true, fitMarkdown = true): ScraperResponse {
     try {
-      logger.info(`Transforming HTML to Markdown for URL: ${scraperResponse.url}`);
+      logger.info(`Transforming HTML to Markdown for URL: ${scraperResponse.url} (onlyMainContent=${onlyMainContent}, fitMarkdown=${fitMarkdown})`);
 
       if (!scraperResponse.content) {
         logger.warn('Content is empty, skipping transformation');
@@ -871,16 +889,34 @@ export class HtmlToMarkdownTransformer {
       // Log the first 200 chars of the HTML for debugging
       logger.debug(`First 200 chars of HTML: ${scraperResponse.content.substring(0, 200)}...`);
 
-      // Extract domain from URL for fixing relative links
+      // Extract origin from URL for fixing relative links. Use `origin` (not
+      // protocol+hostname) so a non-default port isn't dropped.
       try {
-        const urlObj = new URL(scraperResponse.url);
-        this.baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+        this.baseUrl = new URL(scraperResponse.url).origin;
       } catch (e) {
         this.baseUrl = ''; // Set a default value if URL parsing fails
       }
 
-      // Pre-clean the HTML - enable main content extraction by default
-      const cleanedHtml = this.cleanHtml(scraperResponse.content, true);
+      // Pre-clean the HTML. When fitMarkdown is on and we want main content only,
+      // use the pruning content filter (link-density + node scoring) for higher
+      // fidelity; otherwise fall back to the heuristic cleaner.
+      let cleanedHtml: string;
+      if (fitMarkdown && onlyMainContent) {
+        try {
+          cleanedHtml = pruneToFitHtml(scraperResponse.content, {
+            preserveTags: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td']
+          });
+          // Safety net: if pruning returned almost nothing, use the heuristic path.
+          if (!cleanedHtml || cleanedHtml.replace(/<[^>]*>/g, '').trim().length < 20) {
+            cleanedHtml = this.cleanHtml(scraperResponse.content, onlyMainContent);
+          }
+        } catch (pruneErr) {
+          logger.warn(`Pruning filter failed, using heuristic cleaner: ${(pruneErr as Error).message}`);
+          cleanedHtml = this.cleanHtml(scraperResponse.content, onlyMainContent);
+        }
+      } else {
+        cleanedHtml = this.cleanHtml(scraperResponse.content, onlyMainContent);
+      }
       logger.debug(`HTML cleaned successfully. Size: ${cleanedHtml.length} characters`);
 
       // Check if headings were preserved

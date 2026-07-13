@@ -40,7 +40,7 @@ export class MapController {
         skipSitemaps = false,
         sitemapsOnly = false,
         useUrlIndex = true,
-        timeoutMs = 30000,
+        timeoutMs = 60000,
         includePatterns,
         excludePatterns,
         rateLimitingOptions = {},
@@ -74,7 +74,7 @@ export class MapController {
       };
 
       // Run URL discovery with timeout wrapper to prevent hanging
-      const discoveryTimeoutMs = timeoutMs ?? 30000; // Use user-provided timeout or default to 30 seconds
+      const discoveryTimeoutMs = timeoutMs ?? 60000; // Use user-provided timeout or default to 60 seconds
       
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error(`Discovery timeout after ${discoveryTimeoutMs}ms`)), discoveryTimeoutMs)

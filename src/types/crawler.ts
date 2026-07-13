@@ -54,6 +54,7 @@ export interface StoredCrawl {
     ignoreRobotsTxt?: boolean;
     regexOnFullURL?: boolean;
     strategy?: CrawlStrategy; // Added crawl strategy
+    keywords?: string[]; // Keywords for best-first URL scoring
     useBrowser?: boolean; // Option to use browser-based crawling with Playwright
   };
   scrapeOptions: ScraperOptions;
@@ -76,9 +77,10 @@ export interface CrawlRequest {
   scrapeOptions?: ScraperOptions;
   webhook?: string;
   strategy?: CrawlStrategy; // Added crawl strategy
+  keywords?: string[]; // Keywords for best-first URL scoring (guided crawl)
   useBrowser?: boolean; // Option to use browser-based crawling with Playwright
   useMapDiscovery?: boolean; // Option to use high-performance URL discovery before crawling
-  
+
   // Map discovery specific parameters (when useMapDiscovery is true)
   maxUrls?: number; // Override limit for discovery
   timeoutMs?: number; // Discovery timeout
@@ -146,6 +148,12 @@ export interface CrawlStatusResponse {
     error?: string;
   }[];
   count?: number;
+  progress?: {
+    total: number;
+    completed: number;
+    failed: number;
+    pending: number;
+  };
   exportedFiles?: {
     count: number;
     outputDirectory: string;

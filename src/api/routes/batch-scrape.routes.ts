@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { handleValidationErrors } from '../middleware/validation';
 import { apiKeyAuth } from '../middleware/auth.middleware';
+import { expensiveLimiter } from '../middleware/rate-limit.middleware';
 import { batchScrapeController } from '../controllers/batch-scrape.controller';
 
 const router = Router();
@@ -80,6 +81,7 @@ const cleanupValidation = [
  */
 router.post(
   '/scrape',
+  expensiveLimiter,
   apiKeyAuth,
   batchScrapeValidation,
   handleValidationErrors,
@@ -96,6 +98,18 @@ router.get(
   batchIdValidation,
   handleValidationErrors,
   batchScrapeController.getBatchStatus.bind(batchScrapeController)
+);
+
+/**
+ * GET /api/batch/scrape/:batchId/errors
+ * List failed jobs (URL + error) for a batch
+ */
+router.get(
+  '/scrape/:batchId/errors',
+  apiKeyAuth,
+  batchIdValidation,
+  handleValidationErrors,
+  batchScrapeController.getBatchErrors.bind(batchScrapeController)
 );
 
 /**

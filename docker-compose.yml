@@ -1,21 +1,20 @@
-version: '3.8'
-
 services:
   # Redis service for job queue and caching
   redis:
     image: redis:7-alpine
     container_name: deepscrape-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # NOT published to the host — only reachable on the internal network. Requires
+    # a password (set REDIS_PASSWORD in .env).
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    mem_limit: 512m
     networks:
       - deepscrape-network
 
@@ -26,37 +25,48 @@ services:
       dockerfile: Dockerfile
     container_name: deepscrape-app
     restart: unless-stopped
+    # No `init: true` — the image's ENTRYPOINT already runs tini as PID 1 to reap
+    # zombie Chromium processes. Adding compose init would nest a second init.
     ports:
-      - "3000:3000"
+      - "${HOST_PORT:-3000}:3000"   # for direct access / local testing; front with nginx in prod
     environment:
       - NODE_ENV=production
       - LOG_DIRECTORY=/app/logs
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - CRAWL_OUTPUT_DIR=/crawl-output
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - CRAWL_OUTPUT_DIR=/app/crawl-output
+      - BATCH_OUTPUT_DIR=/app/batch-output
+      # Optional host-env passthroughs (empty default = feature off).
+      - PROXY_LIST=${PROXY_LIST:-}
+      - PROXY_ENABLED=${PROXY_ENABLED:-}
     env_file:
       - .env
     volumes:
       - ./cache:/app/cache
       - ./logs:/app/logs
-      - ./crawl-output:/crawl-output
+      - ./crawl-output:/app/crawl-output
+      - ./batch-output:/app/batch-output
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    mem_limit: 4g
     networks:
       - deepscrape-network
 
-  # Nginx reverse proxy for HTTPS
+  # Nginx reverse proxy for HTTPS — only started with `--profile proxy`
+  # (requires TLS certs in ./nginx/certs). The core app+redis stack runs without it.
   nginx:
     image: nginx:1.27-alpine
     container_name: deepscrape-nginx
     restart: unless-stopped
+    profiles: ["proxy"]
     ports:
       - "80:80"
       - "443:443"
@@ -65,14 +75,17 @@ services:
       - ./nginx/www:/var/www/certbot
       - ./nginx/certs:/etc/letsencrypt
     depends_on:
-      - deepscrape
+      deepscrape:
+        condition: service_healthy
     networks:
       - deepscrape-network
 
-  # Certbot for Let's Encrypt renewals
+  # Certbot for Let's Encrypt renewals — only with `--profile proxy`
   certbot:
     image: certbot/certbot:v2.10.0
     container_name: deepscrape-certbot
+    restart: unless-stopped
+    profiles: ["proxy"]
     volumes:
       - ./nginx/www:/var/www/certbot
       - ./nginx/certs:/etc/letsencrypt

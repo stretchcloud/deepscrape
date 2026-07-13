@@ -912,16 +912,16 @@ export class PlaywrightService extends EventEmitter {
         // Process batch concurrently with controlled parallelism
         await Promise.allSettled(
           batch.map(url => this.processUrlInBatch(
-            url, 
-            limit, 
-            browserPool, 
-            options, 
-            maxLinksPerPage, 
-            baseUrl, 
-            includePaths, 
-            excludePaths, 
-            excludeDomains, 
-            enableDeepCrawling, 
+            url,
+            limit,
+            browserPool,
+            options,
+            maxLinksPerPage,
+            baseUrl,
+            includePaths,
+            excludePaths,
+            excludeDomains,
+            enableDeepCrawling,
             currentDepth
           ))
         );
@@ -931,7 +931,7 @@ export class PlaywrightService extends EventEmitter {
       }
 
       currentDepth++;
-      
+
       // If deep crawling is disabled, only process the first depth level
       if (!enableDeepCrawling && currentDepth >= 1) {
         logger.info('Deep crawling disabled, stopping after first level');
@@ -945,7 +945,7 @@ export class PlaywrightService extends EventEmitter {
       maxDepthReached: currentDepth,
       enableDeepCrawling
     });
-    
+
     return Array.from(this.discoveredUrls);
   }
 
@@ -956,14 +956,14 @@ export class PlaywrightService extends EventEmitter {
     maxLinksPerPage?: number;
   }): Promise<PlaywrightResponse> {
     const maxLinksPerPage = options.maxLinksPerPage || 100;
-    
+
     try {
       // Set page timeout
       page.setDefaultTimeout(7000);
       page.setDefaultNavigationTimeout(7000);
-      
+
       // Navigate with timeout
-      await page.goto(url, { 
+      await page.goto(url, {
         waitUntil: 'domcontentloaded',
         timeout: 7000
       });
@@ -976,17 +976,17 @@ export class PlaywrightService extends EventEmitter {
         page.evaluate((maxLinks) => {
           const title = document.title;
           const content = document.body?.innerText || '';
-          
+
           // Get all links and limit them
           const linkElements = Array.from(document.querySelectorAll('a[href]'));
           const links = linkElements
             .map(el => (el as HTMLAnchorElement).href)
             .filter(href => href?.startsWith('http'))
             .slice(0, maxLinks); // Limit links per page
-          
+
           return { title, content, links };
         }, maxLinksPerPage),
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Page evaluation timeout')), 5000)
         )
       ]);
@@ -1025,7 +1025,7 @@ export class PlaywrightService extends EventEmitter {
 
       try {
         const linkUrl = new URL(link);
-        
+
         // Remove fragments (#) from URLs to avoid duplicate crawling
         linkUrl.hash = '';
         const cleanLink = linkUrl.toString();
@@ -1082,29 +1082,29 @@ export class PlaywrightService extends EventEmitter {
 
     try {
       const { page, browserId } = await this.acquirePageWithTimeout(browserPool);
-      
+
       try {
         const response = await this.crawlPageEnhanced(page, url, {
           ...options,
           maxLinksPerPage
         });
-        
+
         await this.processDiscoveryResponse(
-          url, 
-          response, 
-          baseUrl, 
-          includePaths, 
-          excludePaths, 
-          excludeDomains, 
-          enableDeepCrawling, 
-          currentDepth, 
+          url,
+          response,
+          baseUrl,
+          includePaths,
+          excludePaths,
+          excludeDomains,
+          enableDeepCrawling,
+          currentDepth,
           limit
         );
-        
+
       } finally {
         await this.releasePageSafely(page, browserId, browserPool, url);
       }
-      
+
     } catch (error) {
       this.handleDiscoveryError(error, url, currentDepth);
     } finally {
@@ -1120,19 +1120,19 @@ export class PlaywrightService extends EventEmitter {
       const urlObj = new URL(url);
       const path = urlObj.pathname.toLowerCase();
       const search = urlObj.search.toLowerCase();
-      
+
       // Skip login, signup, and authentication pages
-      if (path.includes('/signin') || path.includes('/login') || 
+      if (path.includes('/signin') || path.includes('/login') ||
           path.includes('/signup') || path.includes('/register') ||
           search.includes('signin') || search.includes('continue=')) {
         return false;
       }
-      
+
       // Skip pages with language parameters that might be duplicates
       if (search.includes('hl=') && !search.includes('hl=en')) {
         return false;
       }
-      
+
       return true;
     } catch {
       return false;
@@ -1145,7 +1145,7 @@ export class PlaywrightService extends EventEmitter {
   private async acquirePageWithTimeout(browserPool: any): Promise<{page: any, browserId: string}> {
     return Promise.race([
       browserPool.getPage(),
-      new Promise<never>((_, reject) => 
+      new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Browser pool timeout')), 10000)
       )
     ]);
@@ -1181,14 +1181,14 @@ export class PlaywrightService extends EventEmitter {
       const cleanUrl = new URL(link);
       cleanUrl.hash = '';
       const cleanLink = cleanUrl.toString();
-      
+
       if (!this.discoveredUrls.has(cleanLink)) {
         this.discoveredUrls.add(cleanLink);
-        
+
         if (enableDeepCrawling) {
           this.urlsToVisit.push(cleanLink);
         }
-        
+
         this.totalDiscovered++;
 
         this.emit('url-discovered', {
@@ -1216,8 +1216,8 @@ export class PlaywrightService extends EventEmitter {
     try {
       await browserPool.releasePage(page, browserId);
     } catch (releaseError) {
-      logger.warn(`Failed to release page for ${url}`, { 
-        error: (releaseError as Error).message 
+      logger.warn(`Failed to release page for ${url}`, {
+        error: (releaseError as Error).message
       });
     }
   }
@@ -1227,7 +1227,7 @@ export class PlaywrightService extends EventEmitter {
    */
   private handleDiscoveryError(error: unknown, url: string, currentDepth: number): void {
     const errorMessage = (error as Error).message;
-    if (!errorMessage.includes('Browser pool timeout') && 
+    if (!errorMessage.includes('Browser pool timeout') &&
         !errorMessage.includes('Page evaluation timeout')) {
       logger.error(`Enhanced discovery error for ${url}`, {
         error: errorMessage,
@@ -1407,9 +1407,9 @@ export class PlaywrightService extends EventEmitter {
     enableDeepCrawling?: boolean;
     browserPoolSize?: number;
   } = {}): Promise<string[]> {
-    const { 
-      maxDepth = 3, 
-      discoveryLimit = 100, 
+    const {
+      maxDepth = 3,
+      discoveryLimit = 100,
       timeout = 15000,
       maxConcurrency = 8,
       maxLinksPerPage = 100,

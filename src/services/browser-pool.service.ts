@@ -2,6 +2,8 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
 import { randomBytes } from 'crypto';
+import { proxyService } from './proxy.service';
+import { pickFingerprint, buildStealthInitScript } from '../scraper/stealth-hardening';
 
 export interface BrowserPoolOptions {
   maxBrowsers?: number;          // Maximum number of browsers in pool
@@ -16,6 +18,7 @@ export interface PooledContext {
   context: BrowserContext;
   id: string;
   activePages: number;
+  proxyServer?: string; // egress proxy this context routes through, if any
 }
 
 export interface PooledBrowser {
@@ -53,13 +56,42 @@ export class BrowserPoolService extends EventEmitter {
   private isShuttingDown = false;
   private readonly beingRemoved: Set<string> = new Set(); // Track browsers being removed to prevent race conditions
 
+  // Concurrency semaphore: caps total simultaneously-open pages at
+  // maxBrowsers * maxContextsPerBrowser so a burst of requests can't launch an
+  // unbounded number of Chromium processes (the classic OOM-after-hours cause).
+  private activePageCount = 0;
+  private readonly slotWaiters: Array<() => void> = [];
+
+  private get maxPages(): number {
+    return this.options.maxBrowsers * this.options.maxContextsPerBrowser;
+  }
+
+  /** Wait until a page slot is free, then reserve it. */
+  private async acquireSlot(): Promise<void> {
+    if (this.activePageCount < this.maxPages) {
+      this.activePageCount++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.slotWaiters.push(resolve));
+    this.activePageCount++;
+  }
+
+  /** Release a page slot and wake the next waiter, if any. */
+  private releaseSlot(): void {
+    this.activePageCount = Math.max(0, this.activePageCount - 1);
+    const next = this.slotWaiters.shift();
+    if (next) next();
+  }
+
   private constructor(options: BrowserPoolOptions = {}) {
     super();
 
     this.options = {
-      maxBrowsers: options.maxBrowsers ?? 5,
-      maxContextsPerBrowser: options.maxContextsPerBrowser ?? 10,
-      idleTimeout: options.idleTimeout ?? 300000, // 5 minutes
+      // Default to modest sizes and allow env overrides so the pool's memory
+      // footprint (each Chromium ≈ 150-300MB) can be tuned to the host/container.
+      maxBrowsers: options.maxBrowsers ?? Number(process.env.MAX_BROWSERS ?? 3),
+      maxContextsPerBrowser: options.maxContextsPerBrowser ?? Number(process.env.MAX_CONTEXTS_PER_BROWSER ?? 8),
+      idleTimeout: options.idleTimeout ?? Number(process.env.BROWSER_IDLE_TIMEOUT_MS ?? 300000),
       launchOptions: options.launchOptions ?? {},
       enableResourceBlocking: options.enableResourceBlocking ?? true,
       stealthMode: options.stealthMode ?? true
@@ -95,7 +127,7 @@ export class BrowserPoolService extends EventEmitter {
 
     const currentSize = this.browsers.size;
     const oldMaxBrowsers = this.options.maxBrowsers;
-    
+
     logger.info('Resizing browser pool', {
       fromMaxBrowsers: oldMaxBrowsers,
       toMaxBrowsers: newMaxBrowsers,
@@ -141,33 +173,61 @@ export class BrowserPoolService extends EventEmitter {
       throw new Error('Browser pool is shutting down');
     }
 
-    let browser = await this.getAvailableBrowser();
-    browser ??= await this.createBrowser();
+    // Block here until a page slot frees up — this is the hard concurrency cap.
+    await this.acquireSlot();
+    try {
+      const browser = await this.pickOrCreateBrowser();
 
-    const pooledContext = await this.getOrCreateContext(browser);
-    const page = await pooledContext.context.newPage();
+      const pooledContext = await this.getOrCreateContext(browser);
+      const page = await pooledContext.context.newPage();
 
-    // Configure page for optimal performance
-    await this.configurePage(page);
+      // Configure page for optimal performance
+      await this.configurePage(page);
 
-    browser.activePages++;
-    pooledContext.activePages++;
-    browser.lastUsed = new Date();
+      browser.activePages++;
+      pooledContext.activePages++;
+      browser.lastUsed = new Date();
 
-    logger.debug('Page acquired from browser pool', {
-      browserId: browser.id,
-      contextId: pooledContext.id,
-      activePages: browser.activePages,
-      totalBrowsers: this.browsers.size
-    });
+      logger.debug('Page acquired from browser pool', {
+        browserId: browser.id,
+        contextId: pooledContext.id,
+        activePages: browser.activePages,
+        totalBrowsers: this.browsers.size,
+        activePageCount: this.activePageCount
+      });
 
-    this.emit('pageAcquired', { browserId: browser.id, activePages: browser.activePages });
+      this.emit('pageAcquired', { browserId: browser.id, activePages: browser.activePages });
 
-    return {
-      page,
-      browserId: browser.id,
-      contextId: pooledContext.id
-    };
+      return { page, browserId: browser.id, contextId: pooledContext.id };
+    } catch (err) {
+      // Failed to actually open the page — give the slot back so we don't leak it.
+      this.releaseSlot();
+      throw err;
+    }
+  }
+
+  /**
+   * Choose a connected browser with spare context capacity (least-loaded first),
+   * or create a new one if we're under maxBrowsers. Because getPage() holds a
+   * semaphore slot, we can never be asked for more pages than the pool can hold.
+   */
+  private async pickOrCreateBrowser(): Promise<PooledBrowser> {
+    const candidates = Array.from(this.browsers.values())
+      .filter(b => !this.beingRemoved.has(b.id) && b.browser.isConnected() && b.contexts.length < this.options.maxContextsPerBrowser)
+      .sort((a, b) => a.activePages - b.activePages);
+
+    if (candidates.length > 0) {
+      return candidates[0];
+    }
+    if (this.browsers.size < this.options.maxBrowsers) {
+      return this.createBrowser();
+    }
+    // All browsers are at context capacity but a page slot was granted — reuse
+    // the least-loaded connected browser (it will get a fresh context/page).
+    const anyConnected = Array.from(this.browsers.values())
+      .filter(b => b.browser.isConnected())
+      .sort((a, b) => a.activePages - b.activePages)[0];
+    return anyConnected ?? this.createBrowser();
   }
 
   /**
@@ -183,13 +243,17 @@ export class BrowserPoolService extends EventEmitter {
       const browser = this.browsers.get(browserId);
       if (!browser) {
         logger.warn('Attempting to release page from unknown browser', { browserId });
-        await page.close();
+        await page.close().catch(() => {});
         return;
       }
 
-      // Close the page
-      if (!page.isClosed()) {
-        await page.close();
+      // Close the page (never let a failure here skip the accounting below).
+      try {
+        if (!page.isClosed()) {
+          await page.close();
+        }
+      } catch (closeErr) {
+        logger.debug(`Page close failed (browser likely crashed): ${(closeErr as Error).message}`);
       }
 
       browser.activePages = Math.max(0, browser.activePages - 1);
@@ -202,14 +266,16 @@ export class BrowserPoolService extends EventEmitter {
           pooledContext.activePages = Math.max(0, pooledContext.activePages - 1);
           const pages = pooledContext.context.pages();
           if (pages.length === 0) {
-            await pooledContext.context.close();
+            await pooledContext.context.close().catch(() => {});
             browser.contexts = browser.contexts.filter(ctx => ctx.id !== contextId);
           }
         }
       }
 
-      // Make browser available if it's not overloaded
-      if (browser.activePages === 0 && !this.availableBrowsers.includes(browserId)) {
+      // A crashed/disconnected browser must be evicted, not returned to the pool.
+      if (!browser.browser.isConnected()) {
+        await this.removeBrowser(browserId);
+      } else if (browser.activePages === 0 && !this.availableBrowsers.includes(browserId)) {
         this.availableBrowsers.push(browserId);
       }
 
@@ -226,6 +292,10 @@ export class BrowserPoolService extends EventEmitter {
         browserId,
         error: (error as Error).message
       });
+    } finally {
+      // Always give the page slot back, even if cleanup above threw — otherwise
+      // the semaphore leaks and the pool eventually deadlocks.
+      this.releaseSlot();
     }
   }
 
@@ -311,7 +381,7 @@ export class BrowserPoolService extends EventEmitter {
     };
 
     const browser = await chromium.launch(launchOptions);
-    const browserId = `browser-${Date.now()}-${randomBytes(6).toString('hex')}`;
+    const browserId = `browser-${randomBytes(9).toString('hex')}`;
 
     const pooledBrowser: PooledBrowser = {
       browser,
@@ -321,6 +391,16 @@ export class BrowserPoolService extends EventEmitter {
       lastUsed: new Date(),
       id: browserId
     };
+
+    // Evict immediately if Chromium crashes/disconnects, so dead entries don't
+    // accumulate and force needless new launches.
+    browser.on('disconnected', () => {
+      if (!this.beingRemoved.has(browserId)) {
+        this.browsers.delete(browserId);
+        this.availableBrowsers = this.availableBrowsers.filter(id => id !== browserId);
+        logger.warn('Browser disconnected — evicted from pool', { browserId });
+      }
+    });
 
     this.browsers.set(browserId, pooledBrowser);
 
@@ -341,15 +421,24 @@ export class BrowserPoolService extends EventEmitter {
   private async getOrCreateContext(browser: PooledBrowser): Promise<PooledContext> {
     // Reuse existing context if under limit
     if (browser.contexts.length < this.options.maxContextsPerBrowser) {
+      // Rotate egress proxies across new contexts when a pool is configured. This
+      // distributes traffic and composes with the SSRF pre-flight (the browser
+      // still only navigates to targets the manager already vetted).
+      const proxy = proxyService.next();
+      // Fingerprint hygiene: use one internally-consistent profile per context so
+      // UA/platform/locale/timezone/WebGL all agree, then patch automation leaks.
+      const fp = this.options.stealthMode ? pickFingerprint() : null;
       const context = await browser.browser.newContext({
-        viewport: { width: 1920, height: 1080 },
-        userAgent: this.getRandomUserAgent(),
-        ...(this.options.stealthMode ? {
-          extraHTTPHeaders: {
-            'Accept-Language': 'en-US,en;q=0.9'
-          }
-        } : {})
+        viewport: fp ? fp.viewport : { width: 1920, height: 1080 },
+        userAgent: fp ? fp.userAgent : this.getRandomUserAgent(),
+        ...(fp ? { locale: fp.locale, timezoneId: fp.timezoneId, extraHTTPHeaders: { 'Accept-Language': `${fp.locale},en;q=0.9` } } : {}),
+        ...(proxy ? { proxy: { server: proxy.server, username: proxy.username, password: proxy.password } } : {})
       });
+
+      // Patch automation leaks (webdriver/chrome/plugins/WebGL) to match the profile.
+      if (fp) {
+        await context.addInitScript(buildStealthInitScript(fp));
+      }
 
       // Configure context for performance
       if (this.options.enableResourceBlocking) {
@@ -359,7 +448,8 @@ export class BrowserPoolService extends EventEmitter {
       const pooledContext: PooledContext = {
         context,
         id: `ctx-${Date.now()}-${randomBytes(4).toString('hex')}`,
-        activePages: 0
+        activePages: 0,
+        proxyServer: proxy?.server
       };
 
       browser.contexts.push(pooledContext);
@@ -393,22 +483,8 @@ export class BrowserPoolService extends EventEmitter {
       });
     }
 
-    // Stealth mode configuration
-    if (this.options.stealthMode) {
-      await page.addInitScript(() => {
-        // Remove webdriver property
-        delete (window as any).navigator.webdriver;
-
-        // Mock languages and plugins
-        Object.defineProperty(window.navigator, 'languages', {
-          get: () => ['en-US', 'en']
-        });
-
-        Object.defineProperty(window.navigator, 'plugins', {
-          get: () => [1, 2, 3, 4, 5]
-        });
-      });
-    }
+    // Stealth/fingerprint hygiene is applied once at the context level
+    // (see getOrCreateContext -> buildStealthInitScript), so nothing to do per-page.
   }
 
   /**
@@ -488,20 +564,20 @@ export class BrowserPoolService extends EventEmitter {
     try {
       // Remove from available list immediately
       this.availableBrowsers = this.availableBrowsers.filter(id => id !== browserId);
-      
+
       // Close all contexts safely
       const contextClosePromises = browser.contexts.map(async (ctx) => {
         try {
           await ctx.context.close();
         } catch (error) {
-          logger.debug('Error closing context (may already be closed)', { 
-            browserId, 
+          logger.debug('Error closing context (may already be closed)', {
+            browserId,
             contextId: ctx.id,
-            error: (error as Error).message 
+            error: (error as Error).message
           });
         }
       });
-      
+
       await Promise.allSettled(contextClosePromises);
 
       // Close browser safely
@@ -510,9 +586,9 @@ export class BrowserPoolService extends EventEmitter {
           await browser.browser.close();
         }
       } catch (error) {
-        logger.debug('Error closing browser (may already be closed)', { 
-          browserId, 
-          error: (error as Error).message 
+        logger.debug('Error closing browser (may already be closed)', {
+          browserId,
+          error: (error as Error).message
         });
       }
 

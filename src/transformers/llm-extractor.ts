@@ -6,23 +6,26 @@ import {
   Schema
 } from '../types/schema';
 import { logger } from '../utils/logger';
+import Ajv, { ValidateFunction } from 'ajv';
+import addFormats from 'ajv-formats';
+import { chunkText, estimateTokens } from './chunker';
+import { scoreExtraction } from './confidence-scorer';
 
-/**
- * Limit token size to prevent exceeding model limits
- * @param text The text to limit
- * @param maxTokens Maximum number of tokens
- */
-function limitTextSize(text: string, maxTokens = 15000): string {
-  // Simple approximation: 1 token ≈ 4 characters for English text
-  const maxCharacters = maxTokens * 4;
+// Shared Ajv instance for validating LLM extraction output against user schemas.
+const ajv = new Ajv({ allErrors: true, strict: false, coerceTypes: true });
+addFormats(ajv);
 
-  if (text.length <= maxCharacters) {
-    return text;
+/** Compile+validate `data` against a JSON schema; returns errors (empty if valid). */
+function validateAgainstSchema(schema: unknown, data: unknown): string[] {
+  try {
+    const validate: ValidateFunction = ajv.compile(schema as object);
+    if (validate(data)) return [];
+    return (validate.errors ?? []).map(e => `${e.instancePath || '/'} ${e.message}`);
+  } catch (err) {
+    // A schema we can't compile shouldn't hard-fail extraction; log and pass.
+    logger.warn(`Could not compile extraction schema for validation: ${(err as Error).message}`);
+    return [];
   }
-
-  // If text is too long, cut it and add a note
-  return text.substring(0, maxCharacters) +
-    '\n\n[Note: Content was truncated due to length limitations.]';
 }
 
 export class LLMExtractor {
@@ -56,59 +59,75 @@ export class LLMExtractor {
         };
       }
 
-      // Limit content size to prevent token limit issues
-      const limitedContent = limitTextSize(content, 15000);
+      // Token-aware chunking: instead of silently truncating long pages at 15k
+      // chars, split into token-budgeted chunks (with overlap), extract from
+      // each, and merge. Small pages are a single chunk (no behavior change).
+      const budgetTokens = Number(process.env.MAX_EXTRACTION_TOKENS ?? 15000);
+      const chunks = estimateTokens(content) <= budgetTokens
+        ? [content]
+        : chunkText(content, { maxTokens: budgetTokens, overlapRate: 0.1 });
 
-      // Format extraction prompt based on extraction type
-      const messages = this.createExtractionPrompt(
-        limitedContent,
-        scraperResponse.title,
-        scraperResponse.url,
-        options
-      );
+      logger.info(`LLM extraction over ${chunks.length} chunk(s) for URL: ${scraperResponse.url}`);
 
-      // Configure response format as JSON if a schema is provided
-      const responseFormat = options.schema
-        ? { type: 'json_object' }
-        : undefined;
-
-      // Make the LLM API call
-      const llmResponse = await this.llmService.getCompletion<T>(
-        messages,
-        {
-          temperature: options.temperature || 0.2,
-          maxTokens: options.maxTokens || 4000
-        },
-        responseFormat
-      );
+      const partials: any[] = [];
+      let lastError: string | undefined;
+      for (const chunk of chunks) {
+        const r = await this.callLlmOnce<T>(chunk, scraperResponse.title, scraperResponse.url, options);
+        if (r.success) {
+          partials.push(r.data);
+        } else {
+          lastError = r.error;
+        }
+      }
 
       const extractionTime = Date.now() - startTime;
 
-      if (!llmResponse.success) {
-        logger.error(`LLM extraction failed: ${llmResponse.error}`);
+      if (partials.length === 0) {
+        logger.error(`LLM extraction failed: ${lastError}`);
         return {
           ...scraperResponse,
-          extractionResult: {
-            success: false,
-            error: llmResponse.error,
-            metadata: {
-              extractionTime
-            }
-          }
+          extractionResult: { success: false, error: lastError ?? 'LLM extraction failed', metadata: { extractionTime } }
         };
       }
 
-      // Add the structured data to the response
-      logger.info(`LLM extraction completed successfully in ${extractionTime}ms`);
+      // Merge chunk results (concat arrays, fill/union objects, join text).
+      const merged = this.mergeExtractions(partials, options);
+
+      // Validate the MERGED result against the schema, if one was supplied.
+      if (options.schema) {
+        const validationErrors = validateAgainstSchema(options.schema, merged);
+        if (validationErrors.length > 0) {
+          logger.warn(`LLM output failed schema validation: ${validationErrors.slice(0, 5).join('; ')}`);
+          return {
+            ...scraperResponse,
+            extractionResult: {
+              success: false,
+              error: `Extracted data did not match the requested schema: ${validationErrors.slice(0, 5).join('; ')}`,
+              data: merged,
+              metadata: { extractionTime }
+            }
+          };
+        }
+      }
+
+      // Deterministic confidence: ground each extracted field against the source
+      // so hallucinated (not-in-source) and omitted (empty) fields are flagged.
+      const confidence = scoreExtraction(merged, content);
+      if (confidence.suspect.length > 0) {
+        logger.warn(`LLM extraction: ${confidence.suspect.length} field(s) not grounded in source (possible hallucination): ${confidence.suspect.join(', ')}`);
+      }
+
+      logger.info(`LLM extraction completed successfully in ${extractionTime}ms (${chunks.length} chunk(s)), confidence ${confidence.overall}`);
       return {
         ...scraperResponse,
-        structuredData: llmResponse.data,
+        structuredData: merged,
         extractionResult: {
           success: true,
-          data: llmResponse.data,
+          data: merged,
           metadata: {
             extractionTime,
-            modelName: this.llmService.model || 'gpt-4o'
+            modelName: this.llmService.model || 'gpt-4o',
+            confidence
           }
         }
       };
@@ -123,6 +142,67 @@ export class LLMExtractor {
         }
       };
     }
+  }
+
+  /**
+   * Run a single LLM extraction call over one chunk of content.
+   */
+  private async callLlmOnce<T>(
+    content: string,
+    title: string,
+    url: string,
+    options: ExtractionOptions
+  ): Promise<{ success: boolean; data?: T; error?: string }> {
+    const messages = this.createExtractionPrompt(content, title, url, options);
+    const responseFormat = options.schema ? { type: 'json_object' } : undefined;
+    const llmResponse = await this.llmService.getCompletion<T>(
+      messages,
+      { temperature: options.temperature || 0.2, maxTokens: options.maxTokens || 4000 },
+      responseFormat
+    );
+    return { success: llmResponse.success, data: llmResponse.data, error: llmResponse.error };
+  }
+
+  /**
+   * Merge per-chunk extraction results into one.
+   * - Single chunk: returned as-is.
+   * - Summaries / QA (strings): concatenated.
+   * - Arrays: concatenated (e.g. lists of items across chunks).
+   * - Objects: unioned — the first non-empty value for each key wins; array-valued
+   *   fields are concatenated.
+   */
+  private mergeExtractions(partials: any[], options: ExtractionOptions): any {
+    if (partials.length === 1) return partials[0];
+
+    // Text results (summary/qa) -> join.
+    if (partials.every(p => typeof p === 'string')) {
+      return partials.join('\n\n');
+    }
+
+    // Array results -> concat.
+    if (partials.every(p => Array.isArray(p))) {
+      return ([] as any[]).concat(...partials);
+    }
+
+    // Object results -> union fields.
+    if (partials.every(p => p && typeof p === 'object' && !Array.isArray(p))) {
+      const merged: Record<string, any> = {};
+      for (const part of partials) {
+        for (const [key, value] of Object.entries(part)) {
+          const existing = merged[key];
+          if (Array.isArray(existing) && Array.isArray(value)) {
+            merged[key] = existing.concat(value);
+          } else if (existing === undefined || existing === null || existing === '' ||
+                     (Array.isArray(existing) && existing.length === 0)) {
+            merged[key] = value;
+          }
+        }
+      }
+      return merged;
+    }
+
+    // Mixed shapes -> return the first successful partial.
+    return partials[0];
   }
 
   /**

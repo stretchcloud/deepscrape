@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { MapController } from '../controllers/map.controller';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
+import { expensiveLimiter } from '../middleware/rate-limit.middleware';
 import { z } from 'zod';
 
 // Validation schema for map request
@@ -160,6 +161,7 @@ const mapController = new MapController();
  */
 router.post(
   '/',
+  expensiveLimiter,
   apiKeyAuth,
   validateRequest(mapRequestSchema),
   mapController.discoverUrls.bind(mapController)

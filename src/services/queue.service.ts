@@ -1,6 +1,6 @@
 import { Job, Worker } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
-import { redisClient, markCrawlJobDone, addCrawlJob } from './redis.service';
+import { redisClient, markCrawlJobDone, addCrawlJob, addCrawlJobs } from './redis.service';
 import { logger } from '../utils/logger';
 import { processCrawlJob, setAddJobsToQueueFn } from '../scraper/crawler-processor';
 import { EnhancedQueueService } from './enhanced-queue.service';
@@ -30,8 +30,10 @@ export async function initQueue(): Promise<void> {
   // Inject the queue function to break circular dependency
   setAddJobsToQueueFn(addCrawlJobsToQueue);
 
-  // Ensure the queue is empty when starting - access through enhancedQueue
-  await crawlQueue.obliterate({ force: true });
+  // NOTE: We deliberately do NOT obliterate the queue on boot. Wiping it on
+  // every restart destroyed all in-flight crawls (their Redis state survived,
+  // leaving them permanently "scraping") and made multi-instance deploys
+  // impossible. BullMQ's persistence + retries are meant to survive restarts.
   logger.info('Enhanced crawler queue initialized');
 }
 
@@ -48,13 +50,14 @@ export async function addCrawlJobToQueue(
   // First add to Redis for tracking
   await addCrawlJob(crawlId, jobId);
 
-  // Use enhanced queue service to add job
+  // Pass the SAME id as the BullMQ jobId so tracked ids match completion ids.
   await enhancedQueue.addJob(jobId, {
     ...jobData,
     crawlId,
     jobId
   }, {
     priority,
+    jobId
   });
 
   return jobId;
@@ -70,12 +73,13 @@ export async function addCrawlJobsToQueue(
 
   const jobIds = jobsData.map(() => uuidv4());
 
-  // Use enhanced queue service for bulk operations
+  // Track all job ids in Redis, then enqueue with matching explicit BullMQ ids.
+  await addCrawlJobs(crawlId, jobIds);
   await enhancedQueue.addBulkJobs(
     jobsData.map((data, index) => ({
       name: jobIds[index],
       data: { ...data, crawlId, jobId: jobIds[index] },
-      opts: { priority }
+      opts: { priority, jobId: jobIds[index] }
     }))
   );
 
@@ -92,7 +96,8 @@ export function initializeWorker(): Worker {
       // Process the job using the crawler processor
       const result = await processCrawlJob(job);
 
-      // Mark job as completed in Redis
+      // Mark job as completed in Redis (single source of truth — the previous
+      // duplicate marking in the 'completed' event listener has been removed).
       if (job.data.crawlId) {
         await markCrawlJobDone(job.data.crawlId, job.id as string, true, result);
       }
@@ -102,28 +107,26 @@ export function initializeWorker(): Worker {
     } catch (error: any) {
       logger.error(`Job ${job.id} failed: ${error.message}`, { error });
 
-      // Mark job as failed in Redis
-      if (job.data.crawlId) {
-        await markCrawlJobDone(job.data.crawlId, job.id as string, false);
+      // Only record a terminal failure once retries are exhausted — otherwise an
+      // intermediate attempt failure would be counted while BullMQ still retries.
+      // During the processor, BullMQ's `attemptsMade` is 0-indexed (count of prior
+      // failed attempts), so the current attempt number is `attemptsMade + 1` and
+      // the final attempt is when that reaches the configured max.
+      const attemptsAllowed = job.opts.attempts ?? 1;
+      const isFinalAttempt = job.attemptsMade + 1 >= attemptsAllowed;
+      if (job.data.crawlId && isFinalAttempt) {
+        await markCrawlJobDone(job.data.crawlId, job.id as string, false, null, {
+          url: job.data.url,
+          error: error?.message ?? String(error)
+        });
       }
 
       throw error;
     }
   });
 
-  // Additional event handlers for crawler-specific logic
-  worker.on('completed', (job) => {
-    logger.debug('Crawler job completed', { jobId: job.id });
-
-    // Store the full job result in Redis
-    if (job.data.crawlId && job.returnvalue) {
-      markCrawlJobDone(job.data.crawlId, job.id as string, true, job.returnvalue)
-        .catch(err => logger.error(`Error storing job result in Redis: ${err.message}`, { jobId: job.id }));
-    }
-  });
-
   worker.on('failed', (job, error) => {
-    logger.error('Crawler job failed', { jobId: job?.id, error });
+    logger.error('Crawler job failed', { jobId: job?.id, error: error?.message });
   });
 
   logger.info('Enhanced crawler worker initialized with advanced features', {

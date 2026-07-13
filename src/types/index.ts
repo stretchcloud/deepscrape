@@ -12,6 +12,13 @@ export interface ScraperOptions {
   fullPage?: boolean;
   javascript?: boolean;
   extractorFormat?: 'html' | 'markdown' | 'text';
+  onlyMainContent?: boolean; // Extract only the main content, stripping nav/footer/ads (default true)
+  fitMarkdown?: boolean; // Use the pruning content filter for high-fidelity "fit markdown" (default true)
+  includeRawHtml?: boolean; // Attach the raw pre-clean HTML to the response (used for crawl link discovery)
+  formats?: string[]; // Multi-format output in one request: any of markdown|html|rawHtml|text|links|screenshot|pdf|mhtml|tables
+  capturePdf?: boolean; // Render the page to PDF (browser path)
+  captureMhtml?: boolean; // Capture an MHTML snapshot (browser path)
+  executeJs?: string; // Arbitrary JS to evaluate in the page; result returned in jsResult (gated by ENABLE_JS_EXECUTION)
   actions?: BrowserAction[];
   url?: string; // For cookie domain when no URL is provided in launch options
   puppeteerLaunchOptions?: Record<string, any>;
@@ -21,6 +28,7 @@ export interface ScraperOptions {
 
   // Browser-based crawling options
   useBrowser?: boolean; // Use browser-based crawling with Playwright
+  preferHttpScraper?: boolean; // Use the fast HTTP (axios) scraper first; only fall back to Playwright if it fails/returns empty (great for server-rendered sites)
   stealthMode?: boolean; // Enable stealth mode to avoid detection
   maxScrolls?: number; // Maximum number of scrolls for extracting dynamic content
 
@@ -77,6 +85,13 @@ export interface ScraperResponse {
   screenshot?: Buffer;
   error?: string;
   extractedData?: any;
+  structuredData?: any;               // Structured data from CSS or LLM extraction
+  extractionResult?: any;             // Full extraction result (success/data/error/metadata)
+  rawHtml?: string;                   // Raw pre-clean HTML (when includeRawHtml is set)
+  formats?: Record<string, any>;      // Multi-format output {markdown, html, rawHtml, text, links, screenshot, pdf, mhtml, tables}
+  pdf?: Buffer;                       // Rendered PDF (when capturePdf)
+  mhtml?: string;                     // MHTML snapshot (when captureMhtml)
+  jsResult?: any;                     // Result of executeJs
 }
 
 // API request

@@ -4,11 +4,19 @@ import { HttpScraper } from './http-scraper';
 import { ContentCleaner } from '../transformers/content-cleaner';
 import { HtmlToMarkdownTransformer } from '../transformers/html-to-markdown';
 import { LLMExtractor } from '../transformers/llm-extractor';
+import { extractWithCssSchema } from '../transformers/css-extractor';
+import { pruneToFitHtml } from '../transformers/content-filter';
+import { extractTables } from '../transformers/table-extractor';
+import { extractContacts } from '../transformers/contact-extractor';
+import { computeChange } from '../services/change-tracking.service';
+import { extractChildLinks } from './crawl-links';
 import { LLMServiceFactory } from '../services/llm-service-factory';
 import { CacheService } from '../services/cache.service';
 import { ExtractionOptions } from '../types/schema';
 import { logger } from '../utils/logger';
+import { assertPublicUrl, SsrfError } from '../utils/ssrf-guard';
 import * as cheerio from 'cheerio';
+import { createHash } from 'crypto';
 
 export class ScraperManager {
   private readonly playwriteScraper: PlaywrightScraper;
@@ -38,15 +46,43 @@ export class ScraperManager {
   /**
    * Generate a unique cache key for a scrape request
    */
-  private generateCacheKey(url: string, options: ScraperOptions): string {
-    // Create a simplified version of options for the cache key
+  private generateCacheKey(
+    url: string,
+    options: ScraperOptions & { extractionOptions?: ExtractionOptions }
+  ): string {
+    // The cache key MUST incorporate every option that changes the produced
+    // result, otherwise two different requests to the same URL can collide and
+    // return each other's data (e.g. different LLM extraction schemas).
     const cacheableOptions = {
       extractorFormat: options.extractorFormat,
       waitForSelector: options.waitForSelector,
-      actions: options.actions
+      actions: options.actions,
+      useBrowser: options.useBrowser,
+      onlyMainContent: options.onlyMainContent,
+      fitMarkdown: options.fitMarkdown,
+      waitForTimeout: options.waitForTimeout,
+      stealthMode: options.stealthMode,
+      skipTlsVerification: options.skipTlsVerification,
+      headers: options.headers,
+      // Extraction changes the output shape entirely — include it in full
+      // (cssSchema included so different extraction schemas never collide).
+      extraction: options.extractionOptions
+        ? {
+            type: options.extractionOptions.extractionType,
+            schema: options.extractionOptions.schema,
+            cssSchema: options.extractionOptions.cssSchema,
+            instructions: options.extractionOptions.instructions,
+            promptFormat: options.extractionOptions.promptFormat,
+            exampleData: options.extractionOptions.exampleData
+          }
+        : undefined
     };
 
-    return `${url}:${JSON.stringify(cacheableOptions)}`;
+    const hash = createHash('sha256')
+      .update(JSON.stringify(cacheableOptions))
+      .digest('hex')
+      .slice(0, 32);
+    return `${url}:${hash}`;
   }
 
   /**
@@ -107,6 +143,17 @@ export class ScraperManager {
    * Get raw content using scrapers with fallback
    */
   private async getRawContent(url: string, options: ScraperOptions): Promise<ScraperResponse> {
+    // Fast path: for server-rendered sites, the HTTP (axios) scraper is ~10x
+    // faster than launching a browser. Try it first when requested and only fall
+    // back to Playwright if it errors or returns empty content.
+    if (options.preferHttpScraper && !options.useBrowser) {
+      const httpResponse = await this.httpScraper.scrape(url, options);
+      if (!httpResponse.error && httpResponse.content && httpResponse.content.trim().length > 200) {
+        return httpResponse;
+      }
+      logger.info(`HTTP scrape thin/failed for ${url}, falling back to Playwright`);
+    }
+
     let scraperResponse = await this.playwriteScraper.scrape(url, options);
 
     // Try HTTP scraper as fallback if Playwright fails
@@ -144,7 +191,13 @@ export class ScraperManager {
     logger.info(`Processing response. Content type: ${cleanedResponse.contentType}, Extractor format: ${options.extractorFormat}`);
 
     if (options.extractorFormat === 'markdown') {
-      processedResponse = this.convertToMarkdown(cleanedResponse);
+      // Honor onlyMainContent (default true). false = keep the full page.
+      // fitMarkdown (default true) uses the pruning content filter for fidelity.
+      processedResponse = this.convertToMarkdown(
+        cleanedResponse,
+        options.onlyMainContent !== false,
+        options.fitMarkdown !== false
+      );
     } else if (options.extractorFormat === 'text') {
       processedResponse = this.extractTextOnly(cleanedResponse);
     }
@@ -155,7 +208,7 @@ export class ScraperManager {
   /**
    * Convert content to markdown format
    */
-  private convertToMarkdown(response: ScraperResponse): ScraperResponse {
+  private convertToMarkdown(response: ScraperResponse, onlyMainContent = true, fitMarkdown = true): ScraperResponse {
     logger.info('Converting HTML to Markdown');
 
     if (response.contentType !== 'html') {
@@ -168,7 +221,7 @@ export class ScraperManager {
       return response;
     }
 
-    const processedResponse = this.markdownTransformer.transform(response);
+    const processedResponse = this.markdownTransformer.transform(response, onlyMainContent, fitMarkdown);
     logger.info(`Markdown conversion complete. Content length: ${processedResponse.content.length}`);
     return processedResponse;
   }
@@ -195,8 +248,120 @@ export class ScraperManager {
       return extractionResult;
     } else {
       logger.warn('Extraction options provided but LLM extractor failed to initialize');
+      // Surface *why* extraction didn't run so callers (e.g. /api/extract sources)
+      // report a concrete reason instead of a silent success:false.
+      return {
+        ...processedResponse,
+        extractionResult: {
+          success: false,
+          error: 'LLM extractor not configured (set OPENAI_API_KEY or an LLM provider)',
+        },
+      };
+    }
+  }
+
+  /**
+   * Apply deterministic CSS-selector extraction (no LLM). Runs against the raw
+   * HTML so selectors match the real document, not the transformed markdown.
+   */
+  private applyCssExtraction(
+    processedResponse: ScraperResponse,
+    rawHtml: string | null,
+    extractionOptions: ExtractionOptions
+  ): ScraperResponse {
+    const start = Date.now();
+    const html = rawHtml || (processedResponse.contentType === 'html' ? processedResponse.content : '');
+    if (!html || !extractionOptions.cssSchema) {
       return processedResponse;
     }
+    try {
+      const records = extractWithCssSchema(html, extractionOptions.cssSchema);
+      logger.info(`CSS extraction produced ${records.length} record(s) in ${Date.now() - start}ms`);
+      return {
+        ...processedResponse,
+        structuredData: records,
+        extractionResult: {
+          success: true,
+          data: records as any,
+          metadata: { extractionTime: Date.now() - start, modelName: 'css-selector' }
+        }
+      };
+    } catch (error) {
+      logger.error(`CSS extraction failed: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        ...processedResponse,
+        extractionResult: { success: false, error: `CSS extraction error: ${(error as Error).message}` }
+      };
+    }
+  }
+
+  /**
+   * Build the requested output formats from the raw HTML in a single pass, so a
+   * caller can get markdown + html + links + screenshot etc. without N requests.
+   */
+  private buildRequestedFormats(
+    url: string,
+    rawHtml: string | null,
+    rawScrape: ScraperResponse,
+    options: ScraperOptions
+  ): Record<string, any> {
+    const formats: Record<string, any> = {};
+    const requested = new Set((options.formats || []).map(f => f.toLowerCase()));
+    const html = rawHtml || (rawScrape.contentType === 'html' ? rawScrape.content : '') || '';
+    const onlyMain = options.onlyMainContent !== false;
+    const fit = options.fitMarkdown !== false;
+
+    for (const fmt of requested) {
+      try {
+        switch (fmt) {
+          case 'rawhtml':
+            formats.rawHtml = html;
+            break;
+          case 'html':
+            formats.html = fit && onlyMain
+              ? pruneToFitHtml(html, { preserveTags: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td'] })
+              : html;
+            break;
+          case 'markdown':
+            formats.markdown = this.markdownTransformer.transform(
+              { ...rawScrape, content: html, contentType: 'html' },
+              onlyMain,
+              fit
+            ).content;
+            break;
+          case 'text':
+            formats.text = cheerio.load(html).root().text().replace(/\s+/g, ' ').trim();
+            break;
+          case 'links':
+            formats.links = extractChildLinks(html, url);
+            break;
+          case 'screenshot':
+            formats.screenshot = rawScrape.screenshot
+              ? `data:image/png;base64,${rawScrape.screenshot.toString('base64')}`
+              : null;
+            break;
+          case 'pdf':
+            formats.pdf = rawScrape.pdf
+              ? `data:application/pdf;base64,${rawScrape.pdf.toString('base64')}`
+              : null;
+            break;
+          case 'mhtml':
+            formats.mhtml = rawScrape.mhtml ?? null;
+            break;
+          case 'tables':
+            formats.tables = extractTables(html);
+            break;
+          case 'contacts':
+            formats.contacts = extractContacts(html, url);
+            break;
+          default:
+            logger.warn(`Unknown format requested: ${fmt}`);
+        }
+      } catch (err) {
+        logger.warn(`Failed to build format '${fmt}' for ${url}: ${(err as Error).message}`);
+      }
+    }
+    return formats;
   }
 
   /**
@@ -255,6 +420,47 @@ export class ScraperManager {
     try {
       logger.info(`Starting scraping process for URL: ${url}`);
 
+      // SSRF pre-flight: reject private/loopback/metadata targets before any I/O.
+      try {
+        await assertPublicUrl(url);
+      } catch (guardError) {
+        if (guardError instanceof SsrfError) {
+          logger.warn(`Scrape blocked by SSRF guard: ${guardError.message}`);
+          return {
+            url,
+            title: '',
+            content: '',
+            contentType: 'html',
+            metadata: { timestamp: new Date().toISOString(), status: 0, headers: {}, processingTime: Date.now() - startTime },
+            error: 'Blocked: target URL resolves to a non-public address'
+          };
+        }
+        throw guardError;
+      }
+
+      // Multi-format requests (and JS execution) bypass the cache — formats are
+      // derived post-cache and can be large/binary, and JS results are dynamic.
+      const multiFormat = Array.isArray(options.formats) && options.formats.length > 0;
+      if (multiFormat || options.executeJs) {
+        options.skipCache = true;
+      }
+
+      // screenshot/pdf/mhtml capture and JS execution require the per-request
+      // Playwright path (extractPageData captures them) — NOT the pooled useBrowser
+      // path. Force the browser + the relevant capture flags, disable the HTTP fast
+      // path, and leave useBrowser off.
+      const fmts = multiFormat ? options.formats!.map(f => f.toLowerCase()) : [];
+      const wantScreenshot = fmts.includes('screenshot');
+      const wantPdf = fmts.includes('pdf');
+      const wantMhtml = fmts.includes('mhtml');
+      if (wantScreenshot || wantPdf || wantMhtml || options.executeJs) {
+        options.preferHttpScraper = false;
+        options.useBrowser = false;
+        if (wantScreenshot) options.fullPage = true;
+        if (wantPdf) options.capturePdf = true;
+        if (wantMhtml) options.captureMhtml = true;
+      }
+
       // Check cache first
       const cachedResponse = await this.checkCache(cacheKey, url, options.skipCache || false);
       if (cachedResponse) {
@@ -268,6 +474,10 @@ export class ScraperManager {
         return scraperResponse;
       }
 
+      // Capture the raw HTML before cleaning/transformation for callers that need
+      // it (e.g. crawl link discovery), so they don't have to re-fetch the page.
+      const rawHtml = scraperResponse.contentType === 'html' ? scraperResponse.content : null;
+
       // Clean content
       const cleanedResponse = this.cleanHtmlContent(scraperResponse);
       if (cleanedResponse.error && !scraperResponse.error) {
@@ -277,11 +487,45 @@ export class ScraperManager {
       // Apply transformations
       let processedResponse = this.applyContentTransformations(cleanedResponse, options);
 
-      // Apply LLM extraction
-      processedResponse = await this.applyLLMExtraction<T>(processedResponse, options);
+      // Apply extraction: deterministic CSS (no LLM) takes precedence, else LLM.
+      if (options.extractionOptions?.cssSchema) {
+        processedResponse = this.applyCssExtraction(processedResponse, rawHtml, options.extractionOptions);
+      } else if (options.extractionOptions) {
+        processedResponse = await this.applyLLMExtraction<T>(processedResponse, options);
+      }
 
       // Finalize and cache
-      return await this.finalizeResponse(processedResponse, url, startTime, cacheKey, options);
+      const finalResponse = await this.finalizeResponse(processedResponse, url, startTime, cacheKey, options);
+
+      // Attach raw HTML AFTER caching so we don't bloat the cache; callers that
+      // set includeRawHtml (crawl discovery) get it on fresh scrapes.
+      if (options.includeRawHtml && rawHtml) {
+        (finalResponse as ScraperResponse & { rawHtml?: string }).rawHtml = rawHtml;
+      }
+
+      // Multi-format output: derive every requested format from the raw HTML in
+      // one request (markdown/html/rawHtml/text/links/screenshot/pdf/mhtml/tables).
+      if (Array.isArray(options.formats) && options.formats.length > 0) {
+        finalResponse.formats = this.buildRequestedFormats(url, rawHtml, scraperResponse, options);
+
+        // Change tracking: diff the main-content markdown against the last snapshot.
+        const fmtSet = new Set(options.formats.map(f => f.toLowerCase()));
+        if (fmtSet.has('changetracking') || fmtSet.has('change-tracking')) {
+          const md: string = finalResponse.formats.markdown
+            ?? this.markdownTransformer.transform(
+                 { ...scraperResponse, content: rawHtml || scraperResponse.content, contentType: 'html' },
+                 options.onlyMainContent !== false,
+                 options.fitMarkdown !== false
+               ).content;
+          const fp = `${options.onlyMainContent !== false}|${options.fitMarkdown !== false}`;
+          finalResponse.formats.changeTracking = await computeChange(url, fp, md || '');
+        }
+      }
+      // Surface arbitrary-JS execution result.
+      if (options.executeJs && scraperResponse.jsResult !== undefined) {
+        finalResponse.jsResult = scraperResponse.jsResult;
+      }
+      return finalResponse;
 
     } catch (error) {
       logger.error(`Unexpected error during scraping process: ${error instanceof Error ? error.message : String(error)}`);

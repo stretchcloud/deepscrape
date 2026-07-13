@@ -6,17 +6,37 @@ Transform any website into structured data using Playwright automation and GPT-4
 
 ## ✨ Features
 
-- **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI
+- **✨ Fit-Markdown Extraction** - pruning content filter (link-density scoring) for clean, LLM-ready markdown
+- **🎯 Deterministic CSS Extraction** - Structured data via CSS selectors, no LLM cost or hallucination
+- **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI, with token-aware chunking + schema validation
+- **📝 Multi-Format Output** - `markdown` + `html` + `rawHtml` + `text` + `links` + `screenshot` + `pdf` + `mhtml` + `tables` + `changeTracking` in a single request
+- **📄 Document Parsing** - `/api/parse` converts PDF / DOCX / HTML files to markdown (magic-byte sniffing, SSRF-guarded)
+- **🔀 Change Tracking** - `changeTracking` format diffs a page against its previous scrape (git-style diff + added/removed lines)
+- **🧠 Multi-URL Extract** - Async `/api/extract` pulls structured data across many pages against one schema
+- **🩹 Self-Healing Extraction** - `/api/extract-auto` derives CSS selectors once, caches them, runs deterministically, and re-derives when the site breaks
+- **🎚️ Confidence Signals** - LLM extraction grounds each field against the source and flags hallucination (suspect) + omission (missing)
+- **🥷 Fingerprint Hygiene** - Consistent browser fingerprints + automation-leak patching (not CAPTCHA-solving; robots.txt respected)
+- **🕹️ Interactive Sessions** - `/api/sessions` keeps a browser context alive to drive step by step (navigate/click/type/scrape)
+- **🤖 Autonomous Agent** - `/api/agent` navigates a site toward a natural-language goal and returns a structured answer
+- **🔁 Proxy Rotation** - Configurable egress-proxy pool for the browser path with health tracking + escalation
+- **📃 llms.txt Generator** - `/api/llmstxt` builds an `llms.txt` (and `llms-full.txt`) index for any site
+- **🔎 Error Introspection** - `/api/crawl/active`, `/crawl/:id/errors`, `/batch/scrape/:id/errors`, and `/api/usage`
+- **🔍 Web Search** - `/api/search` (Serper / SearXNG / DuckDuckGo) with optional scrape-of-results
+- **🕷️ Web Crawling** - True multi-level crawl with best-first URL scoring, robots.txt, live status, cancel
+- **📡 Live Streaming** - Server-Sent Events stream crawl pages as they complete; ZIP/JSON downloads over HTTP
+- **🗺️ URL Discovery** - `/map` endpoint discovering thousands of URLs in seconds, **including subdomains**
+- **🛡️ SSRF-Hardened** - DNS-resolving guard blocks private/metadata IPs on every fetch and redirect hop
+- **🚦 Rate Limits & Quotas** - Per-key rate limiting + per-key daily quotas
+- **📊 Observability** - Prometheus `/metrics`, liveness + readiness probes
+- **🧩 MCP Server** - Model Context Protocol server so AI agents (Claude, Cursor, …) can use DeepScrape as tools
+- **📦 Node SDK** - Typed client with `streamCrawl` and `waitForCrawl` helpers
 - **📦 Batch Processing** - Process multiple URLs efficiently with controlled concurrency
-- **🧬 API-first** - REST endpoints secured with API keys, documented with Swagger.
-- **🎭 Browser Automation** - Full Playwright support with stealth mode  
-- **📝 Multiple Formats** - Output as HTML, Markdown, or plain text
-- **📥 Download Options** - Individual files, ZIP archives, or consolidated JSON
+- **🎭 Browser Automation** - Playwright with stealth mode, plus a fast HTTP path for server-rendered sites
 - **⚡ Smart Caching** - File-based caching with configurable TTL
-- **🔄 Job Queue** - Background processing with BullMQ and Redis
-- **🕷️ Web Crawling** - Multi-page crawling with configurable strategies
-- **🗺️ URL Discovery** - `/map` endpoint for discovering 5,000+ URLs in seconds
-- **🐳 Docker Ready** - One-command deployment
+- **🔄 Job Queue** - Background processing with BullMQ and Redis; `ROLE=web|worker` split for horizontal scaling
+- **🐳 Docker Ready** - Hardened one-command deployment (managed-Redis ready, non-root, tini)
+
+> 📖 **New to this version?** Jump to the [Feature Guide](#-feature-guide-new-capabilities) below for usage of every new capability.
 
 ## 🚀 Quick Start
 
@@ -46,9 +66,515 @@ CACHE_ENABLED=true
 npm run dev
 ```
 
-Test: `curl https://deepscrapper.ai/health`
+Test: `curl http://localhost:3000/health`
 
 ⚡ **New**: Enhanced crawling with `useMapDiscovery: true` - discover 1000+ URLs in seconds instead of minutes!
+
+---
+
+## 🧭 Feature Guide (New Capabilities)
+
+All examples assume the API is running at `http://localhost:3000` and use an API key via the `X-API-Key` header. Set your key with `API_KEY=...` in `.env`.
+
+```bash
+export API_KEY="your-secret-key"
+export BASE="http://localhost:3000"
+```
+
+### 1. Scrape output formats
+
+**Fit-markdown (default).** Scraping to markdown now uses a *pruning content filter* that scores each DOM node (with **link-density** as the key signal) to strip nav/footer/ads/boilerplate while preserving headings, tables, and code. It's on by default for markdown.
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","options":{"extractorFormat":"markdown"}}'
+```
+
+Relevant `options`:
+
+| Option | Default | Description |
+|---|---|---|
+| `extractorFormat` | `html` | `markdown` \| `html` \| `text` |
+| `onlyMainContent` | `true` | Strip nav/boilerplate; `false` keeps the whole page |
+| `fitMarkdown` | `true` | Use the pruning content filter (set `false` for the legacy heuristic) |
+
+**Multi-format — get everything in one call.** Pass `formats` to return several representations at once under a `formats` object. `screenshot` is returned as a base64 PNG data-URI (forces a browser render).
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","options":{"formats":["markdown","html","rawHtml","text","links","screenshot"]}}'
+```
+
+```jsonc
+{
+  "success": true,
+  "url": "https://example.com",
+  "formats": {
+    "markdown": "# Example Domain\n\n...",
+    "html": "<div><h1>Example Domain</h1>...",   // cleaned/pruned HTML
+    "rawHtml": "<!doctype html>...",              // untouched source
+    "text": "Example Domain This domain is ...",
+    "links": ["https://www.iana.org/domains/example"],
+    "screenshot": "data:image/png;base64,iVBORw0K..."
+  }
+}
+```
+
+Supported formats: `markdown`, `html`, `rawHtml`, `text`, `links`, `screenshot`, `pdf`, `mhtml`, `tables`, `contacts`, `changeTracking`.
+
+**`contacts`.** Deterministic (no-LLM) extraction of `emails`, `phones`, and `socials` (twitter/linkedin/facebook/instagram/youtube/github/tiktok) from a page — for lead-gen / contact enrichment.
+
+**`pdf` / `mhtml` / `tables`.** `pdf` renders the page to a PDF (base64 `data:application/pdf` URI); `mhtml` captures a single-file MHTML archive (the exact bytes, for offline/forensic use); `tables` returns every HTML `<table>` as structured JSON (`headers`, `rows`, `rowCount`, `columnCount`, `caption`) with **no LLM** — pure parsing that understands `thead`/`tbody`, `colspan`, and caption. `pdf`/`mhtml` force a browser render; `tables` works on any HTML.
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://en.wikipedia.org/wiki/Comparison_of_web_browsers","options":{"formats":["tables","pdf","mhtml"]}}'
+# -> { "formats": { "tables":[{"headers":[…],"rows":[[…]],"rowCount":42,"columnCount":6}], "pdf":"data:application/pdf;base64,…", "mhtml":"From: <Saved…" } }
+```
+
+**Raw JS execution — `executeJs`.** Run JavaScript in the page after load and get the return value back as `jsResult`. Forces a browser render and bypasses cache. Gated by `ENABLE_JS_EXECUTION` (set to `false` to disable in hardened deployments).
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","options":{"executeJs":"return document.querySelectorAll(\"a\").length"}}'
+# -> { "jsResult": 1, ... }
+```
+
+**Change tracking — `changeTracking` format.** Add `changeTracking` to `formats` to diff a page's main-content markdown against the previous scrape of the same URL. Returns `changeStatus` (`new` \| `same` \| `changed`), the previous timestamp, and — when changed — a git-style `diff.gitDiff` plus structured `added`/`removed` line lists. Snapshots are stored in Redis (30-day TTL, `CHANGE_TRACKING_TTL`).
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","options":{"formats":["markdown","changeTracking"]}}'
+# first call  -> { "formats": { "changeTracking": { "changeStatus":"new", "currentScrapeAt":"…" } } }
+# later call  -> { "formats": { "changeTracking": { "changeStatus":"changed", "previousScrapeAt":"…",
+#                    "diff": { "gitDiff":"--- previous\n+++ current\n@@ …", "added":["…"], "removed":["…"] } } } }
+```
+
+### 2. Structured extraction
+
+**Deterministic CSS extraction (no LLM — free & fast).** Provide `extractionOptions.cssSchema` and get one record per `baseSelector` match. Field types: `text`, `attribute`, `html`, `number`, `list`, `nested`, `nested_list`.
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "url":"https://quotes.toscrape.com",
+  "options":{"extractionOptions":{"cssSchema":{
+    "baseSelector":"div.quote",
+    "fields":[
+      {"name":"text","selector":"span.text","type":"text"},
+      {"name":"author","selector":"small.author","type":"text"},
+      {"name":"tags","selector":"a.tag","type":"list"}
+    ]}}}
+}'
+# -> { "structuredData": [ {"text":"…","author":"Albert Einstein","tags":["change","deep-thoughts",…]}, … ] }
+```
+
+**LLM extraction (schema-validated + chunked).** Provide a JSON schema; output is validated with ajv and long pages are automatically chunked (token-aware, with overlap) and merged. Requires `OPENAI_API_KEY`.
+
+```bash
+curl -s -X POST "$BASE/api/extract-schema" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "url":"https://example.com/product",
+  "schema":{"type":"object","properties":{"name":{"type":"string"},"price":{"type":"string"}},"required":["name"]}
+}'
+```
+
+### 3. Web search — `POST /api/search`
+
+Search the web and optionally scrape each result. Providers: **serper** (keyed, reliable), **searxng** (self-hosted), **duckduckgo** (keyless, best-effort). The provider is auto-selected: `SERPER_API_KEY` → `SEARXNG_URL` → DuckDuckGo.
+
+```bash
+curl -s -X POST "$BASE/api/search" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"query":"web scraping techniques","limit":5,"scrapeResults":false}'
+```
+
+```jsonc
+{ "success": true, "query": "…", "count": 5,
+  "results": [ {"position":1,"title":"…","url":"https://…","snippet":"…","markdown":"…(if scrapeResults)"} ] }
+```
+
+| Body field | Default | Description |
+|---|---|---|
+| `query` | — | Search query (required) |
+| `limit` | 10 | Max results (≤50) |
+| `provider` | auto | `serper` \| `searxng` \| `duckduckgo` |
+| `scrapeResults` | false | Scrape each result to markdown |
+| `scrapeOptions` | — | Options forwarded to the scraper when `scrapeResults` |
+
+> ⚠️ Keyless DuckDuckGo is **best-effort** — it anti-bot-challenges datacenter IPs. Set `SERPER_API_KEY` (free tier at serper.dev) or `SEARXNG_URL` for reliable results.
+
+### 4. Web crawling (multi-level, guided)
+
+`POST /api/crawl` performs a **true multi-level** crawl (respecting `maxDepth`), stays on-domain, honors `robots.txt`, dedupes, and enforces a hard page budget.
+
+```bash
+curl -s -X POST "$BASE/api/crawl" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "url":"https://docs.example.com",
+  "limit":500,
+  "maxDepth":3,
+  "useMapDiscovery":true,
+  "scrapeOptions":{"extractorFormat":"markdown","preferHttpScraper":true}
+}'
+# -> { "success": true, "id": "…", "url": "http://localhost:3000/api/crawl/<id>", "outputDirectory":"…" }
+```
+
+Key options:
+
+| Option | Default | Description |
+|---|---|---|
+| `limit` | 100 | Max pages (capped by `MAX_CRAWL_LIMIT`) |
+| `maxDepth` | 5 | Crawl depth (capped by `MAX_CRAWL_DEPTH`) |
+| `useMapDiscovery` | false | Seed from the sitemap (complete + fast) instead of link-by-link |
+| `strategy` | bfs | `bfs` \| `best_first` |
+| `keywords` | — | With `strategy:"best_first"`, crawl the most relevant URLs first |
+| `includePaths` / `excludePaths` | — | Regex path filters (validated; bad regex rejected) |
+| `allowSubdomains` | false | Follow subdomain links |
+| `ignoreRobotsTxt` | false | Skip robots.txt |
+| `webhook` | — | POST results when done (SSRF-guarded) |
+
+**Check status** (from Redis — reliable, includes progress):
+
+```bash
+curl -s "$BASE/api/crawl/<id>" -H "X-API-Key: $API_KEY"
+# -> { "status":"completed", "progress":{"total":500,"completed":498,"failed":2,"pending":0}, "jobs":[…], "exportedFiles":{…} }
+```
+
+**Cancel:**
+
+```bash
+curl -s -X DELETE "$BASE/api/crawl/<id>" -H "X-API-Key: $API_KEY"   # -> status becomes "cancelled"
+```
+
+### 5. Getting crawl results out
+
+Three ways, use whichever fits:
+
+**a) Live stream (SSE)** — pages pushed as they complete (an upstream project-style):
+
+```bash
+curl -N "$BASE/api/crawl/<id>/stream" -H "X-API-Key: $API_KEY"
+# event: open
+# event: page   -> data: {"url":"…","title":"…","markdown":"…","metadata":{…}}
+# event: progress -> data: {"total":…,"completed":…,"failed":…,"pending":…}
+# event: done   -> data: {"status":"completed",…}
+```
+
+**b) Download over HTTP** (no filesystem access needed):
+
+```bash
+curl "$BASE/api/crawl/<id>/download/zip"  -H "X-API-Key: $API_KEY" -o crawl.zip   # markdown files + manifest.json
+curl "$BASE/api/crawl/<id>/download/json" -H "X-API-Key: $API_KEY" -o crawl.json  # consolidated array
+```
+
+**c) Files on disk** — every page is written to `CRAWL_OUTPUT_DIR` (`./crawl-output/<id>/` on the host via the Docker bind mount) in real time, plus a `_summary.md` and consolidated `.markdown`/`.json` on completion.
+
+### 6. URL discovery incl. subdomains — `POST /api/map`
+
+Discover a site's URLs from sitemaps/robots/crawling in seconds. With `includeSubdomains:true`, DeepScrape actively discovers sibling subdomains (e.g. `docs.`, `blog.`, `community.`) and merges each one's sitemap (round-robin so one huge subdomain can't crowd out the others).
+
+```bash
+curl -s -X POST "$BASE/api/map" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","maxUrls":5000,"includeSubdomains":true}'
+# -> { "success": true, "data": { "links": ["https://docs.example.com/…", …], "total": 5000, "timeTaken": 10143, "discoveryMethods": {…} } }
+```
+
+| Body field | Default | Description |
+|---|---|---|
+| `maxUrls` | 5000 | Cap (≤30000) |
+| `includeSubdomains` | true | Discover + merge sibling-subdomain sitemaps |
+| `searchQuery` | — | Rank/filter discovered URLs by relevance |
+| `includePatterns` / `excludePatterns` | — | Filter discovered URLs |
+| `timeoutMs` | 60000 | Discovery timeout |
+| `skipSitemaps` / `sitemapsOnly` | false | Control discovery methods |
+
+### 7. Fast HTTP scraping — `preferHttpScraper`
+
+For server-rendered sites (docs, blogs, wikis), skip the headless browser and fetch via HTTP — ~8× faster. Falls back to Playwright automatically if the page comes back empty. Great for large crawls of static sites.
+
+```bash
+curl -s -X POST "$BASE/api/scrape" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://docs.example.com/page","options":{"preferHttpScraper":true,"extractorFormat":"markdown"}}'
+```
+
+### 8. Security
+
+- **SSRF protection** — every outbound fetch (scrape, crawl, sitemap, webhook, discovery) resolves DNS and blocks private/loopback/link-local/**cloud-metadata (`169.254.169.254`)**/encoded-IP targets, re-validating on every redirect hop. Set `ALLOW_PRIVATE_NETWORK_SCRAPE=true` only for trusted internal deployments.
+- **Auth** — API key via the `X-API-Key` header only (never query string), constant-time compared, never logged. Supports comma-separated keys for rotation. In production the server refuses to start without a strong key.
+- **Rate limiting** — per-key (falls back to IP): global + stricter limits on scrape/crawl/search. Returns `429` with `RateLimit-*` headers.
+- **Daily quotas** — set `DAILY_QUOTA` (per key/day). Responses carry `X-Quota-Limit`/`X-Quota-Remaining`; over-quota returns `429`. Per-key overrides via `DAILY_QUOTA_OVERRIDES=keyA:5000,keyB:100000`.
+- **Crawl caps** — `limit`/`maxDepth`/concurrency are clamped; invalid include/exclude regexes are rejected (ReDoS-safe).
+
+### 9. Observability & health
+
+```bash
+curl "$BASE/health"        # liveness -> {"status":"UP"}
+curl "$BASE/health/ready"  # readiness (checks Redis) -> {"status":"READY","redis":"up"} or 503
+curl "$BASE/metrics"       # Prometheus text: http_requests_total, http_request_duration_seconds, deepscrape_*
+```
+
+### 10. Horizontal scaling — `ROLE`
+
+Run the web tier and worker tier as separate processes/replicas:
+
+```bash
+ROLE=web    npm start   # serve the API + enqueue jobs (no worker)
+ROLE=worker npm start   # process crawl/scrape jobs only (scale these independently)
+ROLE=all    npm start   # both (default)
+```
+
+Safe to run multiple worker replicas — the queue is no longer wiped on boot and job ids are deterministic.
+
+### 11. MCP server (for AI agents)
+
+A Model Context Protocol server lets Claude/Cursor/etc. call DeepScrape as tools. It lives in [`mcp/`](mcp/) as its own package and exposes: `deepscrape_scrape`, `deepscrape_map`, `deepscrape_crawl`, `deepscrape_crawl_status`, `deepscrape_search`, `deepscrape_agent` + `deepscrape_agent_status` (autonomous navigation), and `deepscrape_session_create` + `deepscrape_session_action` + `deepscrape_session_close` (interactive browser sessions).
+
+```bash
+cd mcp && npm install && npm run build
+```
+
+Configure it in your MCP client (e.g. Claude Desktop):
+
+```json
+{
+  "mcpServers": {
+    "deepscrape": {
+      "command": "node",
+      "args": ["/absolute/path/to/deepscraper/mcp/dist/server.js"],
+      "env": { "DEEPSCRAPE_API_URL": "http://localhost:3000", "DEEPSCRAPE_API_KEY": "your-secret-key" }
+    }
+  }
+}
+```
+
+See [`mcp/README.md`](mcp/README.md) for details.
+
+### 12. Node SDK
+
+A typed client lives in [`sdk/`](sdk/). Zero dependencies (uses global `fetch`).
+
+```ts
+import { DeepScrapeClient } from './sdk/src';
+
+const client = new DeepScrapeClient({ baseUrl: 'http://localhost:3000', apiKey: process.env.API_KEY! });
+
+// Scrape
+const page = await client.scrape('https://example.com', { extractorFormat: 'markdown' });
+
+// Search
+const hits = await client.search('web scraping', { limit: 5 });
+
+// Crawl + wait for completion
+const { id } = await client.startCrawl('https://docs.example.com', { limit: 200, useMapDiscovery: true });
+const final = await client.waitForCrawl(id);
+
+// Or stream pages as they complete
+for await (const evt of client.streamCrawl(id)) {
+  if (evt.event === 'page') console.log(evt.data.url);
+}
+```
+
+See [`sdk/README.md`](sdk/README.md) for the full API.
+
+### 13. New configuration (env)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `REDIS_URL` | — | Full Redis URL incl. `rediss://` TLS + auth (for managed Redis); overrides host/port |
+| `REDIS_PASSWORD` / `REDIS_TLS` | — | Auth/TLS when using host/port |
+| `ALLOW_PRIVATE_NETWORK_SCRAPE` | false | Disable SSRF private-IP blocking (trusted internal only) |
+| `MAX_CRAWL_LIMIT` / `MAX_CRAWL_DEPTH` | 1000 / 10 | Hard crawl caps |
+| `MAX_BROWSERS` / `MAX_CONTEXTS_PER_BROWSER` | 3 / 8 | Browser pool sizing (memory tuning) |
+| `CRAWLER_CONCURRENCY` | 5 | Worker concurrency |
+| `RATE_LIMIT_GLOBAL` / `_EXPENSIVE` / `_CRAWL` | 120 / 20 / 10 | Per-window request limits |
+| `DAILY_QUOTA` / `DAILY_QUOTA_OVERRIDES` | 0 (off) | Per-key daily quota |
+| `SERPER_API_KEY` / `SEARXNG_URL` | — | Reliable `/api/search` providers |
+| `ROLE` | all | `web` \| `worker` \| `all` |
+| `MAX_RESPONSE_BYTES` | 10485760 | Max fetched page size |
+| `LOG_TO_FILE` / `LOG_MAX_SIZE` / `LOG_MAX_FILES` | true / 20m / 14d | Log rotation |
+| `ENABLE_JS_EXECUTION` | true | Allow the `executeJs` scrape option + session `evaluate` (set `false` to disable) |
+| `CHANGE_TRACKING_TTL` | 2592000 | Change-tracking snapshot TTL in seconds (30 days) |
+| `TASK_CONCURRENCY` | 3 | Async task-queue worker concurrency (extract/llmstxt/scrape/agent) |
+| `MAX_DOC_BYTES` | 26214400 | Max document size for `/api/parse` (25 MB) |
+| `MAX_BROWSER_SESSIONS` | 10 | Max concurrent interactive sessions |
+| `SESSION_IDLE_TTL_MS` / `SESSION_MAX_LIFETIME_MS` | 300000 / 1800000 | Session idle reap + absolute lifetime |
+| `AGENT_MAX_STEPS_CAP` | 20 | Hard cap on agent navigation steps |
+| `PROXY_LIST` | — | Comma-separated egress proxies for the browser path (empty = off) |
+| `PROXY_USERNAME` / `PROXY_PASSWORD` | — | Shared proxy creds (or embed per-proxy as `user:pass@host`) |
+| `PROXY_MAX_FAILURES` / `PROXY_COOLDOWN_MS` | 3 / 60000 | Proxy health: failures before cooldown, cooldown length |
+| `SELF_HEAL_SCHEMA_TTL` | 604800 | Derived CSS-schema cache TTL for `/api/extract-auto` (7 days) |
+| `SELF_HEAL_HEALTHY_RATIO` | 0.5 | Min fraction of records with populated required fields before "breakage" |
+| `SESSION_STEALTH` | true | Fingerprint hygiene for sessions/agent (set `false` for a plain UA) |
+
+See [`.env.example`](.env.example) for the complete list.
+
+---
+
+### 14. Async jobs, document parsing & introspection
+
+Long-running work runs on a **BullMQ-backed async task queue** (persistent, retried, and scalable with `ROLE=worker`), so requests return a job id immediately and you poll for the result. Job status survives worker restarts.
+
+**Multi-URL LLM extract — `POST /api/extract`.** Extract structured data across many pages against one schema. Pass explicit `urls`, or a single `url` to auto-discover pages from the site (map). Returns a job id; poll `GET /api/extract/:id`. Requires an LLM key (`OPENAI_API_KEY`) — without one, each source reports a concrete reason rather than failing silently.
+
+```bash
+curl -s -X POST "$BASE/api/extract" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "urls":["https://example.com/a","https://example.com/b"],
+  "prompt":"Extract the product name and price",
+  "schema":{"type":"object","properties":{"name":{"type":"string"},"price":{"type":"string"}}}
+}'
+# -> { "id":"<job>", "status":"pending", "url":"…/api/extract/<job>" }
+curl -s "$BASE/api/extract/<job>" -H "X-API-Key: $API_KEY"
+# -> { "status":"completed", "result":{ "data":[{…},{…}], "sources":[{"url":"…","success":true}] } }
+```
+
+**Async single scrape — `POST /api/scrape/async`.** The full `/api/scrape` (all options/formats) as a background job; poll `GET /api/scrape/job/:id`.
+
+**`llms.txt` generation — `POST /api/llmstxt`.** Discover a site's pages and produce an [`llms.txt`](https://llmstxt.org/) index (title + description per page); set `includeFullText:true` to also get `llms-full.txt` with each page's markdown. Poll `GET /api/llmstxt/:id`.
+
+```bash
+curl -s -X POST "$BASE/api/llmstxt" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://docs.example.com","maxUrls":100,"includeFullText":false}'
+# -> { "id":"<job>", ... }   then GET /api/llmstxt/<job>
+# result: { "host":"docs.example.com", "pageCount":87, "llmstxt":"# docs.example.com\n\n> …\n\n## Pages\n- [Title](url): desc\n…" }
+```
+
+**Document parsing — `POST /api/parse`.** Convert a **PDF / DOCX / HTML** document to markdown. Pass base64 `content` or a `url` to fetch (SSRF-guarded). The type is sniffed from magic bytes, so a mislabeled file still parses. Synchronous.
+
+```bash
+curl -s -X POST "$BASE/api/parse" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/whitepaper.pdf"}'
+# -> { "success":true, "markdown":"# Title\n\n…", "detectedType":"pdf", "metadata":{"pages":12} }
+```
+
+**Usage / credits — `GET /api/usage`.** The calling key's usage against its daily quota.
+
+```bash
+curl -s "$BASE/api/usage" -H "X-API-Key: $API_KEY"
+# -> { "usage": { "requestsToday": 42, "dailyLimit": 1000, "remaining": 958, "unlimited": false } }
+```
+
+**Error introspection & active crawls.** Every crawl/batch failure is recorded with its URL and reason:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/crawl/active` | In-flight crawls with live progress (`total`/`success`/`failed`/`done`) |
+| `GET /api/crawl/:id/errors` | Failed pages for a crawl — `{ url, error, at }` per failure |
+| `GET /api/batch/scrape/:id/errors` | Failed URLs for a batch — `{ id, url, error }` per failure |
+
+```bash
+curl -s "$BASE/api/crawl/active" -H "X-API-Key: $API_KEY"
+# -> { "active":[{"id":"…","url":"…","createdAt":…,"progress":{"total":50,"success":48,"failed":2,"done":50}}] }
+curl -s "$BASE/api/crawl/<id>/errors" -H "X-API-Key: $API_KEY"
+# -> { "success":true, "count":2, "errors":[{"url":"…","error":"…","at":"…"}] }
+```
+
+> Reliability note: a page that fails to fetch (DNS/HTTP/timeout) is now correctly counted as a **failure** — recorded in `/errors` and reflected in the crawl/batch status (`completed_with_errors`) — instead of being miscounted as a successful scrape.
+
+### 15. Interactive sessions, autonomous agent & proxy rotation
+
+**Persistent browser sessions — `/api/sessions`.** Keep a real browser context alive across many calls so you can drive it step by step (cookies/auth/JS state persist between actions). Ideal for authenticated flows and multi-step interactions.
+
+```bash
+# Create a session (optionally navigate on creation)
+curl -s -X POST "$BASE/api/sessions" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"initialUrl":"https://example.com"}'
+# -> { "session": { "id":"<sid>", "currentUrl":"https://example.com/", "currentTitle":"Example Domain", ... } }
+
+# Drive it: one action per call
+curl -s -X POST "$BASE/api/sessions/<sid>/action" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"type":"navigate","url":"https://example.com/login"}'
+curl -s -X POST "$BASE/api/sessions/<sid>/action" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"type":"type","selector":"#user","text":"alice"}'
+curl -s -X POST "$BASE/api/sessions/<sid>/action" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"type":"scrape","formats":["markdown","links"]}'
+# Then GET /api/sessions/<sid> (status), GET /api/sessions (list), DELETE /api/sessions/<sid> (close)
+```
+
+Actions: `navigate`, `click`, `type`, `fill`, `select`, `scroll`, `waitForSelector`, `wait`, `screenshot`, `scrape`, `evaluate` (gated by `ENABLE_JS_EXECUTION`), `back`, `forward`, `reload`, `content`. Every `navigate` is SSRF-guarded. Sessions are capped (`MAX_BROWSER_SESSIONS`), idle-reaped (`SESSION_IDLE_TTL_MS`), and force-closed at `SESSION_MAX_LIFETIME_MS`.
+
+> Scope: sessions are in-memory and pinned to one process — with `ROLE=web|worker` (or multiple replicas) front them with sticky routing.
+
+**Autonomous agent — `/api/agent`.** Give a natural-language goal and a start URL; the agent drives a session in a bounded observe → decide → act loop (an LLM picks navigate/click/type/finish each step), then returns a structured (schema) or textual answer. Async — poll `GET /api/agent/:id`. Requires an LLM key (`OPENAI_API_KEY`); without one the job fails fast with a clear reason.
+
+```bash
+curl -s -X POST "$BASE/api/agent" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "url":"https://docs.example.com",
+  "prompt":"Find the current stable version number and its release date",
+  "schema":{"type":"object","properties":{"version":{"type":"string"},"released":{"type":"string"}}},
+  "maxSteps":6
+}'
+# -> { "id":"<job>", ... }   then GET /api/agent/<job>
+# result: { "completed":true, "finalUrl":"…", "steps":[{step,thought,action,url},…], "data":{"version":"…","released":"…"} }
+```
+
+Hard bounds: step budget (`maxSteps`, capped by `AGENT_MAX_STEPS_CAP`), per-action timeouts, SSRF-guarded navigation, strict JSON action contract, guaranteed session teardown.
+
+**Proxy rotation — browser path.** Configure an egress-proxy pool via `PROXY_LIST`; the browser pool, sessions, and agent rotate across proxies round-robin with per-proxy health tracking (a proxy that fails repeatedly is put on cooldown) and escalation (session creation retries the next proxy on a failed initial navigation). Check status at `GET /api/proxies`.
+
+```bash
+# PROXY_LIST="http://user:pass@proxy1:8000,http://proxy2:8000" in the environment
+curl -s "$BASE/api/proxies" -H "X-API-Key: $API_KEY"
+# -> { "enabled":true, "total":2, "healthy":2, "proxies":[{"server":"http://proxy1:8000","healthy":true,"failures":0}, …] }
+```
+
+> Proxies apply to the **browser** path only, by design. The HTTP/axios path pins each connection to a pre-validated public IP (per-hop SSRF protection) that an HTTP proxy would bypass — and browser-rendered scrapes are where proxies matter most. **There is no CAPTCHA-solving / bot-detection-bypass component** — this is proxy rotation infrastructure, nothing more.
+
+### 16. Self-healing extraction, confidence signals & fingerprint hygiene
+
+**Self-healing extraction — `POST /api/extract-auto`.** The pattern that fixes the "my scrapers break every week" problem: an LLM derives robust CSS selectors **once**, they're cached, and every subsequent call runs **deterministic** (free, fast) extraction. When the site changes and the selectors stop yielding data (breakage detected), it automatically re-derives and re-caches. You can bootstrap with your own `cssSchema` to skip the first LLM call.
+
+```bash
+curl -s -X POST "$BASE/api/extract-auto" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "url":"https://quotes.toscrape.com",
+  "fields":[{"name":"text","required":true},{"name":"author","required":true}]
+}'
+# -> { "success":true, "data":[{"text":"…","author":"Albert Einstein"}, …],
+#      "meta": { "source":"derived|cache|healed", "healed":false, "healthy":true,
+#                "recordCount":10, "schema":{…derived CSS selectors, reusable…} } }
+```
+
+`meta.source` tells you what happened (`derived` first time, `cache` on reuse, `healed` after a breakage), and `meta.schema` returns the selectors so you can inspect or reuse them. Deriving/re-deriving needs an LLM key; the deterministic + cache + breakage-detect path works without one.
+
+**Extraction confidence signals.** LLM extraction (`/api/extract`, `extractionOptions`) now returns a deterministic, grounding-based confidence report so hallucination and omission stop being silent. Each field is checked against the source text; values that aren't substantiated are flagged.
+
+```jsonc
+"confidence": {
+  "overall": 0.9,
+  "fields": { "name": {"present":true,"grounded":true,"confidence":0.9},
+              "price": {"present":true,"grounded":false,"confidence":0.3} },
+  "suspect": ["price"],   // present but NOT found in source → possible hallucination
+  "missing": []           // absent/empty → omission
+}
+```
+
+**Anti-bot fingerprint hygiene.** Browser scrapes, sessions, and the agent use one internally-consistent fingerprint per context (UA + platform + locale + timezone + WebGL all agree) and patch the common automation leaks (`navigator.webdriver`, missing `window.chrome`, empty plugins, headless WebGL vendor). This stops *legitimate* scrapes from being falsely flagged as bots.
+
+> Scope, stated honestly: this is fingerprint **hygiene**, not warfare. It does **not** solve CAPTCHAs or defeat Cloudflare Turnstile/DataDome, and it is **not** a residential-proxy "unlocker" — hard targets need a purpose-built anti-detect browser. `robots.txt` is still honored; set `SESSION_STEALTH=false` (or `stealthMode:false`) for a plain, honest fingerprint.
+
+### 17. Hidden-API discovery, markdown reader & cost estimate
+
+**Hidden-API discovery — `POST /api/discover-apis`.** JS-heavy sites almost always pull their data from a JSON/GraphQL endpoint under the hood. This loads the page in a real browser, records the XHR/fetch calls, and returns the JSON-ish endpoints so you can query them directly — far cheaper and more stable than scraping rendered HTML.
+
+```bash
+curl -s -X POST "$BASE/api/discover-apis" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://quotes.toscrape.com/scroll"}'
+# -> { "count":1, "apis":[{"url":"https://quotes.toscrape.com/api/quotes?page=1","method":"GET","status":200,"contentType":"application/json","isJson":true}] }
+```
+
+**Markdown reader — `GET /api/reader?url=...`.** A one-shot "URL → clean markdown" reader that honors the emerging `Accept: text/markdown` agent convention: send that header and you get the raw markdown body; otherwise you get JSON.
+
+```bash
+curl -s "$BASE/api/reader?url=https://example.com" -H "X-API-Key: $API_KEY" -H "Accept: text/markdown"   # -> raw markdown
+curl -s "$BASE/api/reader?url=https://example.com" -H "X-API-Key: $API_KEY"                               # -> { markdown, title, ... }
+```
+
+**Pre-run cost estimate — `POST /api/crawl/estimate`.** Know the size and cost shape *before* you run — no bill shock. Returns max pages (capped by `MAX_CRAWL_LIMIT`), render mode, estimated LLM calls, and an honest flat-cost note.
+
+```bash
+curl -s -X POST "$BASE/api/crawl/estimate" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"limit":250,"scrapeOptions":{"extractionOptions":{"schema":{}}}}'
+# -> { "estimate": { "maxPages":250, "renderMode":"http", "estimatedLlmCalls":250,
+#      "pricing":"self-hosted: flat infrastructure cost — no per-page credits, no bill shock.", "note":"…" } }
+```
+
+---
 
 ## 🚀 **Quick Recommendations**
 
@@ -2183,10 +2709,11 @@ Status response shows exported files:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/scrape` | POST | Scrape single URL |
-| `/api/extract-schema` | POST | Extract structured data |
+| `/api/scrape` | POST | Scrape single URL (supports `formats`, `cssSchema`, `preferHttpScraper`) |
+| `/api/extract-schema` | POST | LLM structured extraction (schema-validated, chunked) |
 | `/api/summarize` | POST | Generate content summary |
-| `/api/map` | POST | **Discover URLs (High-Performance)** |
+| `/api/search` | POST | **Web search** (Serper/SearXNG/DuckDuckGo) + optional scrape |
+| `/api/map` | POST | **Discover URLs (High-Performance)** — supports `includeSubdomains` |
 | `/api/map/cache/stats` | GET | Get URL discovery cache stats |
 | `/api/map/cache/clear` | POST | Clear URL discovery cache |
 | `/api/map/health` | GET | Map service health check |
@@ -2196,9 +2723,16 @@ Status response shows exported files:
 | `/api/batch/scrape/:id/download/json` | GET | Download batch as JSON |
 | `/api/batch/scrape/:id/download/:jobId` | GET | Download individual result |
 | `/api/batch/scrape/:id` | DELETE | Cancel batch processing |
-| `/api/crawl` | POST | Start web crawl (supports `useMapDiscovery: true` for 60x faster discovery) |
-| `/api/crawl/:id` | GET | Get crawl status |
+| `/api/crawl` | POST | Start web crawl (`useMapDiscovery`, `strategy:"best_first"`, `keywords`) |
+| `/api/crawl/:id` | GET | Get crawl status + progress |
+| `/api/crawl/:id/stream` | GET | **Stream crawl pages as Server-Sent Events** |
+| `/api/crawl/:id/download/zip` | GET | **Download crawl markdown as ZIP** |
+| `/api/crawl/:id/download/json` | GET | **Download crawl as consolidated JSON** |
+| `/api/crawl/:id` | DELETE | Cancel a running crawl |
 | `/api/cache` | DELETE | Clear cache |
+| `/health` | GET | Liveness probe (no auth) |
+| `/health/ready` | GET | Readiness probe — checks Redis (no auth) |
+| `/metrics` | GET | Prometheus metrics (no auth) |
 
 ### Complete `/api/crawl/:id` Options
 
@@ -2672,15 +3206,23 @@ Welcome to the getting started guide...
 
 - [x] 📦 Batch processing with controlled concurrency
 - [x] 📥 Multiple download formats (ZIP, JSON, individual files)
-- [x] 🗺️ High-performance URL discovery (`/map` endpoint)
-- [ ] 🔍 Search engine API integrations (Google, Bing, DuckDuckGo)
-- [ ] 🚸 Browser pooling & warm-up
+- [x] 🗺️ High-performance URL discovery (`/map` endpoint) + subdomain discovery
+- [x] ✨ Fit-markdown extraction (pruning content filter)
+- [x] 🎯 Deterministic CSS/selector extraction (no LLM)
+- [x] 📝 Multi-format single-request responses (markdown/html/links/screenshot/…)
+- [x] 🔍 Search engine API integration (`/api/search` — Serper / SearXNG / DuckDuckGo)
+- [x] 📡 Live crawl streaming (SSE) + crawl ZIP/JSON downloads
+- [x] 🧩 MCP server for AI agents
+- [x] 📦 Node SDK
+- [x] 🛡️ SSRF protection, rate limiting, per-key daily quotas
+- [x] 📊 Prometheus `/metrics` + readiness probe
+- [x] 🚸 Browser pool with concurrency semaphore + crash eviction
+- [x] ↔️ Horizontal scaling via `ROLE=web|worker` split
 - [ ] 🧠 Automatic schema generation (LLM)
-- [ ] 📊 Prometheus metrics & Grafana dashboard
-- [ ] 🌐 Cloud-native cache backends (S3/Redis)
+- [ ] 🌐 Cloud-native cache backends (S3)
 - [ ] 🌈 Web UI playground
-- [ ] 🔔 Advanced webhook payloads with retry logic
-- [ ] 📈 Batch processing analytics and insights
+- [ ] 📈 Batch on BullMQ + processing analytics
+- [ ] 📦 Publish SDK & MCP server to npm
 
 ---
 
