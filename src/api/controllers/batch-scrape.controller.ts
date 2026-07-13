@@ -83,6 +83,21 @@ export class BatchScrapeController {
   }
 
   /**
+   * List the failed jobs (URL + error) for a batch.
+   */
+  async getBatchErrors(req: Request, res: Response): Promise<void> {
+    try {
+      const { batchId } = req.params;
+      const errors = await batchScrapeService.getBatchErrors(batchId);
+      res.json({ success: true, count: errors.length, errors });
+    } catch (error) {
+      const msg = (error as Error).message;
+      logger.error('Failed to get batch errors', { batchId: req.params.batchId, error: msg });
+      res.status(msg.includes('not found') ? 404 : 500).json({ success: false, error: msg.includes('not found') ? msg : 'Internal server error' });
+    }
+  }
+
+  /**
    * Cancel a batch scraping operation
    */
   async cancelBatch(req: Request, res: Response): Promise<void> {

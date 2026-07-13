@@ -4,6 +4,8 @@ import scraperManager from '../../scraper/scraper-manager';
 import { logger } from '../../utils/logger';
 import { apiKeyAuth as auth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
+import { expensiveLimiter, statusLimiter } from '../middleware/rate-limit.middleware';
+import { createTask, getTask } from '../../services/task.service';
 import { ExtractionResult } from '../../types/schema';
 
 // Extended ScraperResponse interface to include extraction results
@@ -43,12 +45,46 @@ const browserActionSchema = z.object({
 });
 
 /**
+ * @route POST /api/scrape/async
+ * @desc Submit a scrape as an async job (returns a job id to poll)
+ * @access Private (requires API key authentication)
+ */
+router.post('/scrape/async', expensiveLimiter, auth, async (req: Request, res: Response) => {
+  try {
+    const { url, options } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'url is required' });
+    }
+    const id = await createTask('scrape', { url, options });
+    const base = `${req.secure ? 'https' : 'http'}://${req.get('host')}`;
+    return res.status(200).json({ success: true, id, url: `${base}/api/scrape/job/${id}`, status: 'pending' });
+  } catch (error) {
+    logger.error(`Failed to create scrape job: ${(error as Error).message}`);
+    return res.status(500).json({ success: false, error: 'Failed to create scrape job' });
+  }
+});
+
+/**
+ * @route GET /api/scrape/job/:id
+ * @desc Poll an async scrape job
+ * @access Private (requires API key authentication)
+ */
+router.get('/scrape/job/:id', statusLimiter, auth, async (req: Request, res: Response) => {
+  const task = await getTask(req.params.id);
+  if (!task) {
+    return res.status(404).json({ success: false, error: 'Job not found' });
+  }
+  return res.json({ success: true, ...task });
+});
+
+/**
  * @route POST /api/scrape
  * @desc Scrape a URL and return the content
  * @access Private (requires API key authentication)
  */
 router.post(
   '/scrape',
+  expensiveLimiter,
   auth,
   validateRequest(
     z.object({
@@ -60,7 +96,15 @@ router.post(
         skipCache: z.boolean().optional(),
         cacheTtl: z.number().int().positive().optional(),
         extractorFormat: z.enum(['html', 'markdown', 'text']).optional(),
-      }).optional()
+        onlyMainContent: z.boolean().optional(),
+        fitMarkdown: z.boolean().optional(),
+        useBrowser: z.boolean().optional(),
+        stealthMode: z.boolean().optional(),
+        skipTlsVerification: z.boolean().optional(),
+        // Extraction options (LLM or deterministic CSS) — validated downstream.
+        extractionOptions: z.any().optional(),
+      // Allow forward-compatible scraper options through to the manager.
+      }).passthrough().optional()
     })
   ),
   async (req: Request, res: Response) => {
@@ -86,12 +130,19 @@ router.post(
         });
       }
       
+      const extended = response as ExtendedScraperResponse;
       return res.json({
         success: true,
         url: response.url,
         title: response.title || "",
         content: response.content,
         contentType: response.contentType,
+        // Multi-format output when requested.
+        ...((response as { formats?: Record<string, any> }).formats !== undefined ? { formats: (response as { formats?: Record<string, any> }).formats } : {}),
+        ...((response as { jsResult?: any }).jsResult !== undefined ? { jsResult: (response as { jsResult?: any }).jsResult } : {}),
+        // Include extraction output when present (CSS or LLM extraction).
+        ...(extended.structuredData !== undefined ? { structuredData: extended.structuredData } : {}),
+        ...(extended.extractionResult !== undefined ? { extractionResult: extended.extractionResult } : {}),
         metadata: {
           ...response.metadata,
           processingTime
@@ -116,6 +167,7 @@ router.post(
  */
 router.post(
   '/extract-schema',
+  expensiveLimiter,
   auth,
   validateRequest(
     z.object({
@@ -348,6 +400,7 @@ function formatResponseAsMarkdown(
  */
 router.post(
   '/summarize',
+  expensiveLimiter,
   auth,
   validateRequest(
     z.object({

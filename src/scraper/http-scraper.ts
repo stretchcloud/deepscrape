@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { ScraperOptions, ScraperResponse } from '../types';
 import { logger } from '../utils/logger';
+import { assertPublicUrl, ssrfSafeRequestConfig, SsrfError } from '../utils/ssrf-guard';
+
+/** Maximum response body size accepted from a fetched page (bytes). */
+const MAX_RESPONSE_BYTES = Number(process.env.MAX_RESPONSE_BYTES ?? 10 * 1024 * 1024);
 
 /**
  * Simple HTTP-based scraper using axios (fallback when Playwright fails)
@@ -14,6 +18,9 @@ export class HttpScraper {
 
     try {
       logger.info(`HTTP scraping URL: ${url}`);
+
+      // SSRF pre-flight: reject private/loopback/metadata targets before any I/O.
+      await assertPublicUrl(url);
 
       const timeout = options.timeout ?? 30000;
       const userAgent = options.userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -30,6 +37,10 @@ export class HttpScraper {
           ...options.headers
         },
         maxRedirects: 5,
+        maxContentLength: MAX_RESPONSE_BYTES,
+        maxBodyLength: MAX_RESPONSE_BYTES,
+        // SSRF-safe agents re-validate the resolved IP on every hop (incl. redirects).
+        ...ssrfSafeRequestConfig(),
         validateStatus: (status) => status < 400
       });
 
@@ -54,6 +65,17 @@ export class HttpScraper {
         }
       };
     } catch (error) {
+      if (error instanceof SsrfError) {
+        logger.warn(`HTTP scraping blocked by SSRF guard for ${url}: ${error.message}`);
+        return {
+          url,
+          title: '',
+          content: '',
+          contentType: 'html',
+          metadata: { timestamp: new Date().toISOString(), status: 0, headers: {} },
+          error: `Blocked: target resolves to a non-public address`
+        };
+      }
       logger.error(`HTTP scraping error for ${url}: ${error instanceof Error ? error.message : String(error)}`);
 
       return {

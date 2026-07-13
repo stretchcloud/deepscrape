@@ -2,9 +2,8 @@ import axios, { AxiosError } from 'axios';
 import { load } from 'cheerio';
 import { URL } from 'url';
 import robotsParser, { Robot } from 'robots-parser';
-import https from 'https';
 import { logger } from '../utils/logger';
-import { extractLinks } from '../utils/html-utils';
+import { assertPublicUrl, ssrfSafeRequestConfig, buildHttpsAgent } from '../utils/ssrf-guard';
 import { CrawlStrategy, CrawlerHooks, CrawlerOptions } from '../types/crawler';
 import { PlaywrightService, PlaywrightOptions } from '../services/playwright.service';
 import { UrlNormalizationService } from '../services/url-normalization.service';
@@ -328,19 +327,13 @@ export class WebCrawler {
   }
 
   public async getRobotsTxt(skipTlsVerification = false, abort?: AbortSignal): Promise<string> {
-    let extraArgs = {};
-    if (skipTlsVerification) {
-      extraArgs = {
-        httpsAgent: new https.Agent({
-          rejectUnauthorized: false,
-        })
-      };
-    }
     try {
       const response = await axios.get(this.robotsTxtUrl, {
         timeout: 10000,
         signal: abort,
-        ...extraArgs,
+        maxContentLength: 1024 * 1024,
+        httpAgent: ssrfSafeRequestConfig().httpAgent,
+        httpsAgent: buildHttpsAgent(skipTlsVerification),
       });
       return response.data;
     } catch (error) {
@@ -468,17 +461,13 @@ export class WebCrawler {
    * Build Axios request configuration
    */
   private buildAxiosConfig(normalizedUrl: string, skipTlsVerification: boolean): any {
-    const config: any = {
+    return {
       timeout: 30000,
+      maxContentLength: Number(process.env.MAX_RESPONSE_BYTES ?? 10 * 1024 * 1024),
+      maxBodyLength: Number(process.env.MAX_RESPONSE_BYTES ?? 10 * 1024 * 1024),
+      httpAgent: ssrfSafeRequestConfig().httpAgent,
+      httpsAgent: buildHttpsAgent(skipTlsVerification),
     };
-
-    if (skipTlsVerification) {
-      config.httpsAgent = new https.Agent({
-        rejectUnauthorized: false,
-      });
-    }
-
-    return config;
   }
 
   /**
@@ -495,6 +484,7 @@ export class WebCrawler {
    */
   private async crawlWithAxios(normalizedUrl: string, skipTlsVerification: boolean): Promise<{html: string, links: string[]}> {
     try {
+      await assertPublicUrl(normalizedUrl);
       const config = this.buildAxiosConfig(normalizedUrl, skipTlsVerification);
       const response = await axios.get(normalizedUrl, config);
 

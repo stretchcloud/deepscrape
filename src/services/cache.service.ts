@@ -143,6 +143,46 @@ export class CacheService {
   }
 
   /**
+   * Sweep the cache directory and delete expired entries. The cache only expires
+   * lazily on read, so without a periodic sweep entries that are never read again
+   * accumulate forever and can exhaust disk. Returns the number of entries removed.
+   */
+  async sweepExpired(): Promise<number> {
+    if (!this.options.enabled) {
+      return 0;
+    }
+    let removed = 0;
+    try {
+      if (!fs.existsSync(this.options.directory)) return 0;
+      const files = await fs.promises.readdir(this.options.directory);
+      const now = Date.now();
+      for (const file of files) {
+        if (!file.endsWith('.meta.json')) continue;
+        const metaPath = path.join(this.options.directory, file);
+        try {
+          const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf-8')) as CacheMetadata;
+          if (meta.expiresAt && now > meta.expiresAt) {
+            const base = file.replace(/\.meta\.json$/, '');
+            await fs.promises.unlink(path.join(this.options.directory, `${base}.json`)).catch(() => {});
+            await fs.promises.unlink(metaPath).catch(() => {});
+            removed++;
+          }
+        } catch {
+          // Corrupt/partial metadata — remove it and its data file.
+          const base = file.replace(/\.meta\.json$/, '');
+          await fs.promises.unlink(path.join(this.options.directory, `${base}.json`)).catch(() => {});
+          await fs.promises.unlink(metaPath).catch(() => {});
+          removed++;
+        }
+      }
+      if (removed > 0) logger.info(`Cache sweep removed ${removed} expired/corrupt entr${removed === 1 ? 'y' : 'ies'}`);
+    } catch (error) {
+      logger.error(`Error sweeping cache: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return removed;
+  }
+
+  /**
    * Clear all cached data
    */
   async clear(): Promise<void> {

@@ -14,6 +14,26 @@ interface LLMResponse<T> {
   error?: string;
 }
 
+/**
+ * Robustly parse a model response as JSON: handles plain JSON objects/arrays and
+ * ```json fenced``` payloads. Returns {ok:false} for anything that isn't JSON.
+ */
+function tryParseJson(content: string | null): { ok: true; value: unknown } | { ok: false } {
+  if (typeof content !== 'string') return { ok: false };
+  let text = content.trim();
+
+  // Strip a ```json ... ``` or ``` ... ``` fence if present.
+  const fence = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fence) text = fence[1].trim();
+
+  if (!(text.startsWith('{') || text.startsWith('['))) return { ok: false };
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export class OpenAIService {
   private client: OpenAI;
   private _model: string;
@@ -21,7 +41,11 @@ export class OpenAIService {
   constructor(config: OpenAIConfig) {
     this.client = new OpenAI({
       apiKey: config.apiKey,
-      organization: config.organization
+      organization: config.organization,
+      // Bound each call so a slow/hung LLM request can't pin a worker slot for
+      // the SDK's 10-minute default; retry transient failures a couple of times.
+      timeout: Number(process.env.OPENAI_TIMEOUT_MS ?? 60_000),
+      maxRetries: Number(process.env.OPENAI_MAX_RETRIES ?? 2)
     });
     this._model = config.model;
   }
@@ -79,24 +103,24 @@ export class OpenAIService {
 
       // Process the response
       const content = response.choices[0].message.content;
+      const wantsJson = Boolean(responseFormat);
 
-      try {
-        // If response is JSON string, parse it
-        const parsedContent = typeof content === 'string' && content.trim().startsWith('{')
-          ? JSON.parse(content)
-          : content;
+      const parsed = tryParseJson(content);
+      if (parsed.ok) {
+        return { success: true, data: parsed.value as T };
+      }
 
+      // If JSON was requested but the model didn't return valid JSON, surface it
+      // as a failure rather than silently returning a raw string as "success".
+      if (wantsJson) {
         return {
-          success: true,
-          data: parsedContent as T
-        };
-      } catch (parseError) {
-        // If parsing fails, return the raw content
-        return {
-          success: true,
+          success: false,
+          error: 'LLM did not return valid JSON',
           data: content as unknown as T
         };
       }
+
+      return { success: true, data: content as unknown as T };
     } catch (error) {
       logger.error(`Error calling OpenAI: ${error instanceof Error ? error.message : String(error)}`);
       return {

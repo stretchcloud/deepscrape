@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { logger } from '../utils/logger';
 import { ScraperOptions, BrowserAction, ScraperResponse, AD_SERVING_DOMAINS } from '../types';
 import { PlaywrightService, PlaywrightOptions } from '../services/playwright.service';
+import { isBlockedRequestUrl } from '../utils/ssrf-guard';
 
 /**
  * Browser-based scraper using Playwright
@@ -103,9 +104,33 @@ export class PlaywrightScraper {
       await this.setupResourceBlocking(page, blockAds, blockResources);
     }
 
+    // Install the SSRF guard LAST so Playwright evaluates it FIRST for every
+    // request (handlers run most-recently-added first). Aborts navigations /
+    // redirects / subresources to private IP literals (e.g. cloud metadata).
+    await this.installSsrfRouteGuard(page);
+
     if (options.headers) {
       await page.setExtraHTTPHeaders(options.headers);
     }
+  }
+
+  /**
+   * Abort any browser request whose URL targets a private / metadata IP literal.
+   * Note: hostnames that resolve to private IPs at browser-resolution time are a
+   * residual gap; the navigation target itself is pre-validated by assertPublicUrl.
+   */
+  private async installSsrfRouteGuard(page: Page): Promise<void> {
+    await page.route('**/*', (route: Route) => {
+      try {
+        if (isBlockedRequestUrl(route.request().url())) {
+          logger.warn(`SSRF guard aborted browser request: ${route.request().url()}`);
+          return route.abort('blockedbyclient');
+        }
+      } catch {
+        // fall through to allow on predicate error
+      }
+      return route.fallback();
+    });
   }
 
   /**
@@ -167,6 +192,9 @@ export class PlaywrightScraper {
     status: number;
     headers: Record<string, string>;
     screenshot?: Buffer;
+    pdf?: Buffer;
+    mhtml?: string;
+    jsResult?: any;
   }> {
     const title = await page.title();
 
@@ -197,7 +225,40 @@ export class PlaywrightScraper {
       screenshot = await page.screenshot({ fullPage: true, type: 'png' });
     }
 
-    return { title, content, status, headers, screenshot };
+    // Render PDF if requested (headless Chromium only).
+    let pdf: Buffer | undefined;
+    if (options.capturePdf) {
+      try {
+        pdf = await page.pdf({ printBackground: true, format: 'A4' });
+      } catch (err) {
+        logger.warn(`PDF capture failed: ${(err as Error).message}`);
+      }
+    }
+
+    // Capture an MHTML snapshot via CDP if requested (Chromium only).
+    let mhtml: string | undefined;
+    if (options.captureMhtml) {
+      try {
+        const client = await page.context().newCDPSession(page);
+        const snap = await client.send('Page.captureSnapshot', { format: 'mhtml' });
+        mhtml = (snap as { data?: string }).data;
+        await client.detach().catch(() => {});
+      } catch (err) {
+        logger.warn(`MHTML capture failed: ${(err as Error).message}`);
+      }
+    }
+
+    // Execute arbitrary JS in the page context if requested and enabled.
+    let jsResult: any;
+    if (options.executeJs && process.env.ENABLE_JS_EXECUTION !== 'false') {
+      try {
+        jsResult = await page.evaluate(`(async () => { ${options.executeJs} })()`);
+      } catch (err) {
+        jsResult = { error: (err as Error).message };
+      }
+    }
+
+    return { title, content, status, headers, screenshot, pdf, mhtml, jsResult };
   }
 
   /**
@@ -256,7 +317,7 @@ export class PlaywrightScraper {
         await this.navigateToUrl(page, url, isAmazon, timeout);
         await this.handlePostNavigation(page, url, options, isAmazon, timeout);
 
-        const { title, content, status, headers, screenshot } = await this.extractPageData(page, url, isAmazon, options);
+        const { title, content, status, headers, screenshot, pdf, mhtml, jsResult } = await this.extractPageData(page, url, isAmazon, options);
 
         const loadTime = Date.now() - startTime;
         logger.info(`Page loaded in ${loadTime}ms`);
@@ -272,7 +333,10 @@ export class PlaywrightScraper {
             headers,
             loadTime
           },
-          screenshot
+          screenshot,
+          pdf,
+          mhtml,
+          jsResult
         };
       } finally {
         if (browser) {

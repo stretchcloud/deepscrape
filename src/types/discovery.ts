@@ -12,7 +12,7 @@ export interface RateLimitingOptions {
 
 export interface CrawlOptions {
   maxCrawlDepth?: number;           // Default: 3, Max: 5
-  maxConcurrentCrawlers?: number;   // Default: 8, Max: 20  
+  maxConcurrentCrawlers?: number;   // Default: 8, Max: 20
   crawlTimeoutPerPage?: number;     // Default: 3000ms, Max: 10000ms
   maxLinksPerPage?: number;         // Default: 100, Max: 500
   enableDeepCrawling?: boolean;     // Default: true

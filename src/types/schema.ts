@@ -1,6 +1,10 @@
 /**
  * Types for schema-based extraction
  */
+import { CssExtractionSchema } from '../transformers/css-extractor';
+import { ConfidenceReport } from '../transformers/confidence-scorer';
+
+export type { CssExtractionSchema };
 
 export type SchemaPropertyType =
   | 'string'
@@ -38,7 +42,7 @@ export interface Schema {
 }
 
 /**
- * Options for LLM extraction
+ * Options for extraction (LLM or deterministic CSS).
  */
 export interface ExtractionOptions {
   temperature?: number;
@@ -48,6 +52,12 @@ export interface ExtractionOptions {
   extractionType?: 'structured' | 'summary' | 'qa';
   promptFormat?: 'zero-shot' | 'few-shot';
   exampleData?: any;
+  /**
+   * Deterministic CSS-selector extraction schema. When present, structured data
+   * is extracted with cheerio (no LLM call) — fast, free, and reliable for
+   * repeated page structures. Takes precedence over LLM extraction.
+   */
+  cssSchema?: CssExtractionSchema;
 }
 
 /**
@@ -61,6 +71,8 @@ export interface ExtractionResult<T> {
     confidenceScore?: number;
     extractionTime?: number;
     modelName?: string;
+    /** Deterministic grounding-based confidence: catches hallucination + omission. */
+    confidence?: ConfidenceReport;
   };
 }
 

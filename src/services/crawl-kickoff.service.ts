@@ -1,7 +1,13 @@
 import { logger } from '../utils/logger';
 import { URLDiscoveryService } from './url-discovery.service';
-import { addCrawlJob, markStreamingDiscoveryActive, markStreamingDiscoveryComplete } from './redis.service';
+import {
+  markStreamingDiscoveryActive,
+  markStreamingDiscoveryComplete,
+  markCrawlKickoffFinished,
+  lockCrawlUrl
+} from './redis.service';
 import { addCrawlJobToQueue } from './queue.service';
+import { UrlNormalizationService } from './url-normalization.service';
 import {
   CrawlKickoffOptions,
   CrawlKickoffResult,
@@ -50,6 +56,9 @@ export class CrawlKickoffService {
     });
 
     try {
+      // Claim the seed URL so map discovery doesn't re-queue it as a duplicate.
+      await lockCrawlUrl(crawlId, UrlNormalizationService.normalizeUrl(url));
+
       // STAGE 1A: Immediate initial URL scraping
       const initialJobId = await this.addInitialScrapeJob(crawlId, url, scrapeOptions);
 
@@ -58,9 +67,11 @@ export class CrawlKickoffService {
       // STAGE 1B: Launch streaming discovery (if enabled)
       let discoveryStarted = false;
       if (useMapDiscovery) {
-        // Mark streaming discovery as active to prevent premature crawl completion
+        // Mark streaming discovery as active to prevent premature crawl completion.
+        // Set this BEFORE the kickoff-finished marker so the completion gate can't
+        // fire in the window between the two.
         await markStreamingDiscoveryActive(crawlId);
-        
+
         // Start map discovery in background (non-blocking) with proper error handling
         this.startStreamingDiscovery(crawlId, url, {
           limit,
@@ -77,7 +88,7 @@ export class CrawlKickoffService {
             error: error.message
           });
           // Mark as complete even on error to prevent hanging
-          markStreamingDiscoveryComplete(crawlId).catch(err => 
+          markStreamingDiscoveryComplete(crawlId).catch(err =>
             logger.error('Failed to mark streaming discovery as complete after error', { crawlId, err })
           );
         });
@@ -88,6 +99,10 @@ export class CrawlKickoffService {
         // Traditional browser-based discovery will be handled by the scraper workers
         logger.info('Using traditional browser-based discovery', { crawlId });
       }
+
+      // Initial job(s) are queued and discovery (if any) is marked active — allow
+      // completion detection to proceed once all jobs and discovery finish.
+      await markCrawlKickoffFinished(crawlId);
 
       return {
         success: true,
@@ -187,7 +202,7 @@ export class CrawlKickoffService {
         crawlId,
         error: (error as Error).message
       });
-      
+
       // Mark as complete even on error to prevent hanging
       await markStreamingDiscoveryComplete(crawlId);
       throw error;
@@ -243,6 +258,14 @@ export class CrawlKickoffService {
     scrapeOptions: any
   ): Promise<void> {
     try {
+      // Atomic dedup: skip URLs already claimed (e.g. the seed, or found by
+      // multiple discovery methods) so they aren't scraped/exported twice.
+      const isNew = await lockCrawlUrl(crawlId, UrlNormalizationService.normalizeUrl(url));
+      if (!isNew) {
+        logger.debug('Skipping already-seen discovered URL', { crawlId, url });
+        return;
+      }
+
       const jobData = {
         url,
         mode: 'streaming-discovered',

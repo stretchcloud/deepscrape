@@ -1,19 +1,8 @@
-import Redis from 'ioredis';
 import { logger } from '../utils/logger';
+import { createRedisClient } from './redis-connection';
 
-// Connect to Redis using the Docker configuration
-const redisClient = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379')
-});
-
-redisClient.on('error', (err) => {
-  logger.error('Redis connection error', { error: err });
-});
-
-redisClient.on('connect', () => {
-  logger.info('Connected to Redis');
-});
+// Unified connection: supports REDIS_URL (with rediss:// TLS) or host/port/password.
+const redisClient = createRedisClient('main');
 
 // Crawl data operations
 export async function saveCrawl(
@@ -30,6 +19,7 @@ export async function saveCrawl(
     ignoreRobotsTxt?: boolean;
     regexOnFullURL?: boolean;
     strategy?: string;
+    keywords?: string[];
     useBrowser?: boolean;
     scrapeOptions?: any;
     robots?: string;
@@ -48,6 +38,7 @@ export async function saveCrawl(
       ignoreRobotsTxt: data.ignoreRobotsTxt,
       regexOnFullURL: data.regexOnFullURL,
       strategy: data.strategy,
+      keywords: data.keywords,
       useBrowser: data.useBrowser
     },
     scrapeOptions: data.scrapeOptions || {},
@@ -55,7 +46,9 @@ export async function saveCrawl(
     robots: data.robots
   };
 
-  await redisClient.set(`crawl:${id}`, JSON.stringify(storedCrawl));
+  // Set the 24h TTL at write time (previously only applied on first getCrawl,
+  // so a never-polled crawl record would leak forever).
+  await redisClient.set(`crawl:${id}`, JSON.stringify(storedCrawl), 'EX', 24 * 60 * 60);
 }
 
 export async function getCrawl(id: string): Promise<any | null> {
@@ -109,37 +102,101 @@ export async function markCrawlJobDone(
   crawlId: string,
   jobId: string,
   success: boolean,
-  result: any = null
+  result: any = null,
+  errorInfo?: { url?: string; error?: string }
 ): Promise<void> {
   try {
-    // Add to appropriate set based on success/failure
+    // Add to the appropriate terminal set. On success, also remove the job from
+    // the failed set: a job that failed an earlier attempt and then succeeded on
+    // retry must be counted once, as a success (previously it was double-counted).
     if (success) {
       await redisClient.sadd(`crawl:${crawlId}:jobs:done:success`, jobId);
+      await redisClient.srem(`crawl:${crawlId}:jobs:done:failed`, jobId);
+      await redisClient.hdel(`crawl:${crawlId}:errors`, jobId);
     } else {
-      await redisClient.sadd(`crawl:${crawlId}:jobs:done:failed`, jobId);
+      // Only mark failed if not already recorded as a success.
+      const isSuccess = await redisClient.sismember(`crawl:${crawlId}:jobs:done:success`, jobId);
+      if (!isSuccess) {
+        await redisClient.sadd(`crawl:${crawlId}:jobs:done:failed`, jobId);
+        // Record the failure reason for the /errors introspection endpoint.
+        await redisClient.hset(
+          `crawl:${crawlId}:errors`,
+          jobId,
+          JSON.stringify({ url: errorInfo?.url, error: errorInfo?.error ?? 'unknown error', at: new Date().toISOString() })
+        );
+        await redisClient.expire(`crawl:${crawlId}:errors`, 24 * 60 * 60);
+      }
     }
+    await redisClient.expire(`crawl:${crawlId}:jobs:done:success`, 24 * 60 * 60);
+    await redisClient.expire(`crawl:${crawlId}:jobs:done:failed`, 24 * 60 * 60);
 
-    // If we have a result, store it separately
+    // Store the per-job result separately (survives BullMQ removeOnComplete).
     if (result) {
-      // Store the full job result in Redis
-      await redisClient.set(`crawl:${crawlId}:job:${jobId}:result`, JSON.stringify(result));
-      // Set expiration separately
-      await redisClient.expire(`crawl:${crawlId}:job:${jobId}:result`, 86400); // 24 hours
+      await redisClient.set(`crawl:${crawlId}:job:${jobId}:result`, JSON.stringify(result), 'EX', 86400);
     }
 
-    // Remove from pending
-    await redisClient.srem(`crawl:${crawlId}:jobs:pending`, jobId);
-
-    // Check if all jobs are completed
-    const pendingCount = await redisClient.scard(`crawl:${crawlId}:jobs:pending`);
-
-    // If no more pending jobs, mark crawl as finished
-    if (pendingCount === 0) {
-      await markCrawlFinished(crawlId);
-    }
+    // Completion is derived from set cardinality (success + failed === total),
+    // gated on kickoff/discovery completion inside isCrawlFinished().
+    await markCrawlFinished(crawlId);
   } catch (error) {
     logger.error('Error marking job as done in Redis', { error, crawlId, jobId });
     throw error;
+  }
+}
+
+/** Per-page failure list for a crawl (jobId -> {url, error, at}). */
+export async function getCrawlErrors(crawlId: string): Promise<Array<{ id: string; url?: string; error: string; at?: string }>> {
+  try {
+    const raw = await redisClient.hgetall(`crawl:${crawlId}:errors`);
+    return Object.entries(raw).map(([id, val]) => {
+      try {
+        const parsed = JSON.parse(val);
+        return { id, url: parsed.url, error: parsed.error ?? 'unknown error', at: parsed.at };
+      } catch {
+        return { id, error: val };
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting crawl errors', { error, crawlId });
+    return [];
+  }
+}
+
+// --- Active crawl registry (for GET /api/crawl/active) ---
+
+/** Register a crawl as active (sorted set scored by start time). */
+export async function addActiveCrawl(crawlId: string, meta: { url: string; createdAt: number }): Promise<void> {
+  try {
+    await redisClient.zadd('active_crawls', meta.createdAt, crawlId);
+    await redisClient.set(`crawl:${crawlId}:meta`, JSON.stringify(meta), 'EX', 24 * 60 * 60);
+  } catch (error) {
+    logger.error('Error registering active crawl', { error, crawlId });
+  }
+}
+
+export async function removeActiveCrawl(crawlId: string): Promise<void> {
+  try {
+    await redisClient.zrem('active_crawls', crawlId);
+  } catch (error) {
+    logger.error('Error removing active crawl', { error, crawlId });
+  }
+}
+
+/** List currently-active crawls with lightweight progress. */
+export async function getActiveCrawls(): Promise<Array<{ id: string; url?: string; createdAt?: number; progress: any }>> {
+  try {
+    const ids = await redisClient.zrevrange('active_crawls', 0, 99);
+    const out = [];
+    for (const id of ids) {
+      const metaRaw = await redisClient.get(`crawl:${id}:meta`);
+      const meta = metaRaw ? JSON.parse(metaRaw) : {};
+      const progress = await getCrawlProgress(id);
+      out.push({ id, url: meta.url, createdAt: meta.createdAt, progress });
+    }
+    return out;
+  } catch (error) {
+    logger.error('Error listing active crawls', { error });
+    return [];
   }
 }
 
@@ -186,6 +243,29 @@ export async function getCrawlDoneJobsCount(crawlId: string): Promise<number> {
   }
 }
 
+/** Aggregate progress counters for a crawl, derived purely from Redis sets. */
+export async function getCrawlProgress(crawlId: string): Promise<{
+  total: number; success: number; failed: number; done: number;
+}> {
+  const [total, success, failed] = await Promise.all([
+    redisClient.scard(`crawl:${crawlId}:jobs`),
+    redisClient.scard(`crawl:${crawlId}:jobs:done:success`),
+    redisClient.scard(`crawl:${crawlId}:jobs:done:failed`)
+  ]);
+  return { total, success, failed, done: success + failed };
+}
+
+/** Read a stored per-job result document (survives BullMQ removeOnComplete). */
+export async function getCrawlJobResult(crawlId: string, jobId: string): Promise<any | null> {
+  const raw = await redisClient.get(`crawl:${crawlId}:job:${jobId}:result`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 export async function markCrawlFinished(crawlId: string): Promise<boolean> {
   try {
     const isFinished = await isCrawlFinished(crawlId);
@@ -197,6 +277,8 @@ export async function markCrawlFinished(crawlId: string): Promise<boolean> {
       if (result === 1) {
         await redisClient.set(`crawl:${crawlId}:completed_at`, Date.now());
         await redisClient.expire(`crawl:${crawlId}:completed_at`, 24 * 60 * 60);
+        // No longer active.
+        await removeActiveCrawl(crawlId);
 
         logger.info(`Crawl ${crawlId} marked as finished`, { crawlId });
 
@@ -223,20 +305,21 @@ export async function isCrawlFinished(crawlId: string): Promise<boolean> {
   try {
     const jobCount = await redisClient.scard(`crawl:${crawlId}:jobs`);
 
-    // Try both the new and old format for done jobs
-    const newDoneJobCount = await redisClient.scard(`crawl:${crawlId}:jobs:done:success`);
-    const oldDoneJobCount = await redisClient.scard(`crawl:${crawlId}:jobs_done`);
+    // Done = successes + failures. Counting failures is essential: otherwise a
+    // single permanently-failed page wedges the crawl in "scraping" forever.
+    const successCount = await redisClient.scard(`crawl:${crawlId}:jobs:done:success`);
+    const failedCount = await redisClient.scard(`crawl:${crawlId}:jobs:done:failed`);
+    const doneJobCount = successCount + failedCount;
 
-    const doneJobCount = Math.max(newDoneJobCount, oldDoneJobCount);
+    // Gate 1: link discovery / kickoff must have finished enqueuing jobs,
+    // otherwise we could "complete" at page 1 while more jobs are still coming.
+    const kickoffFinished = await redisClient.exists(`crawl:${crawlId}:kickoff:finish`);
+    // Gate 2: streaming discovery (map mode) must not still be running.
+    const streamingActive = await redisClient.exists(`crawl:${crawlId}:streaming:active`);
 
-    // Check if streaming discovery is still running
-    const isStreamingDiscoveryActive = await redisClient.exists(`crawl:${crawlId}:streaming:active`);
+    logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} done (ok=${successCount} fail=${failedCount}), kickoff=${kickoffFinished} streaming=${streamingActive}`);
 
-    logger.debug(`Crawl ${crawlId}: ${doneJobCount}/${jobCount} jobs done, streaming discovery active: ${isStreamingDiscoveryActive}`);
-
-    // Don't mark as finished if streaming discovery is still active
-    if (isStreamingDiscoveryActive) {
-      logger.debug(`Crawl ${crawlId}: Streaming discovery still active, not marking as finished`);
+    if (!kickoffFinished || streamingActive) {
       return false;
     }
 
@@ -245,6 +328,55 @@ export async function isCrawlFinished(crawlId: string): Promise<boolean> {
     logger.error('Error checking if crawl is finished', { error, crawlId });
     throw error;
   }
+}
+
+/** Mark that all kickoff/discovery jobs have finished being enqueued. */
+export async function markCrawlKickoffFinished(crawlId: string): Promise<void> {
+  await redisClient.set(`crawl:${crawlId}:kickoff:finish`, 'yes', 'EX', 24 * 60 * 60);
+}
+
+export async function isCrawlKickoffFinished(crawlId: string): Promise<boolean> {
+  return (await redisClient.exists(`crawl:${crawlId}:kickoff:finish`)) === 1;
+}
+
+/**
+ * Atomically claim a URL for a crawl. Returns true if this URL had not been seen
+ * before (so the caller should enqueue it), false if already claimed. This is
+ * the SADD-return-as-visited-check pattern — the atomic dedup that stops two
+ * workers from crawling the same normalized URL.
+ */
+export async function lockCrawlUrl(crawlId: string, normalizedUrl: string): Promise<boolean> {
+  const added = await redisClient.sadd(`crawl:${crawlId}:visited`, normalizedUrl);
+  await redisClient.expire(`crawl:${crawlId}:visited`, 24 * 60 * 60);
+  return added === 1;
+}
+
+/** Current number of pages that have been queued against the crawl budget. */
+export async function getCrawlPageCount(crawlId: string): Promise<number> {
+  const n = await redisClient.get(`crawl:${crawlId}:page_count`);
+  return n ? parseInt(n, 10) : 0;
+}
+
+/**
+ * Atomically reserve up to `want` slots against the crawl's page budget of
+ * `limit`. Returns how many slots were actually granted (0..want). Uses INCRBY
+ * then rolls back any overshoot so concurrent workers can't exceed the limit.
+ */
+export async function reserveCrawlPageSlots(crawlId: string, want: number, limit: number): Promise<number> {
+  if (want <= 0) return 0;
+  const key = `crawl:${crawlId}:page_count`;
+  const total = await redisClient.incrby(key, want);
+  await redisClient.expire(key, 24 * 60 * 60);
+  if (total <= limit) return want;
+  const overshoot = total - limit;
+  const granted = Math.max(0, want - overshoot);
+  // Roll back the portion we couldn't grant.
+  await redisClient.decrby(key, want - granted);
+  return granted;
+}
+
+export async function isCrawlCancelled(crawlId: string): Promise<boolean> {
+  return (await redisClient.exists(`crawl:${crawlId}:cancelled`)) === 1;
 }
 
 // Streaming discovery status management
@@ -282,11 +414,14 @@ export async function cancelCrawl(crawlId: string): Promise<void> {
     const crawl = await getCrawl(crawlId);
     if (!crawl) throw new Error('Crawl not found');
 
-    crawl.cancelled = true;
-    await saveCrawl(crawlId, crawl);
-    
-    // Also stop streaming discovery if active
+    // Store cancellation as its own key. The previous implementation round-tripped
+    // the stored crawl back through saveCrawl (which expects the request shape),
+    // corrupting the record and dropping the flag entirely.
+    await redisClient.set(`crawl:${crawlId}:cancelled`, 'yes', 'EX', 24 * 60 * 60);
+
+    // Stop streaming discovery and let completion logic finalize the crawl.
     await markStreamingDiscoveryComplete(crawlId);
+    await markCrawlKickoffFinished(crawlId);
   } catch (error) {
     logger.error('Error canceling crawl', { error, crawlId });
     throw error;

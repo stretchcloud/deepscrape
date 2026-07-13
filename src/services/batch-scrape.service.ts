@@ -10,6 +10,7 @@ import {
   ScraperResponse
 } from '../types';
 import axios from 'axios';
+import { assertPublicUrl, ssrfSafeRequestConfig } from '../utils/ssrf-guard';
 
 /**
  * Service for handling batch scraping operations
@@ -105,6 +106,21 @@ export class BatchScrapeService {
   /**
    * Get batch status and results
    */
+  /**
+   * Return the failed jobs (URL + error) for a batch — error introspection.
+   */
+  async getBatchErrors(batchId: string): Promise<Array<{ id: string; url: string; error?: string }>> {
+    const metadataStr = await redisClient.get(`${BatchScrapeService.BATCH_KEY_PREFIX}${batchId}`);
+    if (!metadataStr) {
+      throw new Error(`Batch ${batchId} not found`);
+    }
+    const jobsStr = await redisClient.get(`${BatchScrapeService.BATCH_JOBS_KEY_PREFIX}${batchId}`);
+    const jobs: BatchScrapeJob[] = jobsStr ? JSON.parse(jobsStr) : [];
+    return jobs
+      .filter(job => job.status === 'failed')
+      .map(job => ({ id: job.id, url: job.url, error: (job as { error?: string }).error }));
+  }
+
   async getBatchStatus(batchId: string): Promise<BatchScrapeStatusResponse> {
     // Get batch metadata
     const metadataStr = await redisClient.get(`${BatchScrapeService.BATCH_KEY_PREFIX}${batchId}`);
@@ -301,6 +317,14 @@ export class BatchScrapeService {
           timeout: 30000 // 30 second timeout per URL
         });
 
+        // scrape() catches transport/DNS/HTTP errors internally and returns a
+        // response with `error` set instead of throwing. Treat that as a failed
+        // attempt so retries run and the job is recorded as failed (and shows up
+        // in /errors) rather than being miscounted as a success.
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
         job.result = result;
         job.status = 'completed';
         job.endTime = Date.now();
@@ -339,12 +363,16 @@ export class BatchScrapeService {
    */
   private async sendWebhook(webhookUrl: string, data: any): Promise<void> {
     try {
+      // Webhooks are user-supplied URLs -> guard against SSRF before POSTing.
+      await assertPublicUrl(webhookUrl);
       await axios.post(webhookUrl, {
         event: 'batch_scrape.completed',
         data,
         timestamp: new Date().toISOString()
       }, {
         timeout: 10000,
+        maxContentLength: 1024 * 1024,
+        ...ssrfSafeRequestConfig(),
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'DeepScrape-Webhook/1.0'

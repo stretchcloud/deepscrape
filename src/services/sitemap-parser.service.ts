@@ -3,7 +3,11 @@ import { parseString } from 'xml2js';
 import * as pako from 'pako';
 import { logger } from '../utils/logger';
 import { URLValidationUtils } from '../utils/url-validation.utils';
+import { ssrfSafeRequestConfig } from '../utils/ssrf-guard';
 import { SitemapInfo } from '../types/discovery';
+
+/** Max depth for recursive sitemap-index descent (cycle/DoS guard). */
+const MAX_SITEMAP_DEPTH = Number(process.env.MAX_SITEMAP_DEPTH ?? 5);
 
 /**
  * Enhanced sitemap parsing service for URL discovery
@@ -43,7 +47,7 @@ export class SitemapParserService {
         '/web_sitemap.xml'
       ];
 
-      let potentialSitemaps = [
+      const potentialSitemaps = [
         ...robotsSitemaps,
         ...commonSitemapPaths.map(path => baseUrl + path)
       ];
@@ -52,7 +56,7 @@ export class SitemapParserService {
       // 3. Parse sitemaps in smaller batches to avoid overwhelming the server
       const batchSize = 3; // Process 3 sitemaps at a time
       const sitemapResults: PromiseSettledResult<string[]>[] = [];
-      
+
       for (let i = 0; i < potentialSitemaps.length; i += batchSize) {
         const batch = potentialSitemaps.slice(i, i + batchSize);
         const batchPromises = batch.map(async (sitemapUrl) => {
@@ -68,7 +72,7 @@ export class SitemapParserService {
 
         const batchResults = await Promise.allSettled(batchPromises);
         sitemapResults.push(...batchResults);
-        
+
         // Add delay between batches
         if (i + batchSize < potentialSitemaps.length) {
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -119,7 +123,8 @@ export class SitemapParserService {
       const response = await axios.get(robotsUrl, {
         timeout: this.timeout,
         headers: { 'User-Agent': this.userAgent },
-        maxContentLength: 1024 * 1024 // 1MB max for robots.txt
+        maxContentLength: 1024 * 1024, // 1MB max for robots.txt
+        ...ssrfSafeRequestConfig()
       });
 
       const robotsContent = response.data;
@@ -152,7 +157,17 @@ export class SitemapParserService {
   /**
    * Parse a single sitemap (XML, text, or gzipped)
    */
-  async parseSitemap(sitemapUrl: string): Promise<string[]> {
+  async parseSitemap(sitemapUrl: string, depth = 0, seen: Set<string> = new Set()): Promise<string[]> {
+    // Cycle / DoS guard for recursive sitemap-index descent.
+    if (depth >= MAX_SITEMAP_DEPTH) {
+      logger.debug(`Sitemap recursion depth cap reached at ${sitemapUrl}`);
+      return [];
+    }
+    if (seen.has(sitemapUrl)) {
+      return [];
+    }
+    seen.add(sitemapUrl);
+
     try {
       const response = await axios.get(sitemapUrl, {
         timeout: this.timeout,
@@ -161,7 +176,8 @@ export class SitemapParserService {
           'Accept-Encoding': 'gzip, deflate'
         },
         maxContentLength: this.maxSitemapSize,
-        responseType: 'arraybuffer'
+        responseType: 'arraybuffer',
+        ...ssrfSafeRequestConfig()
       });
 
       let content: string;
@@ -181,7 +197,7 @@ export class SitemapParserService {
 
       // Determine format and parse accordingly
       if (content.trim().startsWith('<?xml') || content.includes('<sitemapindex>') || content.includes('<urlset>')) {
-        return await this.parseXmlSitemap(content, sitemapUrl);
+        return await this.parseXmlSitemap(content, sitemapUrl, depth, seen);
       } else {
         return this.parseTextSitemap(content);
       }
@@ -197,7 +213,7 @@ export class SitemapParserService {
   /**
    * Parse XML sitemap content
    */
-  private async parseXmlSitemap(content: string, sitemapUrl: string): Promise<string[]> {
+  private async parseXmlSitemap(content: string, sitemapUrl: string, depth = 0, seen: Set<string> = new Set()): Promise<string[]> {
     return new Promise((resolve, reject) => {
       parseString(content, { explicitArray: false }, async (err, result) => {
         if (err) {
@@ -214,11 +230,11 @@ export class SitemapParserService {
               ? result.sitemapindex.sitemap
               : [result.sitemapindex.sitemap];
 
-            // Recursively parse child sitemaps
+            // Recursively parse child sitemaps (depth/cycle guarded)
             const childPromises = sitemaps.map(async (sitemap: any) => {
               if (sitemap.loc) {
                 try {
-                  return await this.parseSitemap(sitemap.loc);
+                  return await this.parseSitemap(sitemap.loc, depth + 1, seen);
                 } catch (error) {
                   logger.debug(`Failed to parse child sitemap: ${sitemap.loc}`);
                   return [];
