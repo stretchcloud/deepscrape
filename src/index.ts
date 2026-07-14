@@ -18,6 +18,8 @@ import agentRoutes from './api/routes/agent.routes';
 import proxiesRoutes from './api/routes/proxies.routes';
 import extractAutoRoutes from './api/routes/extract-auto.routes';
 import { discoverApisRouter, readerRouter, crawlEstimateRouter } from './api/routes/phase2-tools.routes';
+import sitesRoutes from './api/routes/sites.routes';
+import { startSiteVerifier, stopSiteVerifier } from './services/site-spec.service';
 import { initTaskQueue, initTaskWorker, closeTaskQueue } from './services/task.service';
 import { logger } from './utils/logger';
 import { initQueue, initializeWorker, closeQueue } from './services/queue.service';
@@ -138,6 +140,7 @@ app.use('/api/proxies', proxiesRoutes);
 app.use('/api/extract-auto', extractAutoRoutes);
 app.use('/api/discover-apis', discoverApisRouter);
 app.use('/api/reader', readerRouter);
+app.use('/api/sites', sitesRoutes);
 
 // Liveness probe — is the process up? (used by container/orchestrator healthchecks)
 app.get('/health', (req, res) => {
@@ -216,6 +219,9 @@ const server = app.listen(PORT, async () => {
   logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
   await initializeCrawlQueue();
   startMaintenance();
+  // The SiteSpec verifier re-runs saved specs and self-heals on drift; only the
+  // worker role runs the background work so split deployments don't double-verify.
+  if (runWorker) startSiteVerifier();
 });
 // Give slow scrape/crawl requests time to complete behind a proxy.
 server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS ?? 120_000);
@@ -237,6 +243,7 @@ async function shutdown(signal: string, exitCode = 0): Promise<void> {
 
   // 1. Stop accepting new connections and stop background maintenance.
   stopMaintenance();
+  stopSiteVerifier();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 
   // 2. Stop the workers (waits for active jobs), then the queues.

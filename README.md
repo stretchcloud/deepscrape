@@ -20,6 +20,7 @@ Transform any website into structured data using Playwright automation and GPT-4
 - **🤖 Autonomous Agent** - `/api/agent` navigates a site toward a natural-language goal and returns a structured answer
 - **🔁 Proxy Rotation** - Configurable egress-proxy pool for the browser path with health tracking + escalation
 - **📃 llms.txt Generator** - `/api/llmstxt` builds an `llms.txt` (and `llms-full.txt`) index for any site
+- **🔌 Site → MCP Endpoint** - `/api/sites` turns any site into a saved, self-healing extraction endpoint; each becomes its own `site_<name>` MCP tool for agents
 - **🔎 Error Introspection** - `/api/crawl/active`, `/crawl/:id/errors`, `/batch/scrape/:id/errors`, and `/api/usage`
 - **🔍 Web Search** - `/api/search` (Serper / SearXNG / DuckDuckGo) with optional scrape-of-results
 - **🕷️ Web Crawling** - True multi-level crawl with best-first URL scoring, robots.txt, live status, cancel
@@ -402,6 +403,7 @@ See [`sdk/README.md`](sdk/README.md) for the full API.
 | `SELF_HEAL_SCHEMA_TTL` | 604800 | Derived CSS-schema cache TTL for `/api/extract-auto` (7 days) |
 | `SELF_HEAL_HEALTHY_RATIO` | 0.5 | Min fraction of records with populated required fields before "breakage" |
 | `SESSION_STEALTH` | true | Fingerprint hygiene for sessions/agent (set `false` for a plain UA) |
+| `SITE_VERIFY_INTERVAL_MS` | 86400000 | SiteSpec verifier cadence (24h; `<=0` disables) |
 
 See [`.env.example`](.env.example) for the complete list.
 
@@ -573,6 +575,50 @@ curl -s -X POST "$BASE/api/crawl/estimate" -H "X-API-Key: $API_KEY" -H "Content-
 # -> { "estimate": { "maxPages":250, "renderMode":"http", "estimatedLlmCalls":250,
 #      "pricing":"self-hosted: flat infrastructure cost — no per-page credits, no bill shock.", "note":"…" } }
 ```
+
+### 18. Site → MCP endpoint generator (`/api/sites`)
+
+Turn any site into a **saved, named, self-healing extraction endpoint** that your agents call over MCP — the self-hosted answer to "turn a website into an API for agents." A **SiteSpec** stores the fields you want + the derived CSS selectors; running it is deterministic (free), and it **re-derives selectors automatically when the site breaks**. Because it runs on *your* infra, it works on your authenticated/internal sites too.
+
+```bash
+# Create a spec (LLM derives selectors from the fields; or pass cssSchema to bootstrap)
+curl -s -X POST "$BASE/api/sites" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "name":"acme_products",
+  "description":"Product name + price from an Acme category page",
+  "url":"https://acme.com/category/{category}",
+  "params":[{"name":"category","required":true}],
+  "fields":[{"name":"title","required":true},{"name":"price","type":"number","required":true}],
+  "verify":true
+}'
+# -> { "spec": { "name":"acme_products", "health":"healthy", ... }, "sample":[ … ] }
+
+# Run it (templated params allowed); self-heals on drift
+curl -s -X POST "$BASE/api/sites/by-name/acme_products/run" -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" -d '{"params":{"category":"shoes"}}'
+# -> { "success":true, "data":[ … ], "health":"healthy", "source":"cache", "recordCount":24, "fieldFillRatio":1 }
+```
+
+Endpoints: `POST /api/sites` (create), `GET /api/sites` (list), `GET /api/sites/:id` (full spec incl. selectors), `POST /api/sites/:id/run` and `POST /api/sites/by-name/:name/run`, `POST /api/sites/:id/verify`, `DELETE /api/sites/:id`. An opt-in **scheduled verifier** (`verify:true`, `SITE_VERIFY_INTERVAL_MS`) re-runs specs and self-heals on drift.
+
+**Authenticated / internal sites (the differentiator).** Bind a spec to a persistent [session](#15-interactive-sessions-autonomous-agent--proxy-rotation) with `sessionId`, and the spec extracts *within that session's authenticated context* — so it works on gated dashboards and internal tools that no hosted service can reach. **DeepScrape never stores credentials**: you authenticate the session yourself (the session actions you issue), and the spec holds only the session reference.
+
+```bash
+# 1) create a session, 2) log in via session actions (your creds, your API calls):
+#    POST /api/sessions {initialUrl:"https://intranet/login"}
+#    POST /api/sessions/<sid>/action {type:"type", selector:"#user", text:"…"}   (+ password, click)
+# 3) bind a spec to the authenticated session:
+curl -s -X POST "$BASE/api/sites" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "name":"internal_dashboard", "url":"https://intranet/reports",
+  "fields":[{"name":"metric","required":true}], "sessionId":"<sid>"
+}'
+# runs (and the site_internal_dashboard MCP tool) now read the logged-in page.
+```
+
+> Honest limitation: sessions are in-memory and idle-reaped (`SESSION_IDLE_TTL_MS`, default 5 min; `SESSION_MAX_LIFETIME_MS`, 30 min). For long-lived authenticated specs, raise those TTLs; when a bound session expires, runs return `health:"degraded"` with a clear "re-bind" message rather than silently scraping the logged-out page.
+
+**In MCP, every spec becomes its own tool.** The MCP server exposes `deepscrape_sites_list` + `deepscrape_site_run`, **plus one dynamic `site_<name>` tool per saved spec** — so an agent discovers `site_acme_products` (with a typed `category` input), not a generic verb. Restart the MCP server to pick up newly-created specs.
+
+> Positioning: this is the **self-hosted** counterpart to hosted "website→agent-API" services — no per-call fees, your data stays yours, and it works on internal/authenticated sites you'd never hand to a third party. It is **read-first**; reliable arbitrary transactions are deliberately out of scope.
 
 ---
 

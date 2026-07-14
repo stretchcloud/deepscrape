@@ -19,6 +19,9 @@ DeepScrape API as tools for AI agents (Claude Desktop, Claude Code, Cursor, etc.
 | `deepscrape_session_close` | Close a session and free its browser context. |
 | `deepscrape_extract_auto` | Self-healing structured extraction — describe fields, no selectors; heals on breakage. |
 | `deepscrape_discover_apis` | Find a page's hidden JSON/XHR/GraphQL endpoints so you can query the API directly. |
+| `deepscrape_sites_list` | List saved SiteSpecs (self-healing site endpoints) with their params + health. |
+| `deepscrape_site_run` | Run a saved SiteSpec by name → fresh structured data (self-heals on drift). |
+| `site_<name>` | **One dynamic tool per saved SiteSpec** — agents discover purpose-named tools (e.g. `site_acme_products`) with typed params. Registered at MCP startup from `GET /api/sites`; restart to pick up new specs. |
 
 ### Typical agent flows
 
