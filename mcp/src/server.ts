@@ -65,6 +65,9 @@
  *   deepscrape_session_close   DELETE /api/sessions/{id}         Close a session
  *   deepscrape_extract_auto    POST   /api/extract-auto          Self-healing structured extraction
  *   deepscrape_discover_apis   POST   /api/discover-apis         Find a page's hidden JSON/XHR APIs
+ *   deepscrape_sites_list      GET    /api/sites                 List saved site endpoints (SiteSpecs)
+ *   deepscrape_site_run        POST   /api/sites/by-name/{n}/run Run a saved site endpoint by name
+ *   site_<name>                POST   /api/sites/by-name/{n}/run One dynamic tool per saved SiteSpec
  *
  * @packageDocumentation
  */
@@ -544,6 +547,89 @@ function registerTools(server: McpServer): void {
       return callDeepScrape('POST', '/api/discover-apis', body);
     },
   );
+
+  // -- deepscrape_sites_list -------------------------------------------------
+  server.registerTool(
+    'deepscrape_sites_list',
+    {
+      title: 'List saved site endpoints',
+      description:
+        'List the saved SiteSpecs — reusable, self-healing extraction endpoints someone configured for ' +
+        'specific websites. Each has a name, description, required params, and current health. Run one ' +
+        'with `deepscrape_site_run`. (Each spec is also exposed as its own `site_<name>` tool.)',
+      inputSchema: {},
+    },
+    async () => callDeepScrape('GET', '/api/sites'),
+  );
+
+  // -- deepscrape_site_run ---------------------------------------------------
+  server.registerTool(
+    'deepscrape_site_run',
+    {
+      title: 'Run a saved site endpoint',
+      description:
+        'Run a saved SiteSpec by name and get fresh structured data. The extraction self-heals if the ' +
+        'site changed. Use `deepscrape_sites_list` to see available names and their required params.',
+      inputSchema: {
+        name: z.string().min(1).describe('The SiteSpec name to run.'),
+        params: z
+          .record(z.string())
+          .optional()
+          .describe('Values for the spec\'s URL parameters (e.g. { "category": "shoes" }).'),
+      },
+    },
+    async ({ name, params }) => {
+      const body: Record<string, unknown> = {};
+      if (params !== undefined) body.params = params;
+      return callDeepScrape('POST', `/api/sites/by-name/${encodeURIComponent(name)}/run`, body);
+    },
+  );
+}
+
+/**
+ * Dynamically register one MCP tool per saved SiteSpec (`site_<name>`), so agents
+ * discover purpose-named tools instead of a generic verb. Fetched once at startup;
+ * failures are non-fatal (the static + generic tools still work). Restart to pick
+ * up newly-created specs.
+ */
+async function registerSiteTools(server: McpServer): Promise<number> {
+  let sites: Array<{ id: string; name: string; description?: string; params?: Array<{ name: string; description?: string; required?: boolean }> }> = [];
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (API_KEY) headers['X-API-Key'] = API_KEY;
+    const resp = await fetch(`${API_URL}/api/sites`, { headers });
+    if (!resp.ok) {
+      console.error(`[${SERVER_NAME}] Could not load SiteSpecs (${resp.status}); per-spec tools skipped.`);
+      return 0;
+    }
+    const body = (await resp.json()) as { sites?: typeof sites };
+    sites = body.sites ?? [];
+  } catch (err) {
+    console.error(`[${SERVER_NAME}] Could not reach DeepScrape for SiteSpecs: ${errorMessage(err)}; per-spec tools skipped.`);
+    return 0;
+  }
+
+  let registered = 0;
+  for (const site of sites) {
+    // Build the tool's input schema from the spec's declared params.
+    const shape: Record<string, z.ZodTypeAny> = {};
+    for (const p of site.params ?? []) {
+      const field = z.string().describe(p.description ?? `Value for "${p.name}".`);
+      shape[p.name] = p.required === false ? field.optional() : field;
+    }
+    server.registerTool(
+      `site_${site.name}`,
+      {
+        title: `Run site: ${site.name}`,
+        description: (site.description || `Run the "${site.name}" saved site endpoint`) + ' (self-healing extraction).',
+        inputSchema: shape,
+      },
+      async (args: Record<string, unknown>) =>
+        callDeepScrape('POST', `/api/sites/by-name/${encodeURIComponent(site.name)}/run`, { params: args ?? {} }),
+    );
+    registered++;
+  }
+  return registered;
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +640,7 @@ async function main(): Promise<void> {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
   registerTools(server);
+  const siteToolCount = await registerSiteTools(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -561,7 +648,8 @@ async function main(): Promise<void> {
   // stderr only — stdout is the MCP protocol channel.
   console.error(
     `[${SERVER_NAME}] MCP server v${SERVER_VERSION} started on stdio ` +
-      `(DeepScrape API: ${API_URL}${API_KEY ? ', API key configured' : ', no API key'}).`,
+      `(DeepScrape API: ${API_URL}${API_KEY ? ', API key configured' : ', no API key'}` +
+      `${siteToolCount > 0 ? `, ${siteToolCount} site tool(s)` : ''}).`,
   );
 }
 
