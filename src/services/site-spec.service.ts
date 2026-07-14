@@ -3,6 +3,7 @@ import { redisClient } from './redis.service';
 import { logger } from '../utils/logger';
 import scraperManager from '../scraper/scraper-manager';
 import { assertPublicUrl, SsrfError } from '../utils/ssrf-guard';
+import { sessionManager, SessionNotFoundError } from './session-manager.service';
 import { selfHealExtract } from './self-heal-extractor.service';
 import { DesiredField } from '../transformers/self-heal-core';
 import { CssExtractionSchema } from '../transformers/css-extractor';
@@ -40,6 +41,7 @@ export interface CreateSpecInput {
   fields: DesiredField[];
   cssSchema?: CssExtractionSchema; // optional bootstrap (skips first LLM derivation)
   sampleParams?: Record<string, unknown>; // values used to fetch a page for derivation
+  sessionId?: string;          // bind to a pre-authenticated session (auth'd/internal sites)
   verify?: boolean;
 }
 
@@ -123,9 +125,15 @@ export async function createSpec(input: CreateSpecInput): Promise<{ spec: SiteSp
   const url = resolveUrlTemplate(input.url, input.sampleParams ?? {});
   await guardUrl(url);
 
-  const scrape = await scraperManager.scrape(url, { includeRawHtml: true });
-  if (scrape.error) throw new SpecValidationError(`could not fetch ${url}: ${scrape.error}`);
-  const html = htmlOf(scrape);
+  // If bound to a session, the session must already exist (the user authenticates
+  // it themselves — we never store credentials, only the session reference).
+  if (input.sessionId && !sessionManager.getSession(input.sessionId)) {
+    throw new SpecValidationError(`session "${input.sessionId}" not found — create and authenticate it first, then bind`);
+  }
+
+  const fetched = await fetchSpecHtml(url, input.sessionId);
+  if (fetched.error) throw new SpecValidationError(`could not fetch ${url}: ${fetched.error}`);
+  const html = fetched.html;
 
   const result = await selfHealExtract({ url, html, fields: input.fields, providedSchema: input.cssSchema });
   if (!result.success || !result.meta?.schema) {
@@ -141,6 +149,7 @@ export async function createSpec(input: CreateSpecInput): Promise<{ spec: SiteSp
     params,
     fields: input.fields,
     cssSchema: result.meta.schema,
+    sessionId: input.sessionId,
     verify: input.verify ?? false,
     health: result.meta.healthy ? 'healthy' : 'degraded',
     lastVerifiedAt: now,
@@ -169,12 +178,12 @@ export async function runSpec(spec: SiteSpec, params: Record<string, unknown> = 
     return { success: false, error: (err as Error).message, url };
   }
 
-  const scrape = await scraperManager.scrape(url, { includeRawHtml: true });
-  if (scrape.error) {
-    await updateHealth(spec, 'degraded', scrape.error);
-    return { success: false, error: scrape.error, url, health: 'degraded' };
+  const fetched = await fetchSpecHtml(url, spec.sessionId);
+  if (fetched.error) {
+    await updateHealth(spec, 'degraded', fetched.error);
+    return { success: false, error: fetched.error, url, health: 'degraded' };
   }
-  const html = htmlOf(scrape);
+  const html = fetched.html;
 
   const result = await selfHealExtract({ url, html, fields: spec.fields, providedSchema: spec.cssSchema });
 
@@ -282,6 +291,29 @@ async function guardUrl(url: string): Promise<void> {
 
 function htmlOf(scrape: { rawHtml?: string; content?: string; contentType?: string }): string {
   return scrape.rawHtml ?? (scrape.contentType === 'html' ? scrape.content ?? '' : '') ?? '';
+}
+
+/**
+ * Fetch a spec's target HTML. When bound to a session, navigate + read the page
+ * WITHIN that pre-authenticated context (so gated/internal pages work) — we hold
+ * only the session reference, never credentials. Otherwise a stateless scrape.
+ */
+async function fetchSpecHtml(url: string, sessionId?: string): Promise<{ html: string; error?: string }> {
+  if (sessionId) {
+    try {
+      await sessionManager.runAction(sessionId, { type: 'navigate', url });
+      const res = await sessionManager.runAction(sessionId, { type: 'scrape', formats: ['html'] });
+      return { html: (res.html as string) ?? '' };
+    } catch (err) {
+      if (err instanceof SessionNotFoundError) {
+        return { html: '', error: 'bound session expired or not found — re-create the session, authenticate it, and re-bind the spec' };
+      }
+      return { html: '', error: (err as Error).message };
+    }
+  }
+  const scrape = await scraperManager.scrape(url, { includeRawHtml: true });
+  if (scrape.error) return { html: '', error: scrape.error };
+  return { html: htmlOf(scrape) };
 }
 
 async function updateHealth(spec: SiteSpec, health: SiteHealth, error: string | null): Promise<void> {

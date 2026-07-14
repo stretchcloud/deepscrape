@@ -24,6 +24,7 @@ export interface SiteSpec {
   params: SiteSpecParam[];
   fields: DesiredField[];
   cssSchema?: CssExtractionSchema; // derived + self-healed selectors (durable copy)
+  sessionId?: string;        // bind to a persistent authenticated session (auth'd/internal sites)
   verify: boolean;           // opt-in to the scheduled verifier
   health: SiteHealth;
   lastVerifiedAt?: number;
@@ -70,8 +71,8 @@ export function resolveUrlTemplate(template: string, params: Record<string, unkn
   return out;
 }
 
-/** Public view of a spec (omits nothing sensitive, but centralizes shaping). */
-export function toSpecSummary(s: SiteSpec): Pick<SiteSpec, 'id' | 'name' | 'description' | 'urlTemplate' | 'params' | 'health' | 'lastVerifiedAt' | 'verify'> {
+/** Public view of a spec. `sessionBound` reports auth-binding without leaking the id. */
+export function toSpecSummary(s: SiteSpec): Pick<SiteSpec, 'id' | 'name' | 'description' | 'urlTemplate' | 'params' | 'health' | 'lastVerifiedAt' | 'verify'> & { sessionBound: boolean } {
   return {
     id: s.id,
     name: s.name,
@@ -81,5 +82,6 @@ export function toSpecSummary(s: SiteSpec): Pick<SiteSpec, 'id' | 'name' | 'desc
     health: s.health,
     lastVerifiedAt: s.lastVerifiedAt,
     verify: s.verify,
+    sessionBound: Boolean(s.sessionId),
   };
 }

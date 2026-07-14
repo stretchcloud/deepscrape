@@ -41,6 +41,7 @@ const createSchema = z.object({
   fields: z.array(fieldSchema).min(1).max(50),
   cssSchema: z.any().optional(),
   sampleParams: z.record(z.any()).optional(),
+  sessionId: z.string().max(100).optional(),
   verify: z.boolean().optional(),
 });
 

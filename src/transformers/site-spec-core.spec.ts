@@ -105,9 +105,21 @@ describe('site-spec-core', () => {
       expect(s).toEqual({
         id: 'id1', name: 'acme', description: 'd', urlTemplate: 'https://x.com/{c}',
         params: [{ name: 'c', required: true }], health: 'healthy', lastVerifiedAt: 123, verify: true,
+        sessionBound: false,
       });
       expect((s as Record<string, unknown>).fields).toBeUndefined();
       expect((s as Record<string, unknown>).cssSchema).toBeUndefined();
+    });
+
+    it('reports sessionBound=true (without leaking the session id) for auth-bound specs', () => {
+      const spec: SiteSpec = {
+        id: 'id2', name: 'internal', description: '', urlTemplate: 'https://x.com', params: [],
+        fields: [{ name: 'x' }], sessionId: 'sess-secret-123', verify: false, health: 'unknown',
+        createdAt: 1, updatedAt: 2,
+      };
+      const s = toSpecSummary(spec);
+      expect(s.sessionBound).toBe(true);
+      expect(JSON.stringify(s)).not.toContain('sess-secret-123');
     });
   });
 });

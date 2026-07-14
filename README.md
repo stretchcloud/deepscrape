@@ -600,6 +600,22 @@ curl -s -X POST "$BASE/api/sites/by-name/acme_products/run" -H "X-API-Key: $API_
 
 Endpoints: `POST /api/sites` (create), `GET /api/sites` (list), `GET /api/sites/:id` (full spec incl. selectors), `POST /api/sites/:id/run` and `POST /api/sites/by-name/:name/run`, `POST /api/sites/:id/verify`, `DELETE /api/sites/:id`. An opt-in **scheduled verifier** (`verify:true`, `SITE_VERIFY_INTERVAL_MS`) re-runs specs and self-heals on drift.
 
+**Authenticated / internal sites (the differentiator).** Bind a spec to a persistent [session](#15-interactive-sessions-autonomous-agent--proxy-rotation) with `sessionId`, and the spec extracts *within that session's authenticated context* — so it works on gated dashboards and internal tools that no hosted service can reach. **DeepScrape never stores credentials**: you authenticate the session yourself (the session actions you issue), and the spec holds only the session reference.
+
+```bash
+# 1) create a session, 2) log in via session actions (your creds, your API calls):
+#    POST /api/sessions {initialUrl:"https://intranet/login"}
+#    POST /api/sessions/<sid>/action {type:"type", selector:"#user", text:"…"}   (+ password, click)
+# 3) bind a spec to the authenticated session:
+curl -s -X POST "$BASE/api/sites" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{
+  "name":"internal_dashboard", "url":"https://intranet/reports",
+  "fields":[{"name":"metric","required":true}], "sessionId":"<sid>"
+}'
+# runs (and the site_internal_dashboard MCP tool) now read the logged-in page.
+```
+
+> Honest limitation: sessions are in-memory and idle-reaped (`SESSION_IDLE_TTL_MS`, default 5 min; `SESSION_MAX_LIFETIME_MS`, 30 min). For long-lived authenticated specs, raise those TTLs; when a bound session expires, runs return `health:"degraded"` with a clear "re-bind" message rather than silently scraping the logged-out page.
+
 **In MCP, every spec becomes its own tool.** The MCP server exposes `deepscrape_sites_list` + `deepscrape_site_run`, **plus one dynamic `site_<name>` tool per saved spec** — so an agent discovers `site_acme_products` (with a typed `category` input), not a generic verb. Restart the MCP server to pick up newly-created specs.
 
 > Positioning: this is the **self-hosted** counterpart to hosted "website→agent-API" services — no per-call fees, your data stays yours, and it works on internal/authenticated sites you'd never hand to a third party. It is **read-first**; reliable arbitrary transactions are deliberately out of scope.
