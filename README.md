@@ -567,18 +567,18 @@ curl -s "$BASE/api/reader?url=https://example.com" -H "X-API-Key: $API_KEY" -H "
 curl -s "$BASE/api/reader?url=https://example.com" -H "X-API-Key: $API_KEY"                               # -> { markdown, title, ... }
 ```
 
-**Pre-run cost estimate — `POST /api/crawl/estimate`.** Know the size and cost shape *before* you run — no bill shock. Returns max pages (capped by `MAX_CRAWL_LIMIT`), render mode, estimated LLM calls, and an honest flat-cost note.
+**Pre-run cost estimate — `POST /api/crawl/estimate`.** Know the size and cost shape *before* you run. Returns max pages (capped by `MAX_CRAWL_LIMIT`), render mode, estimated LLM calls, and a flat-cost note.
 
 ```bash
 curl -s -X POST "$BASE/api/crawl/estimate" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
   -d '{"limit":250,"scrapeOptions":{"extractionOptions":{"schema":{}}}}'
 # -> { "estimate": { "maxPages":250, "renderMode":"http", "estimatedLlmCalls":250,
-#      "pricing":"self-hosted: flat infrastructure cost — no per-page credits, no bill shock.", "note":"…" } }
+#      "pricing":"self-hosted: flat infrastructure cost — no per-page or per-result fees.", "note":"…" } }
 ```
 
 ### 18. Site → MCP endpoint generator (`/api/sites`)
 
-Turn any site into a **saved, named, self-healing extraction endpoint** that your agents call over MCP — the self-hosted answer to "turn a website into an API for agents." A **SiteSpec** stores the fields you want + the derived CSS selectors; running it is deterministic (free), and it **re-derives selectors automatically when the site breaks**. Because it runs on *your* infra, it works on your authenticated/internal sites too.
+Turn any site into a **saved, named, self-healing extraction endpoint** that your agents call over MCP. A **SiteSpec** stores the fields you want + the derived CSS selectors; running it is deterministic (free), and it **re-derives selectors automatically when the site breaks**. Because it runs on *your* infra, it works on your authenticated/internal sites too.
 
 ```bash
 # Create a spec (LLM derives selectors from the fields; or pass cssSchema to bootstrap)
@@ -600,7 +600,7 @@ curl -s -X POST "$BASE/api/sites/by-name/acme_products/run" -H "X-API-Key: $API_
 
 Endpoints: `POST /api/sites` (create), `GET /api/sites` (list), `GET /api/sites/:id` (full spec incl. selectors), `POST /api/sites/:id/run` and `POST /api/sites/by-name/:name/run`, `POST /api/sites/:id/verify`, `DELETE /api/sites/:id`. An opt-in **scheduled verifier** (`verify:true`, `SITE_VERIFY_INTERVAL_MS`) re-runs specs and self-heals on drift.
 
-**Authenticated / internal sites (the differentiator).** Bind a spec to a persistent [session](#15-interactive-sessions-autonomous-agent--proxy-rotation) with `sessionId`, and the spec extracts *within that session's authenticated context* — so it works on gated dashboards and internal tools that no hosted service can reach. **DeepScrape never stores credentials**: you authenticate the session yourself (the session actions you issue), and the spec holds only the session reference.
+**Authenticated / internal sites.** Bind a spec to a persistent [session](#15-interactive-sessions-autonomous-agent--proxy-rotation) with `sessionId`, and the spec extracts *within that session's authenticated context* — so it works on gated dashboards and internal tools. **DeepScrape never stores credentials**: you authenticate the session yourself (the session actions you issue), and the spec holds only the session reference.
 
 ```bash
 # 1) create a session, 2) log in via session actions (your creds, your API calls):
@@ -618,7 +618,7 @@ curl -s -X POST "$BASE/api/sites" -H "X-API-Key: $API_KEY" -H "Content-Type: app
 
 **In MCP, every spec becomes its own tool.** The MCP server exposes `deepscrape_sites_list` + `deepscrape_site_run`, **plus one dynamic `site_<name>` tool per saved spec** — so an agent discovers `site_acme_products` (with a typed `category` input), not a generic verb. Restart the MCP server to pick up newly-created specs.
 
-> Positioning: this is the **self-hosted** counterpart to hosted "website→agent-API" services — no per-call fees, your data stays yours, and it works on internal/authenticated sites you'd never hand to a third party. It is **read-first**; reliable arbitrary transactions are deliberately out of scope.
+> Runs entirely on your own infrastructure, so it works on internal/authenticated sites and keeps your data in-house. It is **read-first** — reliable arbitrary transactions (form submits, purchases) are out of scope by design.
 
 ---
 
@@ -3250,25 +3250,32 @@ Welcome to the getting started guide...
 
 ## 🛣️ Roadmap
 
-- [x] 📦 Batch processing with controlled concurrency
-- [x] 📥 Multiple download formats (ZIP, JSON, individual files)
-- [x] 🗺️ High-performance URL discovery (`/map` endpoint) + subdomain discovery
-- [x] ✨ Fit-markdown extraction (pruning content filter)
-- [x] 🎯 Deterministic CSS/selector extraction (no LLM)
-- [x] 📝 Multi-format single-request responses (markdown/html/links/screenshot/…)
-- [x] 🔍 Search engine API integration (`/api/search` — Serper / SearXNG / DuckDuckGo)
-- [x] 📡 Live crawl streaming (SSE) + crawl ZIP/JSON downloads
-- [x] 🧩 MCP server for AI agents
-- [x] 📦 Node SDK
-- [x] 🛡️ SSRF protection, rate limiting, per-key daily quotas
-- [x] 📊 Prometheus `/metrics` + readiness probe
-- [x] 🚸 Browser pool with concurrency semaphore + crash eviction
-- [x] ↔️ Horizontal scaling via `ROLE=web|worker` split
-- [ ] 🧠 Automatic schema generation (LLM)
+**Shipped**
+
+- [x] 📦 Batch processing + multiple download formats (ZIP / JSON / individual)
+- [x] 🗺️ High-performance URL discovery (`/map`) + subdomain discovery
+- [x] ✨ Fit-markdown extraction + deterministic CSS/selector extraction (no LLM)
+- [x] 📝 Multi-format responses (markdown/html/rawHtml/text/links/screenshot/pdf/mhtml/tables/contacts)
+- [x] 🔍 Web search (`/api/search` — Serper / SearXNG / DuckDuckGo)
+- [x] 📡 Live crawl streaming (SSE) + ZIP/JSON downloads
+- [x] 🧩 MCP server + Node SDK
+- [x] 🛡️ SSRF protection, rate limiting, per-key daily quotas, Prometheus `/metrics`, readiness probe
+- [x] 🚸 Browser pool (concurrency semaphore + crash eviction) + `ROLE=web|worker` horizontal scaling
+- [x] 🧠 Automatic schema generation / **self-healing extraction** (`/api/extract-auto`)
+- [x] 🎚️ Extraction confidence signals (grounding-based hallucination/omission flags)
+- [x] 🥷 Anti-bot fingerprint hygiene (opt-out; not CAPTCHA-solving)
+- [x] 🕹️ Interactive browser sessions + autonomous agent (`/api/agent`) + proxy rotation
+- [x] 🔌 Hidden-API discovery, markdown reader (`Accept: text/markdown`), pre-run crawl estimate
+- [x] 🔀 Change tracking, `llms.txt` generation, document parsing (`/api/parse`)
+- [x] 🧭 Site → MCP endpoint generator (`/api/sites`), incl. authenticated/internal sites
+
+**Planned**
+
 - [ ] 🌐 Cloud-native cache backends (S3)
 - [ ] 🌈 Web UI playground
 - [ ] 📈 Batch on BullMQ + processing analytics
 - [ ] 📦 Publish SDK & MCP server to npm
+- [ ] 🔁 Live MCP tool refresh for new SiteSpecs (no restart)
 
 ---
 

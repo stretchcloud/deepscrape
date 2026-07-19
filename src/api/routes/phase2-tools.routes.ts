@@ -53,7 +53,7 @@ readerRouter.get('/', expensiveLimiter, apiKeyAuth, async (req: Request, res: Re
   }
 });
 
-// ---- POST /api/crawl/estimate : pre-run cost/size estimate (no bill shock) ----
+// ---- POST /api/crawl/estimate : pre-run cost/size estimate ----
 export const crawlEstimateRouter = Router();
 const estimateSchema = z.object({
   url: z.string().url().optional(),
@@ -74,7 +74,7 @@ crawlEstimateRouter.post('/', statusLimiter, apiKeyAuth, validateRequest(estimat
       maxPages,
       renderMode: usesBrowser ? 'browser' : 'http',
       estimatedLlmCalls: usesLlm ? maxPages : 0,
-      pricing: 'self-hosted: flat infrastructure cost — no per-page credits, no per-result fees, no bill shock.',
+      pricing: 'self-hosted: flat infrastructure cost — no per-page or per-result fees.',
       note: usesLlm
         ? 'LLM extraction uses YOUR OpenAI key (no markup). Set a cssSchema or /api/extract-auto to avoid per-page LLM cost.'
         : 'No LLM calls: extraction is deterministic or disabled. Cost is compute/proxy only, capped by `limit`.',
