@@ -14,7 +14,7 @@ Config: `OPENAI_API_KEY`, `OPENAI_MODEL` (defaults to `gpt-4o`).
 
 Crawl flow: `/api/crawl` in `src/api/controllers/crawler.controller.ts` uses `WebCrawler` from `src/scraper/crawler.ts`.
 Queueing: jobs are managed via `src/services/queue.service.ts` using BullMQ + Redis.
-Streaming discovery: `CrawlKickoffService` in `src/services/crawl-kickoff.service.ts` can run URL discovery via `URLDiscoveryService` and enqueue results as they stream in.
+Streaming discovery: `CrawlKickoffService` in `src/services/crawl-kickoff.service.ts` can run streaming URL discovery via `URLDiscoveryService` and enqueue results as they stream in.
 
 URL discovery: `/api/map` in `src/api/routes/map.routes.ts` uses `URLDiscoveryService` for sitemaps, robots.txt, common paths, search, and optional browser crawling.
 

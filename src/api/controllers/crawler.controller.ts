@@ -374,7 +374,7 @@ export async function listActiveCrawls(_req: Request, res: Response): Promise<vo
 
 /**
  * Stream crawl results as Server-Sent Events. Pushes each page as soon as it
- * completes (like an upstream project's incremental output), then a final `done` event.
+ * completes (incremental output), then a final `done` event.
  * This is the container-agnostic way to receive markdown continuously — no
  * dependency on the crawl-output filesystem. Consume with `curl -N`.
  */

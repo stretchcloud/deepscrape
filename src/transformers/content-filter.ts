@@ -4,7 +4,7 @@ import type { AnyNode } from 'domhandler';
 /**
  * Content filtering ("fit markdown") based on a heuristic pruning algorithm.
  *
- * This is a faithful TypeScript port of an upstream project's `PruningContentFilter`. The
+ * This is a faithful TypeScript pruning content filter. The
  * goal is to isolate the *main* readable content of an HTML document and discard
  * boilerplate (navigation, footers, ad units, social widgets, etc.) while
  * preserving high-value structures such as headings, tables and code blocks.

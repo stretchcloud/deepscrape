@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 /**
  * Deterministic, LLM-free structured extraction driven by CSS selectors.
  *
- * This is a self-contained TypeScript port of an upstream project's `JsonCssExtractionStrategy`.
+ * This is a self-contained TypeScript CSS-selector extraction strategy.
  * Given an HTML document and a declarative schema, it produces one plain record per
  * element matching the schema's `baseSelector`. Every field is resolved *relative to*
  * its base element, so the same schema can be reused across repeated page structures

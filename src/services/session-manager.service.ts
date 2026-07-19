@@ -14,7 +14,7 @@ import { ScraperResponse } from '../types';
  * Unlike the ephemeral browser pool (acquire page -> scrape -> release), a session
  * keeps a dedicated browser context + page alive across many HTTP calls so a client
  * can drive it step by step (navigate, click, type, scrape) while cookies/auth/JS
- * state persist. Equivalent to an upstream project/a browser service "sessions".
+ * state persist.
  *
  * Reliability model:
  *  - Sessions live on a dedicated Chromium (separate from the scrape pool) so a

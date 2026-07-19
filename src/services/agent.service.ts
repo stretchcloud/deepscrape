@@ -5,7 +5,7 @@ import { LLMServiceFactory } from './llm-service-factory';
 import { OpenAIService } from './openai.service';
 
 /**
- * Autonomous navigation agent (equivalent to an upstream project's `/agent` / the agent).
+ * Autonomous navigation agent.
  *
  * Given a natural-language goal and a starting URL, the agent drives a real
  * persistent browser session in a bounded observe -> decide -> act loop:

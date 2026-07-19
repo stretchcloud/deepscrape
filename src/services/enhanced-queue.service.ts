@@ -43,7 +43,7 @@ export interface SystemLoad {
 }
 
 /**
- * Enhanced queue service with advanced features inspired by an upstream project
+ * Enhanced queue service with advanced features
  * Includes job locking, dynamic concurrency, and sophisticated error handling
  */
 export class EnhancedQueueService {

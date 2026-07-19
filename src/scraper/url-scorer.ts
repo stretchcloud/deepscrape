@@ -1,7 +1,7 @@
 /**
  * URL scorers for best-first (guided) crawling.
  *
- * A small, self-contained port of an upstream project's URL scorers. Each scorer inspects a
+ * A small, self-contained set of URL scorers. Each scorer inspects a
  * candidate URL and returns a heuristic in the closed interval [0, 1] that a
  * best-first frontier can use to prioritise which links to visit next. Higher is
  * "more worth crawling".

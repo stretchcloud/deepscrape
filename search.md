@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation plan for adding a search API endpoint to DeepScraper, inspired by an upstream project's search functionality. The search API will allow users to search the web and optionally scrape the results using DeepScraper's existing powerful scraping and extraction capabilities.
+This document outlines the implementation plan for adding a search API endpoint to DeepScraper. The search API will allow users to search the web and optionally scrape the results using DeepScraper's existing powerful scraping and extraction capabilities.
 
 ## Architecture Overview
 

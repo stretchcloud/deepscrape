@@ -16,7 +16,7 @@ import {
 } from '../types/streaming-crawl';
 
 /**
- * Crawl Kickoff Service - Implements 3-stage streaming architecture
+ * Crawl Kickoff Service - Implements a 3-stage streaming architecture
  *
  * Stage 1: Kickoff Job - Immediate initial scraping + parallel discovery launch
  * Stage 2: Streaming Discovery - Real-time URL streaming to scrape queue

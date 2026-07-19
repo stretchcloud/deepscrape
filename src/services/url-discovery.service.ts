@@ -22,7 +22,7 @@ import {
 import axios from 'axios';
 
 /**
- * Multi-method URL discovery service inspired by an upstream project's /v1/map
+ * Multi-method URL discovery service
  */
 export class URLDiscoveryService {
   private readonly sitemapParser: SitemapParserService;

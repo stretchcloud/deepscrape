@@ -98,7 +98,7 @@ __tests__/
 *.spec.js
 *.spec.ts
 
-# an upstream project subdirectory (not needed for main app)
+# extra subdirectory (not needed for main app)
 firecrawl/
 
 # Temporary files

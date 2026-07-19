@@ -2,8 +2,7 @@ import * as cheerio from 'cheerio';
 import { pruneToFitHtml, computeNodeScore, PruningOptions } from './content-filter';
 
 /**
- * Unit tests for the "fit markdown" content filter (a port of an upstream project's
- * PruningContentFilter). Tests are grouped by the public API surface:
+ * Unit tests for the "fit markdown" content filter (pruning + link-density). Tests are grouped by the public API surface:
  * `computeNodeScore` (the per-node scoring heuristic) and `pruneToFitHtml`
  * (the end-to-end extraction pass).
  */

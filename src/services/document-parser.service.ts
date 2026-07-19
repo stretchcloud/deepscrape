@@ -6,8 +6,7 @@ import { logger } from '../utils/logger';
 import { assertPublicUrl, ssrfSafeRequestConfig } from '../utils/ssrf-guard';
 
 /**
- * Parse a document (PDF / DOCX / HTML) into markdown — the equivalent of
- * an upstream project's /parse. Accepts a base64 body or a URL to fetch. Never trusts the
+ * Parse a document (PDF / DOCX / HTML) into markdown. Accepts a base64 body or a URL to fetch. Never trusts the
  * declared type blindly: it also sniffs magic bytes (%PDF, PK-zip) so a
  * mislabeled file still parses correctly.
  */

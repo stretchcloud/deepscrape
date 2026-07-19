@@ -6,7 +6,7 @@ Transform any website into structured data using Playwright automation and GPT-4
 
 ## ✨ Features
 
-- **✨ Fit-Markdown Extraction** - pruning content filter (link-density scoring) for clean, LLM-ready markdown
+- **✨ Fit-Markdown Extraction** - Pruning content filter (link-density scoring) for clean, LLM-ready markdown
 - **🎯 Deterministic CSS Extraction** - Structured data via CSS selectors, no LLM cost or hallucination
 - **🤖 LLM Extraction** - Convert web content to structured JSON using OpenAI, with token-aware chunking + schema validation
 - **📝 Multi-Format Output** - `markdown` + `html` + `rawHtml` + `text` + `links` + `screenshot` + `pdf` + `mhtml` + `tables` + `changeTracking` in a single request
@@ -248,7 +248,7 @@ curl -s -X DELETE "$BASE/api/crawl/<id>" -H "X-API-Key: $API_KEY"   # -> status 
 
 Three ways, use whichever fits:
 
-**a) Live stream (SSE)** — pages pushed as they complete (an upstream project-style):
+**a) Live stream (SSE)** — pages pushed as they complete:
 
 ```bash
 curl -N "$BASE/api/crawl/<id>/stream" -H "X-API-Key: $API_KEY"
@@ -829,7 +829,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 ### URL Discovery (High-Performance)
 
-Discover thousands of URLs from a website in seconds using our endpoint:
+Discover thousands of URLs from a website in seconds using our high-performance `/map` endpoint:
 
 ```bash
 curl -X POST https://deepscrapper.ai/api/map \

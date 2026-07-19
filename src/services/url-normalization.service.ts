@@ -2,7 +2,7 @@ import { logger } from '../utils/logger';
 
 /**
  * Service for URL normalization and similar URL detection
- * Inspired by an upstream project's approach to prevent duplicate content scraping
+ * Prevents duplicate content scraping via URL normalization
  */
 export class UrlNormalizationService {
   // Common tracking parameters to remove

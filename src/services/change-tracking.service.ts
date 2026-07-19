@@ -4,7 +4,7 @@ import { redisClient } from './redis.service';
 import { logger } from '../utils/logger';
 
 /**
- * Change tracking (equivalent to an upstream project's `changeTracking` format).
+ * Change tracking.
  *
  * On each scrape, we snapshot the page's main-content markdown keyed by the URL
  * (+ options that affect the content). On the next scrape of the same key we

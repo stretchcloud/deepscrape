@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 /**
  * Automatic HTML `<table>` extraction into structured JSON.
  *
- * an upstream project exposes `result.tables`; this is the equivalent. It parses every
+ * Parses every
  * `<table>` in a document into `{ headers, rows }`, handling `<thead>`/`<tbody>`,
  * header rows without `<thead>`, `colspan`, and caption text. Pure/testable —
  * takes an HTML string, returns plain objects, never throws.
