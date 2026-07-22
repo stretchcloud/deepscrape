@@ -16,7 +16,7 @@ RUN npm run build
 # Official Playwright image: matches the installed playwright version and ships
 # Chromium + all system libraries, so we don't hand-maintain an apt list or run a
 # separate browser install. PLAYWRIGHT_BROWSERS_PATH=/ms-playwright is preset.
-FROM mcr.microsoft.com/playwright:v1.52.0-jammy AS production
+FROM mcr.microsoft.com/playwright:v1.61.1-jammy AS production
 
 # tini as PID 1 to reap zombie Chromium helper processes.
 RUN apt-get update && apt-get install -y --no-install-recommends tini \
