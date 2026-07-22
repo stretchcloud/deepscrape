@@ -1,20 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter, statusLimiter } from '../middleware/rate-limit.middleware';
 import scraperManager from '../../scraper/scraper-manager';
 import { discoverApis } from '../../services/api-discovery.service';
 import { logger } from '../../utils/logger';
+import { discoverApisSchema, crawlEstimateSchema } from '../schemas';
 
 // ---- POST /api/discover-apis : surface a page's underlying JSON/XHR endpoints ----
 export const discoverApisRouter = Router();
-const discoverSchema = z.object({
-  url: z.string().url(),
-  timeout: z.number().int().min(1000).max(120000).optional(),
-  includeNonJson: z.boolean().optional(),
-});
-discoverApisRouter.post('/', expensiveLimiter, apiKeyAuth, validateRequest(discoverSchema), async (req: Request, res: Response) => {
+discoverApisRouter.post('/', expensiveLimiter, apiKeyAuth, validateRequest(discoverApisSchema), async (req: Request, res: Response) => {
   try {
     const { url, timeout, includeNonJson } = req.body;
     const result = await discoverApis(url, { timeout, includeNonJson });
@@ -55,13 +50,7 @@ readerRouter.get('/', expensiveLimiter, apiKeyAuth, async (req: Request, res: Re
 
 // ---- POST /api/crawl/estimate : pre-run cost/size estimate ----
 export const crawlEstimateRouter = Router();
-const estimateSchema = z.object({
-  url: z.string().url().optional(),
-  limit: z.number().int().positive().optional(),
-  maxDepth: z.number().int().min(0).optional(),
-  scrapeOptions: z.record(z.any()).optional(),
-});
-crawlEstimateRouter.post('/', statusLimiter, apiKeyAuth, validateRequest(estimateSchema), (req: Request, res: Response) => {
+crawlEstimateRouter.post('/', statusLimiter, apiKeyAuth, validateRequest(crawlEstimateSchema), (req: Request, res: Response) => {
   const { limit, scrapeOptions } = req.body as { limit?: number; scrapeOptions?: Record<string, any> };
   const maxLimit = Number(process.env.MAX_CRAWL_LIMIT ?? 1000);
   const maxPages = Math.min(limit ?? 100, maxLimit);

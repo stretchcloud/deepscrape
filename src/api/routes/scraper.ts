@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import scraperManager from '../../scraper/scraper-manager';
 import { logger } from '../../utils/logger';
 import { apiKeyAuth as auth } from '../middleware/auth.middleware';
@@ -7,6 +6,7 @@ import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter, statusLimiter } from '../middleware/rate-limit.middleware';
 import { createTask, getTask } from '../../services/task.service';
 import { ExtractionResult } from '../../types/schema';
+import { scrapeRequestSchema, extractSchemaRequestSchema, summarizeRequestSchema, cacheInvalidateSchema } from '../schemas';
 
 // Extended ScraperResponse interface to include extraction results
 interface ExtendedScraperResponse {
@@ -35,15 +35,6 @@ interface ExtendedScraperResponse {
 const router = Router();
 
 // Browser action schema
-const browserActionSchema = z.object({
-  type: z.enum(['click', 'scroll', 'wait', 'fill', 'select']),
-  selector: z.string().optional(),
-  value: z.string().optional(),
-  position: z.number().optional(),
-  timeout: z.number().optional(),
-  optional: z.boolean().optional()
-});
-
 /**
  * @route POST /api/scrape/async
  * @desc Submit a scrape as an async job (returns a job id to poll)
@@ -87,25 +78,7 @@ router.post(
   expensiveLimiter,
   auth,
   validateRequest(
-    z.object({
-      url: z.string().url(),
-      options: z.object({
-        waitForSelector: z.string().optional(),
-        waitForTimeout: z.number().int().positive().optional(),
-        actions: z.array(browserActionSchema).optional(),
-        skipCache: z.boolean().optional(),
-        cacheTtl: z.number().int().positive().optional(),
-        extractorFormat: z.enum(['html', 'markdown', 'text']).optional(),
-        onlyMainContent: z.boolean().optional(),
-        fitMarkdown: z.boolean().optional(),
-        useBrowser: z.boolean().optional(),
-        stealthMode: z.boolean().optional(),
-        skipTlsVerification: z.boolean().optional(),
-        // Extraction options (LLM or deterministic CSS) — validated downstream.
-        extractionOptions: z.any().optional(),
-      // Allow forward-compatible scraper options through to the manager.
-      }).passthrough().optional()
-    })
+    scrapeRequestSchema
   ),
   async (req: Request, res: Response) => {
     try {
@@ -170,21 +143,7 @@ router.post(
   expensiveLimiter,
   auth,
   validateRequest(
-    z.object({
-      url: z.string().url(),
-      schema: z.object({}).passthrough(), // Allow any schema object
-      options: z.object({
-        waitForSelector: z.string().optional(),
-        waitForTimeout: z.number().int().positive().optional(),
-        actions: z.array(browserActionSchema).optional(),
-        skipCache: z.boolean().optional(),
-        cacheTtl: z.number().int().positive().optional(),
-        extractorFormat: z.enum(['html', 'markdown', 'text']).optional(),
-        temperature: z.number().min(0).max(2).optional(),
-        maxTokens: z.number().int().positive().optional(),
-        instructions: z.string().optional()
-      }).optional()
-    })
+    extractSchemaRequestSchema
   ),
   async (req: Request, res: Response) => {
     try {
@@ -403,19 +362,7 @@ router.post(
   expensiveLimiter,
   auth,
   validateRequest(
-    z.object({
-      url: z.string().url(),
-      maxLength: z.number().int().positive().optional(), // Maximum length of summary in words
-      options: z.object({
-        waitForSelector: z.string().optional(),
-        waitForTimeout: z.number().int().positive().optional(),
-        actions: z.array(browserActionSchema).optional(),
-        skipCache: z.boolean().optional(),
-        cacheTtl: z.number().int().positive().optional(),
-        extractorFormat: z.enum(['html', 'markdown', 'text']).optional(),
-        temperature: z.number().min(0).max(2).optional(),
-      }).optional()
-    })
+    summarizeRequestSchema
   ),
   async (req: Request, res: Response) => {
     try {
@@ -514,9 +461,7 @@ router.delete(
   '/cache',
   auth,
   validateRequest(
-    z.object({
-      url: z.string().optional() // If provided, invalidate only this URL
-    })
+    cacheInvalidateSchema
   ),
   async (req: Request, res: Response) => {
     try {
