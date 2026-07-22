@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter } from '../middleware/rate-limit.middleware';
-import { searchWeb } from '../../services/search.service';
+import { runSearch } from '../../services/search.service';
 import scraperManager from '../../scraper/scraper-manager';
 import { logger } from '../../utils/logger';
 import { searchRequestSchema } from '../schemas';
@@ -24,18 +24,30 @@ router.post(
       const { query, limit = 10, provider, lang, scrapeResults, scrapeOptions } = req.body;
       logger.info(`Search request: "${query}" (limit ${limit}, provider ${provider ?? 'default'})`);
 
-      const results = await searchWeb(query, { limit, provider, lang });
+      const { results, provider: usedProvider, reason } = await runSearch(query, { limit, provider, lang });
 
       if (!scrapeResults || results.length === 0) {
-        return res.json({ success: true, query, count: results.length, results });
+        // `note` explains an empty result set (e.g. keyless provider blocked) so a
+        // zero-count response is never a silent mystery.
+        return res.json({
+          success: true, query, provider: usedProvider, count: results.length, results,
+          ...(reason ? { note: reason } : {}),
+        });
       }
 
       // Scrape each result (bounded concurrency to avoid a fan-out storm).
       const scraped = await scrapeResultsBounded(results, scrapeOptions, 3);
-      return res.json({ success: true, query, count: scraped.length, results: scraped });
+      return res.json({ success: true, query, provider: usedProvider, count: scraped.length, results: scraped });
     } catch (error) {
-      logger.error(`Search error: ${error instanceof Error ? error.message : String(error)}`);
-      return res.status(500).json({ success: false, error: 'Search failed' });
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Search error: ${msg}`);
+      // Missing provider config (SEARXNG_URL / SERPER_API_KEY) is the caller's to fix —
+      // surface the actionable message as a 400 instead of an opaque 500.
+      const isConfigError = /SEARXNG_URL|SERPER_API_KEY/.test(msg);
+      return res.status(isConfigError ? 400 : 500).json({
+        success: false,
+        error: isConfigError ? msg : 'Search failed',
+      });
     }
   }
 );
