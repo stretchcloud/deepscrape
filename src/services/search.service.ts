@@ -73,7 +73,33 @@ const DESKTOP_USER_AGENT =
  *          request failure.
  * @throws  When `opts.provider === 'searxng'` but `SEARXNG_URL` is not configured.
  */
-export async function searchWeb(query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {
+/** Result of a search, including which provider ran and — when empty — why. */
+export interface SearchOutcome {
+  results: SearchResult[];
+  provider: 'duckduckgo' | 'searxng' | 'serper';
+  /**
+   * Set when `results` is empty for a reason the caller can act on — e.g. the
+   * keyless DuckDuckGo endpoint was anti-bot-challenged, or a provider request
+   * failed. Absent for a genuinely no-hit query.
+   */
+  reason?: string;
+}
+
+/** Internal per-provider return: results plus an optional actionable reason. */
+interface ProviderResult {
+  results: SearchResult[];
+  reason?: string;
+}
+
+/**
+ * Run a web search and return results plus diagnostics (which provider ran, and —
+ * when empty — why). This is what the API route uses so it can tell callers the
+ * difference between "no hits" and "the keyless provider is blocked / not configured".
+ *
+ * @throws When a provider is explicitly selected but its required configuration is
+ *         missing (`searxng` without SEARXNG_URL, `serper` without SERPER_API_KEY).
+ */
+export async function runSearch(query: string, opts: SearchOptions = {}): Promise<SearchOutcome> {
   // Auto-select the most reliable configured provider when none is specified:
   // Serper (keyed) > SearXNG (self-hosted) > DuckDuckGo (keyless, best-effort —
   // datacenter IPs are frequently anti-bot challenged, so keyless is not reliable
@@ -84,27 +110,55 @@ export async function searchWeb(query: string, opts: SearchOptions = {}): Promis
   const trimmedQuery = (query ?? '').trim();
   if (!trimmedQuery) {
     logger.warn('searchWeb called with an empty query; returning no results', { provider });
-    return [];
+    return { results: [], provider };
   }
 
-  let results: SearchResult[];
+  let raw: ProviderResult;
   switch (provider) {
     case 'serper':
-      results = await fetchSerper(trimmedQuery, limit, opts);
+      raw = await fetchSerper(trimmedQuery, limit, opts);
       break;
     case 'searxng':
       // NOTE: a missing SEARXNG_URL throws (config error); request failures do not.
-      results = await fetchSearxng(trimmedQuery, limit, opts);
+      raw = await fetchSearxng(trimmedQuery, limit, opts);
       break;
     case 'duckduckgo':
     default:
-      results = await fetchDuckDuckGo(trimmedQuery, limit, opts);
+      raw = await fetchDuckDuckGo(trimmedQuery, limit, opts);
       break;
   }
 
-  // Final safety net so the public contract (dedup + cap + contiguous positions)
-  // always holds, independent of any individual provider's implementation.
-  return dedupeAndCap(results, limit);
+  // Dedup + cap + contiguous positions, independent of any provider's implementation.
+  const results = dedupeAndCap(raw.results, limit);
+  const reason = results.length === 0 ? (raw.reason ?? emptyResultHint(provider)) : undefined;
+  return reason ? { results, provider, reason } : { results, provider };
+}
+
+/**
+ * Results-only convenience wrapper over {@link runSearch}. Preserves the original
+ * signature for callers that don't need diagnostics.
+ */
+export async function searchWeb(query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {
+  return (await runSearch(query, opts)).results;
+}
+
+/**
+ * Human-readable explanation for an empty result set, by provider. For the keyless
+ * DuckDuckGo path this is almost always an anti-bot challenge on server/datacenter
+ * IPs rather than a genuine no-hit query.
+ */
+export function emptyResultHint(provider: 'duckduckgo' | 'searxng' | 'serper'): string {
+  switch (provider) {
+    case 'duckduckgo':
+      return 'No results from the keyless DuckDuckGo endpoint. It anti-bot-challenges ' +
+        'datacenter / server IPs (HTTP 202), so it is unreliable from a hosted API. For ' +
+        'dependable search set SERPER_API_KEY (free tier at serper.dev) or SEARXNG_URL.';
+    case 'searxng':
+      return 'No results from the configured SearXNG instance for this query.';
+    case 'serper':
+    default:
+      return 'No results from Serper for this query.';
+  }
 }
 
 /**
@@ -230,12 +284,16 @@ function resolveDuckDuckGoUrl(href: string): string | null {
  * Fetch and parse results from the keyless DuckDuckGo HTML endpoint.
  * Never throws — network / HTTP failures are logged and yield `[]`.
  */
-async function fetchDuckDuckGo(query: string, limit: number, opts: SearchOptions): Promise<SearchResult[]> {
+async function fetchDuckDuckGo(query: string, limit: number, opts: SearchOptions): Promise<ProviderResult> {
   const form = new URLSearchParams({ q: query });
   if (opts.lang) {
     // DuckDuckGo uses `kl` for region/locale, e.g. `us-en`.
     form.set('kl', opts.lang);
   }
+
+  const CHALLENGE = 'DuckDuckGo returned an anti-bot challenge (HTTP 202) — its keyless ' +
+    'endpoint blocks datacenter / server IPs. Set SERPER_API_KEY (free at serper.dev) or ' +
+    'SEARXNG_URL for reliable search.';
 
   try {
     // The HTML endpoint expects a POST form submission; a GET returns a 202
@@ -245,6 +303,8 @@ async function fetchDuckDuckGo(query: string, limit: number, opts: SearchOptions
     const response = await axios.post<string>(DUCKDUCKGO_HTML_ENDPOINT, form.toString(), {
       timeout: REQUEST_TIMEOUT_MS,
       responseType: 'text',
+      // 202 is DDG's challenge; don't let axios throw on it — we handle it explicitly.
+      validateStatus: (s) => s >= 200 && s < 500,
       headers: {
         'User-Agent': DESKTOP_USER_AGENT,
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -255,17 +315,17 @@ async function fetchDuckDuckGo(query: string, limit: number, opts: SearchOptions
 
     if (response.status === 202) {
       logger.warn('DuckDuckGo returned a 202 challenge (anti-bot); no results. Configure SERPER_API_KEY or SEARXNG_URL for reliable search.');
-      return [];
+      return { results: [], reason: CHALLENGE };
     }
 
     const html = typeof response.data === 'string' ? response.data : String(response.data ?? '');
-    return parseDuckDuckGoHtml(html, limit);
+    return { results: parseDuckDuckGoHtml(html, limit) };
   } catch (error) {
     logger.warn('DuckDuckGo search request failed', {
       query,
       error: (error as Error).message,
     });
-    return [];
+    return { results: [], reason: `DuckDuckGo request failed: ${(error as Error).message}` };
   }
 }
 
@@ -286,7 +346,7 @@ function autoProvider(): 'serper' | 'searxng' | 'duckduckgo' {
  * Serper.dev — a reliable, keyed Google-search API (free tier available). Set
  * SERPER_API_KEY. POST https://google.serper.dev/search with {q, num}.
  */
-async function fetchSerper(query: string, limit: number, opts: SearchOptions): Promise<SearchResult[]> {
+async function fetchSerper(query: string, limit: number, opts: SearchOptions): Promise<ProviderResult> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey || !apiKey.trim()) {
     throw new Error('searchWeb: provider \'serper\' selected but SERPER_API_KEY is not set.');
@@ -301,7 +361,7 @@ async function fetchSerper(query: string, limit: number, opts: SearchOptions): P
     const organic = (response.data as { organic?: unknown }).organic;
     if (!Array.isArray(organic)) {
       logger.warn('Serper response had no organic results array');
-      return [];
+      return { results: [] };
     }
     const results: SearchResult[] = [];
     for (const r of organic) {
@@ -315,14 +375,14 @@ async function fetchSerper(query: string, limit: number, opts: SearchOptions): P
       });
       if (results.length >= limit) break;
     }
-    return results;
+    return { results };
   } catch (error) {
     logger.warn('Serper search request failed', { query, error: (error as Error).message });
-    return [];
+    return { results: [], reason: `Serper request failed: ${(error as Error).message}` };
   }
 }
 
-async function fetchSearxng(query: string, limit: number, opts: SearchOptions): Promise<SearchResult[]> {
+async function fetchSearxng(query: string, limit: number, opts: SearchOptions): Promise<ProviderResult> {
   const base = process.env.SEARXNG_URL;
   if (!base || !base.trim()) {
     throw new Error(
@@ -347,14 +407,14 @@ async function fetchSearxng(query: string, limit: number, opts: SearchOptions): 
       },
     });
 
-    return mapSearxngResults(response.data, limit);
+    return { results: mapSearxngResults(response.data, limit) };
   } catch (error) {
     logger.warn('SearXNG search request failed', {
       endpoint,
       query,
       error: (error as Error).message,
     });
-    return [];
+    return { results: [], reason: `SearXNG request failed: ${(error as Error).message}` };
   }
 }
 

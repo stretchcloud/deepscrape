@@ -1,6 +1,8 @@
 import {
   parseDuckDuckGoHtml,
   searchWeb,
+  runSearch,
+  emptyResultHint,
   SearchResult,
 } from './search.service';
 
@@ -173,5 +175,35 @@ describe('searchWeb', () => {
   it('throws when the \'searxng\' provider is selected but SEARXNG_URL is unset', async () => {
     delete process.env.SEARXNG_URL;
     await expect(searchWeb('typescript', { provider: 'searxng' })).rejects.toThrow(/SEARXNG_URL/);
+  });
+});
+
+describe('runSearch diagnostics (why a search came back empty)', () => {
+  const savedSerper = process.env.SERPER_API_KEY;
+  const savedSearxng = process.env.SEARXNG_URL;
+  afterEach(() => {
+    savedSerper === undefined ? delete process.env.SERPER_API_KEY : (process.env.SERPER_API_KEY = savedSerper);
+    savedSearxng === undefined ? delete process.env.SEARXNG_URL : (process.env.SEARXNG_URL = savedSearxng);
+  });
+
+  it('reports the provider used and no reason for an empty query', async () => {
+    delete process.env.SERPER_API_KEY;
+    delete process.env.SEARXNG_URL;
+    const out = await runSearch('   ');
+    expect(out).toEqual({ results: [], provider: 'duckduckgo' });
+    expect(out.reason).toBeUndefined();
+  });
+
+  it('the duckduckgo empty-hint names the datacenter block and the real fix', () => {
+    const hint = emptyResultHint('duckduckgo');
+    expect(hint).toMatch(/202/);
+    expect(hint).toMatch(/datacenter|server IPs/i);
+    expect(hint).toMatch(/SERPER_API_KEY/);
+    expect(hint).toMatch(/SEARXNG_URL/);
+  });
+
+  it('gives provider-appropriate empty hints for searxng and serper', () => {
+    expect(emptyResultHint('searxng')).toMatch(/SearXNG/);
+    expect(emptyResultHint('serper')).toMatch(/Serper/);
   });
 });
