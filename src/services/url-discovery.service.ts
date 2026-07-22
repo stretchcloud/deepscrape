@@ -1069,10 +1069,13 @@ export class URLDiscoveryService {
     }
   }
 
-  /** Registrable base domain from a hostname (naive last-two-labels heuristic). */
+  /**
+   * Registrable base domain from a hostname. Delegates to the same helper the
+   * result filter uses (URLValidationUtils.registrableDomain), so the subdomains
+   * this discovers and the subdomains the filter keeps can never disagree.
+   */
   private baseDomainOf(hostname: string): string {
-    const labels = hostname.split('.').filter(Boolean);
-    return labels.length > 2 ? labels.slice(-2).join('.') : hostname;
+    return URLValidationUtils.registrableDomain(hostname);
   }
 
   /**
@@ -1484,6 +1487,22 @@ export class URLDiscoveryService {
   /**
    * Generate cache key for discovery options
    */
+  /**
+   * A stable per-URL token embedded in the cache key so `clearCache(url)` can
+   * find every cached variant (different maxUrls/options) for one URL. Normalized
+   * (scheme + lowercased host + path, no trailing slash) so trivial differences
+   * like a trailing slash still match.
+   */
+  private urlKeyToken(url: string): string {
+    try {
+      const u = new URL(url);
+      const path = u.pathname.replace(/\/+$/, '');
+      return encodeURIComponent(`${u.protocol}//${u.hostname.toLowerCase()}${path}`);
+    } catch {
+      return encodeURIComponent(url ?? '');
+    }
+  }
+
   private generateCacheKey(options: DiscoveryOptions): string {
     const keyData = {
       url: options.url,
@@ -1498,7 +1517,8 @@ export class URLDiscoveryService {
 
     const keyString = JSON.stringify(keyData);
     const hash = require('crypto').createHash('sha256').update(keyString).digest('hex');
-    return `${this.cachePrefix}:${hash}`;
+    // The URL token makes keys clearable by URL; the hash keeps per-option variants distinct.
+    return `${this.cachePrefix}:${this.urlKeyToken(options.url)}:${hash}`;
   }
 
   /**
@@ -1537,25 +1557,31 @@ export class URLDiscoveryService {
   }
 
   /**
-   * Clear discovery cache for a specific URL
+   * Clear every cached discovery variant for a specific URL. Returns the number
+   * of cache entries removed.
+   *
+   * Cache keys are `url-discovery:<urlToken>:<optionsHash>`. The previous code
+   * matched keys with `.includes(encodeURIComponent(url))`, but the URL never
+   * appeared in the key (it was folded into the hash), so this always matched
+   * nothing and silently cleared zero entries.
    */
-  async clearCache(url: string): Promise<void> {
+  async clearCache(url: string): Promise<number> {
     try {
-      const pattern = `${this.cachePrefix}:*`;
-      const keys = await redisClient.keys(pattern);
-
-      // Filter keys that contain the URL
-      const urlKeys = keys.filter(key => key.includes(encodeURIComponent(url)));
+      const keys = await redisClient.keys(`${this.cachePrefix}:*`);
+      const prefix = `${this.cachePrefix}:${this.urlKeyToken(url)}:`;
+      const urlKeys = keys.filter(key => key.startsWith(prefix));
 
       if (urlKeys.length > 0) {
         await redisClient.del(...urlKeys);
-        logger.info('Cleared discovery cache', { url, keysCleared: urlKeys.length });
       }
+      logger.info('Cleared discovery cache', { url, keysCleared: urlKeys.length });
+      return urlKeys.length;
     } catch (error) {
       logger.warn('Failed to clear discovery cache', {
         url,
         error: (error as Error).message
       });
+      throw error;
     }
   }
 

@@ -67,7 +67,51 @@ export class URLValidationUtils {
   }
 
   /**
-   * Check if URL matches domain constraints
+   * A curated set of common two-level public suffixes. Not a full Public Suffix
+   * List (that would need a dependency + periodic updates), but it covers the
+   * cases a blind "last two labels" gets wrong — without it, `docs.a.co.uk`
+   * would reduce to `co.uk` and then match every other .co.uk site.
+   */
+  private static readonly MULTI_PART_TLDS = new Set([
+    'co.uk', 'org.uk', 'me.uk', 'ac.uk', 'gov.uk', 'net.uk', 'sch.uk', 'ltd.uk', 'plc.uk',
+    'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'id.au',
+    'co.nz', 'net.nz', 'org.nz', 'govt.nz', 'ac.nz',
+    'co.za', 'org.za', 'web.za', 'gov.za',
+    'co.jp', 'or.jp', 'ne.jp', 'ac.jp', 'go.jp',
+    'com.br', 'net.br', 'org.br', 'gov.br',
+    'com.cn', 'net.cn', 'org.cn', 'gov.cn',
+    'co.in', 'net.in', 'org.in', 'gen.in', 'firm.in',
+    'com.sg', 'com.hk', 'com.mx', 'com.tr', 'com.ar', 'com.tw', 'com.pl', 'com.ua',
+  ]);
+
+  /**
+   * Best-effort registrable ("base") domain — the thing a subdomain filter must
+   * key on. `www.sonarsource.com` and `docs.sonarsource.com` both -> `sonarsource.com`.
+   * IP literals and single-label hosts are returned unchanged.
+   */
+  static registrableDomain(hostname: string): string {
+    const host = (hostname || '').toLowerCase().replace(/\.$/, '');
+    // IPv4 / IPv6 literal, or a single-label host (localhost): use as-is.
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':') || !host.includes('.')) {
+      return host;
+    }
+    const labels = host.split('.');
+    if (labels.length <= 2) return host;
+    const lastTwo = labels.slice(-2).join('.');
+    if (URLValidationUtils.MULTI_PART_TLDS.has(lastTwo)) {
+      return labels.slice(-3).join('.');
+    }
+    return lastTwo;
+  }
+
+  /**
+   * Check if URL matches domain constraints.
+   *
+   * With includeSubdomains, "same domain" means the same REGISTRABLE domain — so
+   * a seed of `www.sonarsource.com` keeps `docs.`, `blog.`, `community.` etc.
+   * Previously this compared against the full seed hostname, so a `www.` seed
+   * matched only `www.sonarsource.com` and dropped every sibling subdomain — the
+   * whole point of includeSubdomains — even though discovery had found them.
    */
   static matchesDomain(url: string, baseUrl: string, includeSubdomains: boolean = true): boolean {
     try {
@@ -75,13 +119,11 @@ export class URLValidationUtils {
       const baseObj = new URL(baseUrl);
 
       if (includeSubdomains) {
-        // Allow subdomains
-        return urlObj.hostname === baseObj.hostname ||
-               urlObj.hostname.endsWith('.' + baseObj.hostname);
-      } else {
-        // Exact hostname match only
-        return urlObj.hostname === baseObj.hostname;
+        return URLValidationUtils.registrableDomain(urlObj.hostname) ===
+               URLValidationUtils.registrableDomain(baseObj.hostname);
       }
+      // Exact hostname match only.
+      return urlObj.hostname === baseObj.hostname;
     } catch (error) {
       return false;
     }
