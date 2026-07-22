@@ -186,13 +186,16 @@ export class MapController {
         return;
       }
 
-      await this.discoveryService.clearCache(url);
+      const keysCleared = await this.discoveryService.clearCache(url);
 
-      logger.info('Discovery cache cleared', { url });
+      logger.info('Discovery cache cleared', { url, keysCleared });
 
       res.status(200).json({
         success: true,
-        message: 'Cache cleared successfully'
+        keysCleared,
+        message: keysCleared > 0
+          ? `Cleared ${keysCleared} cached ${keysCleared === 1 ? 'entry' : 'entries'} for this URL`
+          : 'No cached entries found for this URL'
       });
 
     } catch (error) {
