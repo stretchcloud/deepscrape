@@ -175,7 +175,7 @@ export const mapRequestSchema = z.object({
   skipSitemaps: z.boolean().optional().default(false),
   sitemapsOnly: z.boolean().optional().default(false),
   useUrlIndex: z.boolean().optional().default(true),
-  timeoutMs: z.number().int().min(1000).max(300000).optional().default(30000),
+  timeoutMs: z.number().int().min(1000).max(300000).optional().default(60000),
   includePatterns: z.array(z.string()).optional(),
   excludePatterns: z.array(z.string()).optional(),
 });

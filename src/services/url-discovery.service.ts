@@ -2,6 +2,7 @@ import { SitemapParserService } from './sitemap-parser.service';
 import { URLValidationUtils } from '../utils/url-validation.utils';
 import { logger } from '../utils/logger';
 import { assertPublicUrl, ssrfSafeRequestConfig } from '../utils/ssrf-guard';
+import { withDeadline, makeDeadline } from './discovery-deadline';
 import { extractChildLinks } from '../scraper/crawl-links';
 import { redisClient } from './redis.service';
 import { PlaywrightService } from './playwright.service';
@@ -146,9 +147,11 @@ export class URLDiscoveryService {
       return cached;
     }
 
-    // Set up abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    // Treat timeoutMs as a SOFT deadline: each phase is bounded by the time left,
+    // and whatever has been discovered when the budget runs out is returned rather
+    // than thrown away. `timedOut` records that the result may be incomplete.
+    const deadline = makeDeadline(timeoutMs);
+    let timedOut = false;
 
     try {
       // Run discovery methods strategically: fast methods first, then supplement with crawling if needed
@@ -177,25 +180,39 @@ export class URLDiscoveryService {
         sitemapPromises.push(this.runDocumentDiscovery(url, rateLimiting));
       }
 
-      // Run fast discovery methods in parallel
-      const sitemapResults = await Promise.allSettled(sitemapPromises);
-
-      // Process sitemap results
-      sitemapResults.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          const methodResult = result.value;
-          allUrls.push(...methodResult.urls);
-          methodCounts[methodResult.method] += methodResult.urls.length;
-        }
-      });
+      // Collect each method's URLs the moment it settles, then wait for the batch
+      // only up to the deadline. A method still running when the budget expires is
+      // dropped, but everything already found is kept — one hung sitemap can no
+      // longer erase the URLs the other methods returned.
+      const collect = (r: DiscoveryMethodResult) => {
+        allUrls.push(...r.urls);
+        methodCounts[r.method] += r.urls.length;
+      };
+      const phase1 = Promise.allSettled(
+        sitemapPromises.map((p) => p.then(collect, () => { /* ignore per-method failure */ }))
+      ).then(() => true);
+      if ((await withDeadline(phase1, deadline.remaining(), false)) === false) {
+        timedOut = true;
+      }
 
       // Phase 1.5: Subdomain expansion — when includeSubdomains is set, actively
-      // discover sibling subdomains (docs., blog., …) and pull each sitemap.
+      // discover sibling subdomains (docs., blog., …) and pull each sitemap. This
+      // is the slow part (a big docs. site can have a huge sitemap), so it only
+      // runs while there's a meaningful budget left and is bounded by it.
       if (includeSubdomains && !skipSitemaps) {
-        const subResult = await this.runSubdomainDiscovery(url, maxUrls);
-        allUrls.push(...subResult.urls);
-        methodCounts.sitemap += subResult.urls.length;
-        logger.info(`Subdomain discovery added ${subResult.urls.length} URLs`, { url });
+        if (deadline.remaining() > 2000) {
+          const subResult = await withDeadline(
+            this.runSubdomainDiscovery(url, maxUrls),
+            deadline.remaining(),
+            { urls: [], method: 'sitemap' as const, timeTaken: 0 }
+          );
+          allUrls.push(...subResult.urls);
+          methodCounts.sitemap += subResult.urls.length;
+          logger.info(`Subdomain discovery added ${subResult.urls.length} URLs`, { url });
+        } else {
+          logger.info('Skipping subdomain discovery: time budget exhausted', { url });
+        }
+        if (deadline.expired()) timedOut = true;
       }
 
       // Phase 2: Browser crawling only if we haven't found enough URLs
@@ -210,25 +227,36 @@ export class URLDiscoveryService {
       // would just add latency without finding meaningfully more.
       const sparseThreshold = Math.min(maxUrls, 30);
       if (!sitemapsOnly && currentUrlCount < sparseThreshold) {
-        logger.info('Running supplemental browser crawling', {
-          url,
-          currentUrls: currentUrlCount,
-          targetUrls: maxUrls
-        });
+        // Browser crawling is the slowest method; skip it if the budget is spent.
+        if (deadline.remaining() > 3000) {
+          logger.info('Running supplemental browser crawling', {
+            url,
+            currentUrls: currentUrlCount,
+            targetUrls: maxUrls
+          });
 
-        const crawlResult = await this.runBrowserDiscovery(
-          url,
-          Math.floor(maxUrls * 0.3),
-          rateLimiting,
-          {
-            ...crawlOptions,
-            maxCrawlDepth: Math.min(crawlOptions?.maxCrawlDepth || 2, 2), // Limit depth for speed
-            enableDeepCrawling: currentUrlCount < maxUrls * 0.5 // Only deep crawl if we really need more URLs
-          }
-        );
+          const crawlResult = await withDeadline(
+            this.runBrowserDiscovery(
+              url,
+              Math.floor(maxUrls * 0.3),
+              rateLimiting,
+              {
+                ...crawlOptions,
+                maxCrawlDepth: Math.min(crawlOptions?.maxCrawlDepth || 2, 2), // Limit depth for speed
+                enableDeepCrawling: currentUrlCount < maxUrls * 0.5 // Only deep crawl if we really need more URLs
+              }
+            ),
+            deadline.remaining(),
+            { urls: [], method: 'crawling' as const, timeTaken: 0 }
+          );
 
-        allUrls.push(...crawlResult.urls);
-        methodCounts.crawling += crawlResult.urls.length;
+          allUrls.push(...crawlResult.urls);
+          methodCounts.crawling += crawlResult.urls.length;
+          if (deadline.expired()) timedOut = true;
+        } else {
+          logger.info('Skipping browser crawling: time budget exhausted', { url, currentUrls: currentUrlCount });
+          timedOut = true;
+        }
       }
 
 
@@ -253,11 +281,16 @@ export class URLDiscoveryService {
         discoveryMethods: methodCounts,
         timeTaken,
         fromCache: false,
-        searchQuery
+        searchQuery,
+        // The soft deadline was hit: these results are usable but may be incomplete.
+        partial: timedOut || undefined
       };
 
-      // Cache the result
-      await this.cacheResult(cacheKey, discoveryResult);
+      // Only cache complete results — a partial (timed-out) run shouldn't poison
+      // the cache with a truncated URL list for the full TTL.
+      if (!timedOut) {
+        await this.cacheResult(cacheKey, discoveryResult);
+      }
 
       logger.info('URL discovery completed', {
         url,
@@ -275,8 +308,6 @@ export class URLDiscoveryService {
         timeTaken: Date.now() - startTime
       });
       throw error;
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 

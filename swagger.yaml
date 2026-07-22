@@ -1428,7 +1428,7 @@ paths:
                   type: integer
                   minimum: 1000
                   maximum: 300000
-                  default: 30000
+                  default: 60000
                 includePatterns:
                   type: array
                   items:
