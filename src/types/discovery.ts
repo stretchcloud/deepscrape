@@ -48,6 +48,8 @@ export interface DiscoveryResult {
   timeTaken: number;
   fromCache: boolean;
   searchQuery?: string;
+  /** True when the soft deadline was hit and the URL list may be incomplete. */
+  partial?: boolean;
 }
 
 export interface DiscoveryMethodResult {
@@ -101,6 +103,8 @@ export interface MapResponse {
     includeSubdomains: boolean;
     maxUrls: number;
     timestamp: string;
+    /** True when discovery hit the soft deadline; widen timeoutMs for more. */
+    partial?: boolean;
   };
   error?: string;
 }

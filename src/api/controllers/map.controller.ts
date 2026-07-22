@@ -73,17 +73,12 @@ export class MapController {
         crawlOptions
       };
 
-      // Run URL discovery with timeout wrapper to prevent hanging
-      const discoveryTimeoutMs = timeoutMs ?? 60000; // Use user-provided timeout or default to 60 seconds
-      
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error(`Discovery timeout after ${discoveryTimeoutMs}ms`)), discoveryTimeoutMs)
-      );
-
-      const discoveryResult = await Promise.race([
-        this.discoveryService.discoverUrls(discoveryOptions),
-        timeoutPromise
-      ]);
+      // The discovery service now enforces `timeoutMs` internally as a SOFT
+      // deadline and always resolves with whatever it found (see
+      // url-discovery.service.ts). No outer reject-race here — that used to throw
+      // away every URL already discovered the moment the deadline passed, turning
+      // a slow-but-successful crawl into a 500 with an empty list.
+      const discoveryResult = await this.discoveryService.discoverUrls(discoveryOptions);
 
       // Prepare response
       const response: MapResponse = {
@@ -93,7 +88,9 @@ export class MapController {
           url,
           includeSubdomains,
           maxUrls,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          // Signal a deadline-truncated result so callers can widen timeoutMs.
+          partial: discoveryResult.partial ?? false
         }
       };
 
