@@ -682,6 +682,22 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 ## API Usage
 
+### OpenAPI specification
+
+Every endpoint is described in [`swagger.yaml`](swagger.yaml) (OpenAPI 3.0) — paste it into
+[editor.swagger.io](https://editor.swagger.io/), or generate a client with `openapi-generator`.
+
+The file is **generated from the zod request schemas** in `src/api/schemas`, which are the same
+schemas the routes validate with — so the documented options can't drift from what the API
+actually accepts:
+
+```bash
+npm run openapi:generate   # rewrite swagger.yaml after changing a schema
+npm run openapi:check      # verify it's in sync (CI runs this)
+```
+
+CI also fails if an endpoint is added without appearing in the spec, so coverage stays complete.
+
 ### Basic Scraping
 
 ```bash

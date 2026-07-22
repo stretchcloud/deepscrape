@@ -3,27 +3,10 @@ import { MapController } from '../controllers/map.controller';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter } from '../middleware/rate-limit.middleware';
-import { z } from 'zod';
+import { mapRequestSchema, mapClearCacheSchema } from '../schemas';
 
 // Validation schema for map request
-const mapRequestSchema = z.object({
-  url: z.string().url('Invalid URL format'),
-  maxUrls: z.number().int().min(1).max(30000).optional().default(5000),
-  includeSubdomains: z.boolean().optional().default(true),
-  searchQuery: z.string().optional(),
-  skipSitemaps: z.boolean().optional().default(false),
-  sitemapsOnly: z.boolean().optional().default(false),
-  useUrlIndex: z.boolean().optional().default(true),
-  timeoutMs: z.number().int().min(1000).max(300000).optional().default(30000),
-  includePatterns: z.array(z.string()).optional(),
-  excludePatterns: z.array(z.string()).optional()
-});
-
 // Validation schema for cache clear request
-const clearCacheSchema = z.object({
-  url: z.string().url('Invalid URL format')
-});
-
 const router = Router();
 const mapController = new MapController();
 
@@ -243,7 +226,7 @@ router.get(
 router.post(
   '/cache/clear',
   apiKeyAuth,
-  validateRequest(clearCacheSchema),
+  validateRequest(mapClearCacheSchema),
   mapController.clearCache.bind(mapController)
 );
 

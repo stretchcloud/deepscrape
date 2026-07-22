@@ -1,23 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter } from '../middleware/rate-limit.middleware';
 import { searchWeb } from '../../services/search.service';
 import scraperManager from '../../scraper/scraper-manager';
 import { logger } from '../../utils/logger';
+import { searchRequestSchema } from '../schemas';
 
 const router = Router();
-
-const searchSchema = z.object({
-  query: z.string().min(1).max(500),
-  limit: z.number().int().positive().max(50).optional(),
-  provider: z.enum(['duckduckgo', 'searxng', 'serper']).optional(),
-  lang: z.string().max(10).optional(),
-  // When true, scrape each result and attach markdown content.
-  scrapeResults: z.boolean().optional(),
-  scrapeOptions: z.record(z.any()).optional(),
-});
 
 /**
  * @route POST /api/search
@@ -28,7 +18,7 @@ router.post(
   '/',
   expensiveLimiter,
   apiKeyAuth,
-  validateRequest(searchSchema),
+  validateRequest(searchRequestSchema),
   async (req: Request, res: Response) => {
     try {
       const { query, limit = 10, provider, lang, scrapeResults, scrapeOptions } = req.body;

@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import { apiKeyAuth } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation';
 import { expensiveLimiter, statusLimiter } from '../middleware/rate-limit.middleware';
@@ -10,42 +9,15 @@ import {
   SessionCapacityError,
 } from '../../services/session-manager.service';
 import { logger } from '../../utils/logger';
+import { sessionCreateSchema, sessionActionSchema } from '../schemas';
 
 const router = Router();
-
-const createSchema = z.object({
-  userAgent: z.string().max(500).optional(),
-  viewport: z.object({ width: z.number().int().min(200).max(4000), height: z.number().int().min(200).max(4000) }).optional(),
-  initialUrl: z.string().url().optional(),
-  proxy: z.object({ server: z.string().max(300), username: z.string().max(200).optional(), password: z.string().max(200).optional() }).optional(),
-});
-
-const ACTION_TYPES = [
-  'navigate', 'click', 'type', 'fill', 'select', 'scroll', 'waitForSelector',
-  'wait', 'screenshot', 'scrape', 'evaluate', 'back', 'forward', 'reload', 'content',
-] as const;
-
-const actionSchema = z.object({
-  type: z.enum(ACTION_TYPES),
-  url: z.string().url().optional(),
-  selector: z.string().max(2000).optional(),
-  value: z.string().optional(),
-  text: z.string().optional(),
-  position: z.number().optional(),
-  timeout: z.number().int().min(0).max(120000).optional(),
-  script: z.string().max(20000).optional(),
-  fullPage: z.boolean().optional(),
-  formats: z.array(z.string()).max(6).optional(),
-  onlyMainContent: z.boolean().optional(),
-  fitMarkdown: z.boolean().optional(),
-  waitUntil: z.enum(['load', 'domcontentloaded', 'networkidle', 'commit']).optional(),
-}).passthrough();
 
 /**
  * @route POST /api/sessions
  * @desc  Create a persistent interactive browser session.
  */
-router.post('/', expensiveLimiter, apiKeyAuth, validateRequest(createSchema), async (req: Request, res: Response) => {
+router.post('/', expensiveLimiter, apiKeyAuth, validateRequest(sessionCreateSchema), async (req: Request, res: Response) => {
   try {
     const info = await sessionManager.createSession(req.body);
     res.status(201).json({ success: true, session: info });
@@ -80,7 +52,7 @@ router.get('/:id', statusLimiter, apiKeyAuth, (req: Request, res: Response) => {
  * @route POST /api/sessions/:id/action
  * @desc  Run one action against the session (navigate/click/type/scrape/...).
  */
-router.post('/:id/action', expensiveLimiter, apiKeyAuth, validateRequest(actionSchema), async (req: Request, res: Response) => {
+router.post('/:id/action', expensiveLimiter, apiKeyAuth, validateRequest(sessionActionSchema.passthrough()), async (req: Request, res: Response) => {
   try {
     const result = await sessionManager.runAction(req.params.id, req.body as SessionAction);
     const info = sessionManager.getSession(req.params.id);

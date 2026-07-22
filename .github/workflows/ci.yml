@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck / build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      # Fails if swagger.yaml drifted from the zod request schemas.
+      # Regenerate locally with `npm run openapi:generate` and commit.
+      - name: OpenAPI spec is in sync
+        run: npm run openapi:check
