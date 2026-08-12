@@ -4,6 +4,25 @@
 
 Transform any website into structured data using Playwright automation and GPT-4o extraction. Built for modern web applications, RAG pipelines, and data workflows.
 
+## 💛 Sponsors
+
+DeepScrape is free and open source. Ongoing development is supported by the sponsors below.
+
+<!--
+  SPONSORS — to add one:
+    1. Drop the banner in assets/sponsors/<name>.png (1200x628 renders well at width="640")
+    2. Copy one block below and update the link, alt text, and description
+    3. Keep the "(Sponsored)" label and the disclosure line at the end of this section
+-->
+
+<a href="https://www.swiftproxy.net/?ref=deepscrape">
+  <img src="assets/sponsors/swiftproxy.png" alt="Swiftproxy — residential proxies from $0.7/GB, ISP proxies $6/IP, 80M+ clean IPs, non-expiring traffic, free trial. 10% off with code PROXY90." width="640">
+</a>
+
+**[Swiftproxy](https://www.swiftproxy.net/?ref=deepscrape)** — 90M+ clean residential and static residential proxies for AI scraping, data extraction, and automation workflows. Build reliable scraping solutions with global IP coverage, stable sessions, and flexible proxy infrastructure. Dynamic proxy traffic never expires until used, with free testing available. **Get 10% off with code `PROXY90`.** *(Sponsored)*
+
+> **Disclosure:** sponsorship funds maintenance of this project. It buys logo placement and a clearly labeled recommendation — it does not buy influence over the code, defaults, benchmarks, or any comparison in this README. Every paid placement is marked *(Sponsored)*.
+
 ## ✨ Features
 
 - **✨ Fit-Markdown Extraction** - Pruning content filter (link-density scoring) for clean, LLM-ready markdown
@@ -515,6 +534,8 @@ Hard bounds: step budget (`maxSteps`, capped by `AGENT_MAX_STEPS_CAP`), per-acti
 curl -s "$BASE/api/proxies" -H "X-API-Key: $API_KEY"
 # -> { "enabled":true, "total":2, "healthy":2, "proxies":[{"server":"http://proxy1:8000","healthy":true,"failures":0}, …] }
 ```
+
+**Recommended proxy provider:** [Swiftproxy](https://www.swiftproxy.net/?ref=deepscrape) — residential proxies from $0.7/GB and static ISP proxies at $6/IP, with non-expiring traffic and a free trial. Drop the endpoints straight into `PROXY_LIST`. 10% off with code `PROXY90`. *(Sponsored — see [Sponsors](#-sponsors))*
 
 > Proxies apply to the **browser** path only, by design. The HTTP/axios path pins each connection to a pre-validated public IP (per-hop SSRF protection) that an HTTP proxy would bypass — and browser-rendered scrapes are where proxies matter most. **There is no CAPTCHA-solving / bot-detection-bypass component** — this is proxy rotation infrastructure, nothing more.
 
@@ -2338,6 +2359,7 @@ Proxies act as intermediaries between your scraper and target websites, helping 
 #### **🛒 Where to Get Proxies**
 
 **Residential Proxy Providers (Recommended for Scraping):**
+- **[Swiftproxy](https://www.swiftproxy.net/?ref=deepscrape)** *(Sponsored)* - 90M+ residential + static ISP IPs, from $0.7/GB, traffic never expires, free trial (code `PROXY90` for 10% off)
 - **Bright Data** (formerly Luminati) - Industry leader, expensive but reliable
 - **Oxylabs** - High-quality residential proxies
 - **Smartproxy** - Good balance of price/quality ($25-75/month)
