@@ -10,16 +10,38 @@ DeepScrape is free and open source. Ongoing development is supported by the spon
 
 <!--
   SPONSORS — to add one:
-    1. Drop the banner in assets/sponsors/<name>.png (1200x628 renders well at width="640")
-    2. Copy one block below and update the link, alt text, and description
-    3. Keep the "(Sponsored)" label and the disclosure line at the end of this section
+    1. Normalize the artwork to a 1.91:1 banner (1200x628 or 800x419) so every
+       cell in the row renders at the same size, and save it to
+       assets/sponsors/<name>.png
+    2. Copy a <td> below and update the link, alt text, name, and description.
+       Use HTML tags inside the cell (<b>, <a>, <code>) — GitHub does not render
+       markdown inside HTML table cells.
+    3. Two sponsors per row; for a third, add a <td> (3-across) or a new <tr>.
+    4. Keep the "(Sponsored)" label and the disclosure line below the table.
 -->
 
-<a href="https://www.swiftproxy.net/?ref=deepscrape">
-  <img src="assets/sponsors/swiftproxy.png" alt="Swiftproxy — residential proxies from $0.7/GB, ISP proxies $6/IP, 80M+ clean IPs, non-expiring traffic, free trial. 10% off with code PROXY90." width="640">
-</a>
-
-**[Swiftproxy](https://www.swiftproxy.net/?ref=deepscrape)** — 90M+ clean residential and static residential proxies for AI scraping, data extraction, and automation workflows. Build reliable scraping solutions with global IP coverage, stable sessions, and flexible proxy infrastructure. Dynamic proxy traffic never expires until used, with free testing available. **Get 10% off with code `PROXY90`.** *(Sponsored)*
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://www.swiftproxy.net/?ref=deepscrape">
+        <img src="assets/sponsors/swiftproxy.png" width="100%" alt="Swiftproxy — residential proxies from $0.7/GB, ISP proxies $6/IP, 80M+ clean IPs, non-expiring traffic, free trial. 10% off with code PROXY90.">
+      </a>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://www.apismart.ai/">
+        <img src="assets/sponsors/apismart.png" width="100%" alt="APISmart — unified access to leading LLM, image, and video models through a single OpenAI-compatible API.">
+      </a>
+    </td>
+  </tr>
+  <tr valign="top">
+    <td width="50%">
+      <sub><b><a href="https://www.swiftproxy.net/?ref=deepscrape">Swiftproxy</a></b> — 90M+ clean residential and static residential proxies for AI scraping, data extraction, and automation workflows. Build reliable scraping solutions with global IP coverage, stable sessions, and flexible proxy infrastructure. Dynamic proxy traffic never expires until used, with free testing available. <b>Get 10% off with code <code>PROXY90</code>.</b> <i>(Sponsored)</i></sub>
+    </td>
+    <td width="50%">
+      <sub><b><a href="https://www.apismart.ai/">APISmart</a></b> — unified access to leading AI models through a single API. Connect to LLM, image, and video models using one API key and an OpenAI-compatible interface, with no need to manage multiple providers separately. Intelligent routing and automatic failover help improve reliability, while centralized billing makes usage easier to manage. Build and scale AI applications faster through one streamlined platform. <i>(Sponsored)</i></sub>
+    </td>
+  </tr>
+</table>
 
 > **Disclosure:** sponsorship funds maintenance of this project. It buys logo placement and a clearly labeled recommendation — it does not buy influence over the code, defaults, benchmarks, or any comparison in this README. Every paid placement is marked *(Sponsored)*.
 
