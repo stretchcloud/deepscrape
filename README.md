@@ -670,7 +670,7 @@ curl -s -X POST "$BASE/api/sites" -H "X-API-Key: $API_KEY" -H "Content-Type: app
 ### **For Maximum Performance:**
 ```bash
 # Use /api/crawl with useMapDiscovery for best results
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -685,7 +685,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 ### **For Bot-Protected Sites:**
 ```bash
 # Use browser-based scraping with stealth mode
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -704,7 +704,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 ### **For Rate-Limited Sites:**
 ```bash
 # Conservative crawling with delays
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -744,7 +744,7 @@ CI also fails if an endpoint is added without appearing in the spec, so coverage
 ### Basic Scraping
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -757,7 +757,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Single page (save Markdown):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -769,14 +769,14 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 **Batch ZIP (Markdown files inside):**
 ```bash
 curl -L -o batch.zip \
-  "https://deepscrapper.ai/api/batch/scrape/<BATCH_ID>/download/zip?format=markdown" \
+  "http://localhost:3000/api/batch/scrape/<BATCH_ID>/download/zip?format=markdown" \
   -H "X-API-Key: your-secret-key"
 ```
 
 **Batch single result (Markdown):**
 ```bash
 curl -L -o item.md \
-  "https://deepscrapper.ai/api/batch/scrape/<BATCH_ID>/download/<JOB_ID>?format=markdown" \
+  "http://localhost:3000/api/batch/scrape/<BATCH_ID>/download/<JOB_ID>?format=markdown" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -843,7 +843,7 @@ curl -L -o item.md \
 
 **JavaScript-Heavy Site with Actions:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -864,7 +864,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Protected Site with Proxy and Authentication:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -891,7 +891,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 Discover thousands of URLs from a website in seconds using our high-performance `/map` endpoint:
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -944,7 +944,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 
 **Basic URL Discovery:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -956,7 +956,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 
 **Filtered Discovery with Patterns:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -971,7 +971,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 
 **High-Performance Discovery with Enhanced Crawling:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -994,7 +994,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 
 **Conservative Discovery (GitHub-safe):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1015,7 +1015,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 
 ### Advanced Discovery with Search
 ```bash
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1058,7 +1058,7 @@ curl -X POST https://deepscrapper.ai/api/map \
 Extract structured data using JSON Schema:
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1089,7 +1089,7 @@ curl -X POST https://deepscrapper.ai/api/extract-schema \
 Scrapes a URL and uses an LLM (GPT-4o) to generate a concise summary of its content.
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/summarize \
+curl -X POST http://localhost:3000/api/summarize \
   -H "Content-Type: application/json" \
   -H "X-API-Key: test-key" \
   -d '{
@@ -1126,7 +1126,7 @@ curl -X POST https://deepscrapper.ai/api/summarize \
 
 **Technical Summary with Focus:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/summarize \
+curl -X POST http://localhost:3000/api/summarize \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1144,7 +1144,7 @@ curl -X POST https://deepscrapper.ai/api/summarize \
 
 **Bullet Point Summary:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/summarize \
+curl -X POST http://localhost:3000/api/summarize \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1178,7 +1178,7 @@ Extract key information from technical documentation:
 
 ```bash
 
-curl -X POST https://deepscrapper.ai/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: test-key" \
   -d '{
@@ -1213,7 +1213,7 @@ curl -X POST https://deepscrapper.ai/api/extract-schema \
 Extract and compare methodologies from research papers:
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: test-key" \
   -d '{
@@ -1241,7 +1241,7 @@ curl -X POST https://deepscrapper.ai/api/extract-schema \
 Extract complex data structure from any medium articles
 
 ```bash
-   curl -X POST https://deepscrapper.ai/api/extract-schema \
+   curl -X POST http://localhost:3000/api/extract-schema \
      -H "Content-Type: application/json" \
      -H "X-API-Key: test-key" \
      -d '{
@@ -1299,7 +1299,7 @@ The schema follows JSON Schema specification with additional extraction hints:
 
 **Extract E-commerce Product Data:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/extract-schema \
+curl -X POST http://localhost:3000/api/extract-schema \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1378,7 +1378,7 @@ Process multiple URLs efficiently with controlled concurrency, automatic retries
 ### Start Batch Processing
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/batch/scrape \
+curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1405,14 +1405,14 @@ Response:
   "batchId": "550e8400-e29b-41d4-a716-446655440000",
   "totalUrls": 5,
   "estimatedTime": 50000,
-  "statusUrl": "https://deepscrapper.ai/api/batch/scrape/550e8400.../status"
+  "statusUrl": "http://localhost:3000/api/batch/scrape/550e8400.../status"
 }
 ```
 
 ### Monitor Batch Progress
 
 ```bash
-curl -X GET https://deepscrapper.ai/api/batch/scrape/{batchId}/status \
+curl -X GET http://localhost:3000/api/batch/scrape/{batchId}/status \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -1436,7 +1436,7 @@ Response:
 #### 1. Download as ZIP Archive (Recommended)
 ```bash
 # Download all results as markdown files in a ZIP
-curl -X GET "https://deepscrapper.ai/api/batch/scrape/{batchId}/download/zip?format=markdown" \
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/zip?format=markdown" \
   -H "X-API-Key: your-secret-key" \
   --output "batch_results.zip"
 
@@ -1456,7 +1456,7 @@ batch_summary.json
 #### 2. Download Individual Results
 ```bash
 # Get job IDs from status endpoint, then download individual files
-curl -X GET "https://deepscrapper.ai/api/batch/scrape/{batchId}/download/{jobId}?format=markdown" \
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/{jobId}?format=markdown" \
   -H "X-API-Key: your-secret-key" \
   --output "page1.md"
 ```
@@ -1464,7 +1464,7 @@ curl -X GET "https://deepscrapper.ai/api/batch/scrape/{batchId}/download/{jobId}
 #### 3. Download Consolidated JSON
 ```bash
 # All results in a single JSON file
-curl -X GET "https://deepscrapper.ai/api/batch/scrape/{batchId}/download/json" \
+curl -X GET "http://localhost:3000/api/batch/scrape/{batchId}/download/json" \
   -H "X-API-Key: your-secret-key" \
   --output "batch_results.json"
 ```
@@ -1472,7 +1472,7 @@ curl -X GET "https://deepscrapper.ai/api/batch/scrape/{batchId}/download/json" \
 ### Advanced Batch Options
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/batch/scrape \
+curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1499,7 +1499,7 @@ curl -X POST https://deepscrapper.ai/api/batch/scrape \
 ### Cancel Batch Processing
 
 ```bash
-curl -X DELETE https://deepscrapper.ai/api/batch/scrape/{batchId} \
+curl -X DELETE http://localhost:3000/api/batch/scrape/{batchId} \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -1530,7 +1530,7 @@ curl -X DELETE https://deepscrapper.ai/api/batch/scrape/{batchId} \
 
 **Advanced Batch with Individual Options:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/batch/scrape \
+curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1576,7 +1576,7 @@ curl -X POST https://deepscrapper.ai/api/batch/scrape \
 
 **Get Paginated Results:**
 ```bash
-curl -X GET "https://deepscrapper.ai/api/batch/scrape/550e8400.../status?limit=10&offset=20" \
+curl -X GET "http://localhost:3000/api/batch/scrape/550e8400.../status?limit=10&offset=20" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -1606,7 +1606,7 @@ curl -X GET "https://deepscrapper.ai/api/batch/scrape/550e8400.../status?limit=1
 
 **Force Cancel Example:**
 ```bash
-curl -X DELETE "https://deepscrapper.ai/api/batch/scrape/550e8400...?force=true" \
+curl -X DELETE "http://localhost:3000/api/batch/scrape/550e8400...?force=true" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -1615,7 +1615,7 @@ curl -X DELETE "https://deepscrapper.ai/api/batch/scrape/550e8400...?force=true"
 Start a multi-page crawl (automatically exports markdown files):
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1633,7 +1633,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 **🚀 Enhanced Streaming Crawling** (Recommended for large sites):
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1819,7 +1819,7 @@ The `waitForSelector` option is a **browser automation feature** that tells Deep
 
 **WordPress Blog (Dynamic Content):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1834,7 +1834,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **E-commerce Product Page:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1849,7 +1849,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Documentation Site (React/SPA):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -1866,7 +1866,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **News Site with Cookie Banner:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2101,7 +2101,7 @@ Browser actions allow you to simulate user interactions on web pages before scra
 
 **E-commerce Product Pages:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2122,7 +2122,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Social Media Feeds:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2145,7 +2145,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **News Sites with Paywalls:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2166,7 +2166,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Single Page Applications (SPAs):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2189,7 +2189,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Search Results Pages:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2331,7 +2331,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 #### **🚀 Complete Example - E-commerce Crawl with Actions**
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2402,7 +2402,7 @@ Proxies act as intermediaries between your scraper and target websites, helping 
 
 **Single Proxy:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2416,7 +2416,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Proxy with Authentication:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2433,7 +2433,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 #### **🔄 Proxy Rotation (Multiple Proxies)**
 
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2458,7 +2458,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Bright Data (Premium Residential):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2478,7 +2478,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Oxylabs Residential:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2494,7 +2494,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Smartproxy (Budget-Friendly):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2515,7 +2515,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Scraping E-commerce (Amazon, eBay):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2536,7 +2536,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **High-Volume Scraping with Rotation:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/batch/scrape \
+curl -X POST http://localhost:3000/api/batch/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2589,7 +2589,7 @@ curl -x "http://your-proxy:8080" \
 
 **Step 2: Test Basic Setup**
 ```bash
-curl -X POST https://deepscrapper.ai/api/scrape \
+curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2604,7 +2604,7 @@ curl -X POST https://deepscrapper.ai/api/scrape \
 
 **Step 3: Scale with Crawling**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2645,7 +2645,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Basic Crawl:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2657,7 +2657,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **High-Performance Discovery Crawl with Enhanced Options:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2686,7 +2686,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Fast Discovery Crawl (Browser-Only, 10x Faster):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2711,7 +2711,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Conservative Discovery Crawl (Rate-Limited):**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2736,7 +2736,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Advanced Browser Crawl with Actions:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2759,7 +2759,7 @@ curl -X POST https://deepscrapper.ai/api/crawl \
 
 **Filtered Crawl with Rate Limiting:**
 ```bash
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -2782,7 +2782,7 @@ Response includes output directory:
 {
   "success": true,
   "id": "abc123-def456",
-  "url": "https://deepscrapper.ai/api/crawl/abc123-def456",
+  "url": "http://localhost:3000/api/crawl/abc123-def456",
   "message": "Crawl initiated successfully. Individual pages will be exported as markdown files.",
   "outputDirectory": "./crawl-output/abc123-def456"
 }
@@ -2791,7 +2791,7 @@ Response includes output directory:
 Check crawl status (includes exported files info):
 
 ```bash
-curl https://deepscrapper.ai/api/crawl/{job-id} \
+curl http://localhost:3000/api/crawl/{job-id} \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -2858,13 +2858,13 @@ GET endpoint to check crawl job status and results.
 
 **Get Full Crawl Status:**
 ```bash
-curl -X GET "https://deepscrapper.ai/api/crawl/abc123-def456" \
+curl -X GET "http://localhost:3000/api/crawl/abc123-def456" \
   -H "X-API-Key: your-secret-key"
 ```
 
 **Get Summary Only:**
 ```bash
-curl -X GET "https://deepscrapper.ai/api/crawl/abc123-def456?format=summary" \
+curl -X GET "http://localhost:3000/api/crawl/abc123-def456?format=summary" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -2902,13 +2902,13 @@ DELETE endpoint to clear the cache.
 
 **Clear All Cache:**
 ```bash
-curl -X DELETE "https://deepscrapper.ai/api/cache" \
+curl -X DELETE "http://localhost:3000/api/cache" \
   -H "X-API-Key: your-secret-key"
 ```
 
 **Clear Specific Pattern:**
 ```bash
-curl -X DELETE "https://deepscrapper.ai/api/cache?pattern=example.com/*" \
+curl -X DELETE "http://localhost:3000/api/cache?pattern=example.com/*" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -2935,7 +2935,7 @@ GET endpoint to retrieve URL discovery cache statistics.
 
 **Get Detailed Stats by Domain:**
 ```bash
-curl -X GET "https://deepscrapper.ai/api/map/cache/stats?detailed=true&groupBy=domain" \
+curl -X GET "http://localhost:3000/api/map/cache/stats?detailed=true&groupBy=domain" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -2972,7 +2972,7 @@ POST endpoint to clear URL discovery cache.
 
 **Clear Specific Domains:**
 ```bash
-curl -X POST "https://deepscrapper.ai/api/map/cache/clear" \
+curl -X POST "http://localhost:3000/api/map/cache/clear" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-secret-key" \
   -d '{
@@ -2994,7 +2994,7 @@ GET endpoint to check URL discovery service health.
 
 **Verbose Health Check:**
 ```bash
-curl -X GET "https://deepscrapper.ai/api/map/health?verbose=true" \
+curl -X GET "http://localhost:3000/api/map/health?verbose=true" \
   -H "X-API-Key: your-secret-key"
 ```
 
@@ -3095,14 +3095,14 @@ The `/api/map` endpoint works seamlessly with existing scraping workflows for ma
 ### 1. Discovery + Batch Scraping
 ```bash
 # Step 1: Discover URLs (fast)
-URLS=$(curl -s -X POST https://deepscrapper.ai/api/map \
+URLS=$(curl -s -X POST http://localhost:3000/api/map \
   -H "X-API-Key: your-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://docs.example.com", "maxUrls": 100}' | \
   jq -r '.data.links[]')
 
 # Step 2: Batch scrape discovered URLs
-curl -X POST https://deepscrapper.ai/api/batch/scrape \
+curl -X POST http://localhost:3000/api/batch/scrape \
   -H "X-API-Key: your-secret-key" \
   -H "Content-Type: application/json" \
   -d "{\"urls\": $(echo $URLS | jq -R -s -c 'split(\"\n\")[:-1]')}"
@@ -3111,7 +3111,7 @@ curl -X POST https://deepscrapper.ai/api/batch/scrape \
 ### 2. Discovery + Targeted Crawling
 ```bash
 # Use discovery to set optimal crawl limits
-curl -X POST https://deepscrapper.ai/api/map \
+curl -X POST http://localhost:3000/api/map \
   -H "X-API-Key: your-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -3121,7 +3121,7 @@ curl -X POST https://deepscrapper.ai/api/map \
   }' | jq '.data.total'  # Returns actual discoverable count
 
 # Then crawl with appropriate limit
-curl -X POST https://deepscrapper.ai/api/crawl \
+curl -X POST http://localhost:3000/api/crawl \
   -H "X-API-Key: your-secret-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -3342,7 +3342,7 @@ Welcome to the getting started guide...
 
 ## License
 
-Apache 2.0 - see [LICENSE](LICENSE) file
+MIT - see [LICENSE](LICENSE) file
 
 ## Contributing
 

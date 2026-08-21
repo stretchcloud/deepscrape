@@ -237,7 +237,7 @@ export function buildOpenApiDocument() {
         'drive persistent browser sessions, and expose any site as a reusable endpoint.\n\n' +
         'This file is GENERATED from the zod request schemas in `src/api/schemas`. ' +
         'Do not edit by hand — run `npm run openapi:generate`.',
-      license: { name: 'Apache-2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0' },
+      license: { name: 'MIT', url: 'https://opensource.org/licenses/MIT' },
     },
     servers: [{ url: 'http://localhost:3000', description: 'Local instance' }],
   });

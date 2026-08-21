@@ -17,8 +17,8 @@ info:
     This file is GENERATED from the zod request schemas in `src/api/schemas`. Do not edit by hand —
     run `npm run openapi:generate`.
   license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
+    name: MIT
+    url: https://opensource.org/licenses/MIT
 servers:
   - url: http://localhost:3000
     description: Local instance
