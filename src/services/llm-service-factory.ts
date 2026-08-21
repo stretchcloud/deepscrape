@@ -11,8 +11,12 @@ export enum TaskComplexity {
 }
 
 /**
- * Factory class for creating LLM services
- * Always uses the OpenAI model specified in env variables
+ * Factory class for creating LLM services.
+ *
+ * Talks to any OpenAI-compatible chat-completions endpoint. Set OPENAI_BASE_URL
+ * to point at a local server (Ollama, vLLM, LM Studio, LiteLLM); leave it unset
+ * for api.openai.com. When a base URL is set the API key becomes optional,
+ * because most local servers ignore it entirely.
  */
 export class LLMServiceFactory {
   /**
@@ -21,24 +25,33 @@ export class LLMServiceFactory {
   static createOpenAIService(taskComplexity?: TaskComplexity): OpenAIService | null {
     try {
       // Get configuration
-      const apiKey = process.env.OPENAI_API_KEY;
+      const baseURL = process.env.OPENAI_BASE_URL?.trim() || undefined;
       const organization = process.env.OPENAI_ORGANIZATION;
       const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Default to gpt-4o
 
+      // Local OpenAI-compatible servers generally ignore the key, but the SDK
+      // requires a non-empty string, so supply a placeholder rather than making
+      // the user invent one.
+      const apiKey = process.env.OPENAI_API_KEY?.trim() || (baseURL ? 'not-needed' : undefined);
+
       if (!apiKey) {
         logger.warn(
-          'OpenAI service not configured correctly. Missing environment variable: OPENAI_API_KEY. ' +
-          'Make sure to set this variable in your .env file.'
+          'LLM service not configured. Set OPENAI_API_KEY to use api.openai.com, ' +
+          'or set OPENAI_BASE_URL to point at a local OpenAI-compatible server ' +
+          '(for example http://localhost:11434/v1 for Ollama).'
         );
         return null;
       }
 
-      logger.info(`Creating OpenAI service with model: ${model}`);
+      logger.info(
+        `Creating LLM service with model: ${model} via ${baseURL ?? 'api.openai.com'}`
+      );
 
       return new OpenAIService({
         apiKey,
         organization,
-        model
+        model,
+        baseURL
       });
     } catch (error) {
       logger.error(`Error creating OpenAI service: ${error instanceof Error ? error.message : String(error)}`);

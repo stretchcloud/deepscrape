@@ -102,6 +102,32 @@ REDIS_HOST=localhost
 CACHE_ENABLED=true
 ```
 
+#### Using a local model instead of OpenAI
+
+DeepScrape talks to any OpenAI-compatible chat-completions endpoint. Set `OPENAI_BASE_URL`
+and the LLM never leaves your machine:
+
+```env
+# Ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_MODEL=llama3.1
+# OPENAI_API_KEY can be left blank — local servers ignore it
+```
+
+| Server | `OPENAI_BASE_URL` |
+|---|---|
+| Ollama | `http://localhost:11434/v1` |
+| vLLM | `http://localhost:8000/v1` |
+| LM Studio | `http://localhost:1234/v1` |
+| LiteLLM | `http://localhost:4000` |
+
+Leave `OPENAI_BASE_URL` unset to use `api.openai.com` as before.
+
+A note on model size: `/api/extract-auto` asks the model to work out a site's CSS selectors
+**once**, then extracts from the cached schema with no model in the loop. That one-shot task is
+well within reach of a 7B model, and it runs once per site rather than once per page. Full-page
+LLM extraction (`/api/extract`) is a harder ask and benefits from a larger model.
+
 ### 3. Start Server
 
 ```bash

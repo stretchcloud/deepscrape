@@ -6,6 +6,12 @@ interface OpenAIConfig {
   apiKey: string;
   organization?: string;
   model: string;
+  /**
+   * Base URL of an OpenAI-compatible API. Leave undefined to use api.openai.com.
+   * Set this to run against Ollama, vLLM, LM Studio, LiteLLM or any other server
+   * that implements the OpenAI chat-completions interface.
+   */
+  baseURL?: string;
 }
 
 interface LLMResponse<T> {
@@ -37,17 +43,26 @@ function tryParseJson(content: string | null): { ok: true; value: unknown } | { 
 export class OpenAIService {
   private client: OpenAI;
   private _model: string;
+  private _baseURL?: string;
 
   constructor(config: OpenAIConfig) {
     this.client = new OpenAI({
       apiKey: config.apiKey,
       organization: config.organization,
+      // undefined falls through to the SDK default (api.openai.com).
+      baseURL: config.baseURL,
       // Bound each call so a slow/hung LLM request can't pin a worker slot for
       // the SDK's 10-minute default; retry transient failures a couple of times.
       timeout: Number(process.env.OPENAI_TIMEOUT_MS ?? 60_000),
       maxRetries: Number(process.env.OPENAI_MAX_RETRIES ?? 2)
     });
     this._model = config.model;
+    this._baseURL = config.baseURL;
+  }
+
+  /** The endpoint in use, or undefined when talking to api.openai.com. */
+  get baseURL(): string | undefined {
+    return this._baseURL;
   }
 
   /**
