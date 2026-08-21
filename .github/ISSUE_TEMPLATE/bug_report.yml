@@ -1,0 +1,42 @@
+name: Bug report
+description: Something isn't working
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The exact request. Redact your API keys.
+      render: bash
+      placeholder: |
+        curl -X POST http://localhost:3000/api/extract-auto \
+          -H "X-API-Key: ***" -H "Content-Type: application/json" \
+          -d '{"url":"https://example.com","fields":["title"]}'
+    validations: { required: true }
+  - type: input
+    id: url
+    attributes:
+      label: Target URL
+      description: If the problem is site-specific, which site? This is usually the fastest route to a fix.
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or error
+      render: shell
+  - type: dropdown
+    id: path
+    attributes:
+      label: Which path
+      options: ["HTTP (fast path)", "Browser (Playwright)", "Not sure"]
+  - type: input
+    id: version
+    attributes:
+      label: Version and Node
+      placeholder: "commit sha or npm version, Node 20.11"
+    validations: { required: true }
