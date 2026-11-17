@@ -191,7 +191,7 @@ export const mapClearCacheSchema = z.object({
 export const searchRequestSchema = z.object({
   query: z.string().min(1).max(500),
   limit: z.number().int().positive().max(50).optional(),
-  provider: z.enum(['duckduckgo', 'searxng', 'serper']).optional(),
+  provider: z.enum(['duckduckgo', 'searxng', 'serper', 'specstream']).optional(),
   lang: z.string().max(10).optional(),
   // When true, scrape each result and attach markdown content.
   scrapeResults: z.boolean().optional(),

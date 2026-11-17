@@ -172,6 +172,11 @@ describe('searchWeb', () => {
     await expect(searchWeb('   ')).resolves.toEqual([]);
   });
 
+  it('throws when the \'specstream\' provider is selected but SPECSTREAM_API_KEY is unset', async () => {
+    delete process.env.SPECSTREAM_API_KEY;
+    await expect(searchWeb('typescript', { provider: 'specstream' })).rejects.toThrow(/SPECSTREAM_API_KEY/);
+  });
+
   it('throws when the \'searxng\' provider is selected but SEARXNG_URL is unset', async () => {
     delete process.env.SEARXNG_URL;
     await expect(searchWeb('typescript', { provider: 'searxng' })).rejects.toThrow(/SEARXNG_URL/);
@@ -202,8 +207,9 @@ describe('runSearch diagnostics (why a search came back empty)', () => {
     expect(hint).toMatch(/SEARXNG_URL/);
   });
 
-  it('gives provider-appropriate empty hints for searxng and serper', () => {
+  it('gives provider-appropriate empty hints for searxng, serper, and specstream', () => {
     expect(emptyResultHint('searxng')).toMatch(/SearXNG/);
     expect(emptyResultHint('serper')).toMatch(/Serper/);
+    expect(emptyResultHint('specstream')).toMatch(/SpecStream/);
   });
 });

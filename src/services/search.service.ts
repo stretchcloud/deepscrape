@@ -42,7 +42,7 @@ export interface SearchOptions {
   /** Maximum number of results to return (default {@link DEFAULT_LIMIT}). */
   limit?: number;
   /** Which search backend to use. Default: auto (serper if SERPER_API_KEY, else searxng if SEARXNG_URL, else duckduckgo). */
-  provider?: 'duckduckgo' | 'searxng' | 'serper';
+  provider?: 'duckduckgo' | 'searxng' | 'serper' | 'specstream';
   /**
    * Preferred result language/region. Mapped to DuckDuckGo's `kl` region param
    * (e.g. `us-en`) and to SearXNG's `language` param (e.g. `en`).
@@ -76,7 +76,7 @@ const DESKTOP_USER_AGENT =
 /** Result of a search, including which provider ran and — when empty — why. */
 export interface SearchOutcome {
   results: SearchResult[];
-  provider: 'duckduckgo' | 'searxng' | 'serper';
+  provider: 'duckduckgo' | 'searxng' | 'serper' | 'specstream';
   /**
    * Set when `results` is empty for a reason the caller can act on — e.g. the
    * keyless DuckDuckGo endpoint was anti-bot-challenged, or a provider request
@@ -118,6 +118,9 @@ export async function runSearch(query: string, opts: SearchOptions = {}): Promis
     case 'serper':
       raw = await fetchSerper(trimmedQuery, limit, opts);
       break;
+    case 'specstream':
+      raw = await fetchSpecStream(trimmedQuery, limit, opts);
+      break;
     case 'searxng':
       // NOTE: a missing SEARXNG_URL throws (config error); request failures do not.
       raw = await fetchSearxng(trimmedQuery, limit, opts);
@@ -147,7 +150,7 @@ export async function searchWeb(query: string, opts: SearchOptions = {}): Promis
  * DuckDuckGo path this is almost always an anti-bot challenge on server/datacenter
  * IPs rather than a genuine no-hit query.
  */
-export function emptyResultHint(provider: 'duckduckgo' | 'searxng' | 'serper'): string {
+export function emptyResultHint(provider: 'duckduckgo' | 'searxng' | 'serper' | 'specstream'): string {
   switch (provider) {
     case 'duckduckgo':
       return 'No results from the keyless DuckDuckGo endpoint. It anti-bot-challenges ' +
@@ -156,8 +159,11 @@ export function emptyResultHint(provider: 'duckduckgo' | 'searxng' | 'serper'): 
     case 'searxng':
       return 'No results from the configured SearXNG instance for this query.';
     case 'serper':
-    default:
       return 'No results from Serper for this query.';
+    case 'specstream':
+      return 'No results from SpecStream for this query.';
+    default:
+      return 'No results for this query.';
   }
 }
 
@@ -336,7 +342,8 @@ async function fetchDuckDuckGo(query: string, limit: number, opts: SearchOptions
  *         logged and yield `[]` instead of throwing.
  */
 /** Pick the most reliable configured provider when the caller didn't specify one. */
-function autoProvider(): 'serper' | 'searxng' | 'duckduckgo' {
+function autoProvider(): 'serper' | 'searxng' | 'duckduckgo' | 'specstream' {
+  if (process.env.SPECSTREAM_API_KEY && process.env.SPECSTREAM_API_KEY.trim()) return 'specstream';
   if (process.env.SERPER_API_KEY && process.env.SERPER_API_KEY.trim()) return 'serper';
   if (process.env.SEARXNG_URL && process.env.SEARXNG_URL.trim()) return 'searxng';
   return 'duckduckgo';
@@ -379,6 +386,46 @@ async function fetchSerper(query: string, limit: number, opts: SearchOptions): P
   } catch (error) {
     logger.warn('Serper search request failed', { query, error: (error as Error).message });
     return { results: [], reason: `Serper request failed: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * SpecStream — high-performance search API (specstream.ai). Set
+ * SPECSTREAM_API_KEY. POST https://api.specstream.ai/v1/web-search with {q, num}.
+ */
+async function fetchSpecStream(query: string, limit: number, opts: SearchOptions): Promise<ProviderResult> {
+  const apiKey = process.env.SPECSTREAM_API_KEY;
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error('searchWeb: provider \'specstream\' selected but SPECSTREAM_API_KEY is not set.');
+  }
+  try {
+    const body: Record<string, unknown> = { q: query, num: Math.min(limit, 100) };
+    if (opts.lang) body.gl = opts.lang;
+    const response = await axios.post('https://api.specstream.ai/v1/web-search', body, {
+      timeout: REQUEST_TIMEOUT_MS,
+      headers: { 'X-API-KEY': apiKey.trim(), 'Content-Type': 'application/json' },
+    });
+    const organic = (response.data as { organic?: unknown }).organic;
+    if (!Array.isArray(organic)) {
+      logger.warn('SpecStream response had no organic results array');
+      return { results: [] };
+    }
+    const results: SearchResult[] = [];
+    for (const r of organic) {
+      const item = r as { title?: string; link?: string; snippet?: string };
+      if (typeof item.link !== 'string') continue;
+      results.push({
+        title: (item.title ?? '').trim(),
+        url: item.link,
+        snippet: (item.snippet ?? '').trim(),
+        position: results.length + 1,
+      });
+      if (results.length >= limit) break;
+    }
+    return { results };
+  } catch (error) {
+    logger.warn('SpecStream search request failed', { query, error: (error as Error).message });
+    return { results: [], reason: `SpecStream request failed: ${(error as Error).message}` };
   }
 }
 
